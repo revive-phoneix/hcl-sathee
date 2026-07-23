@@ -1,4 +1,5 @@
-import { Search, Calendar, Download, RefreshCw } from "lucide-react";
+import { Search, Calendar, RefreshCw } from "lucide-react";
+import ExportDropdown from "../common/ExportDropdown";
 
 export default function AttendanceToolbar({
   search,
@@ -6,7 +7,8 @@ export default function AttendanceToolbar({
   activeTab,
   selectedDate,
   onDateChange,
-  onExport,
+  onExportXlsx,
+  onExportSvg,
   onRefresh,
   exporting = false,
 }) {
@@ -43,15 +45,11 @@ export default function AttendanceToolbar({
           </label>
         )}
 
-        <button
-          type="button"
-          onClick={onExport}
-          disabled={exporting}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-60"
-        >
-          <Download size={14} />
-          {exporting ? "Exporting…" : "Export"}
-        </button>
+        <ExportDropdown
+          exporting={exporting}
+          onExportXlsx={onExportXlsx}
+          onExportSvg={onExportSvg}
+        />
 
         <button
           type="button"

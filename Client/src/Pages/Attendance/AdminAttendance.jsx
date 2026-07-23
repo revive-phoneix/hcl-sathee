@@ -8,7 +8,10 @@ import SummaryCards from "../../Components/Attendance/SummaryCards";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import { fetchUsers } from "../../services/users";
 import { matchesPortalCentre } from "../../utils/portalMapping";
-import { downloadAttendancePdf } from "../../utils/exportAttendancePdf";
+import {
+  downloadAttendanceSvg,
+  downloadAttendanceXlsx,
+} from "../../utils/exportAttendance";
 
 const ATTENDANCE_BY_TAB = {
   daily: [
@@ -138,7 +141,7 @@ export default function AdminAttendance({
     loadMitras();
   }, []);
 
-  const handleExport = () => {
+  const runAttendanceExport = (format) => {
     if (isMitraTab) {
       alert("Export for Sathee Mitra attendance is not available yet");
       return;
@@ -146,16 +149,18 @@ export default function AdminAttendance({
 
     try {
       setExporting(true);
-      downloadAttendancePdf({
+      const payload = {
         records: filtered,
         columnLabel: COLUMN_LABEL[activeTab],
         activeTab,
         portalName,
         selectedDate: activeTab === "daily" ? selectedDate : null,
-      });
+      };
+      if (format === "xlsx") downloadAttendanceXlsx(payload);
+      else downloadAttendanceSvg(payload);
     } catch (error) {
-      console.error("Export attendance PDF error:", error);
-      alert("Unable to export attendance PDF right now");
+      console.error(`Export attendance ${format.toUpperCase()} error:`, error);
+      alert(`Unable to export attendance ${format.toUpperCase()} right now`);
     } finally {
       setExporting(false);
     }
@@ -187,7 +192,8 @@ export default function AdminAttendance({
             activeTab={activeTab}
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
-            onExport={handleExport}
+            onExportXlsx={() => runAttendanceExport("xlsx")}
+            onExportSvg={() => runAttendanceExport("svg")}
             onRefresh={() => {
               setSearch("");
               setSelectedDate(toInputDate());

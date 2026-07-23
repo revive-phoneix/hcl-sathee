@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import ExportDropdown from '../common/ExportDropdown'
+import { downloadTableSvg, downloadTableXlsx } from '../../utils/exportTable'
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -127,6 +129,7 @@ export default function Schedule({ isOpen, onClose }) {
   const [faculty, setFaculty] = useState('All Faculty')
   const [search, setSearch] = useState('')
   const [uploadedFile, setUploadedFile] = useState(null)
+  const [exporting, setExporting] = useState(false)
   const backdropRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -165,6 +168,37 @@ export default function Schedule({ isOpen, onClose }) {
     const file = e.target.files?.[0] || null
     setUploadedFile(file)
     e.target.value = ''
+  }
+
+  const runScheduleExport = (format) => {
+    try {
+      setExporting(true)
+      const headers = ['Topic', 'Days', 'Start', 'End', 'Faculty', 'Completion (%)', 'Status']
+      const exportRows = rows.map((r) => [
+        r.topic,
+        r.days,
+        r.start,
+        r.end,
+        r.faculty,
+        r.completion,
+        r.status,
+      ])
+      const filename = `schedule-${subject}-${month}`.toLowerCase().replace(/\s+/g, '-')
+      const payload = {
+        headers,
+        rows: exportRows,
+        filename,
+        title: `Teaching Schedule · ${subject} · ${month}`,
+        sheetName: 'Schedule',
+      }
+      if (format === 'xlsx') downloadTableXlsx(payload)
+      else downloadTableSvg(payload)
+    } catch (error) {
+      console.error(`Export schedule ${format.toUpperCase()} error:`, error)
+      alert(`Unable to export schedule ${format.toUpperCase()} right now`)
+    } finally {
+      setExporting(false)
+    }
   }
 
   return (
@@ -385,13 +419,12 @@ export default function Schedule({ isOpen, onClose }) {
           >
             Close
           </button>
-          <button className="px-5 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 active:scale-95 transition-all shadow-sm flex items-center gap-2">
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M7 1v8M4 6l3 3 3-3" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              <path d="M1 10v1.5A1.5 1.5 0 002.5 13h9A1.5 1.5 0 0013 11.5V10" stroke="white" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            Export Schedule
-          </button>
+          <ExportDropdown
+            exporting={exporting}
+            onExportXlsx={() => runScheduleExport('xlsx')}
+            onExportSvg={() => runScheduleExport('svg')}
+            label="Export Schedule"
+          />
         </div>
       </div>
     </div>
