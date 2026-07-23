@@ -1,63 +1,129 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import StudentsTab from "../../Components/Analytics/StudentsTab";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import TeachersTab from "../../Components/Analytics/TeachersTab";
 import MentorDetailsModal from "../../Components/Analytics/MentorDetailsModal";
 import { MainLayout } from "../../Components/MainLayout";
+import { fetchUsers } from "../../services/users";
+import { fetchMitraAttendance } from "../../services/mitraAttendance";
 
-const MENTORS = [
-  {
-    id: "M001",
-    name: "Dr. Priya Sharma",
-    qualification: "Ph.D. Physics",
-    subject: "Physics",
-    email: "priya.sharma@sathee.edu",
-    address: "New Delhi",
-    phone: "+91 98110 44321",
-    attendance: 98,
-    centre: "HCL Rajasthan",
-    experience: "12 years",
-    specialization: "Mechanics, Electrodynamics, Modern Physics",
-    joinDate: "Jan 2023",
-  },
-  {
-    id: "M002",
-    name: "Prof. Ankit Gupta",
-    qualification: "M.Sc. Mathematics",
-    subject: "Mathematics",
-    email: "ankit.gupta@sathee.edu",
-    address: "Noida",
-    phone: "+91 97420 33211",
-    attendance: 95,
-    centre: "HCL Madhya Pradesh",
-    experience: "9 years",
-    specialization: "Algebra, Calculus, Coordinate Geometry",
-    joinDate: "Mar 2024",
-  },
-  {
-    id: "M003",
-    name: "Ms. Sunita Rao",
-    qualification: "M.A. English",
-    subject: "English",
-    email: "sunita.rao@sathee.edu",
-    address: "Bengaluru",
-    phone: "+91 80992 11034",
-    attendance: 87,
-    centre: "HCL Jharkhand",
-    experience: "7 years",
-    specialization: "Grammar, Comprehension, Essay Writing",
-    joinDate: "Aug 2023",
-  },
-];
+const toInputDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const lastNDates = (n = 7) => {
+  const dates = [];
+  const today = new Date();
+  for (let i = 0; i < n; i += 1) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    dates.push(toInputDate(d));
+  }
+  return dates;
+};
+
+const formatJoinDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const mapUserToMentor = (user, attendanceRate) => ({
+  id: user.id,
+  name: user.name || "—",
+  qualification: "Sathee Mitra",
+  subject: "Sathee Mitra",
+  email: user.email || "—",
+  address: "—",
+  phone: user.phone || "—",
+  attendance: attendanceRate,
+  centre: user.centre || "—",
+  experience: "—",
+  specialization: "Sathee Mitra",
+  joinDate: formatJoinDate(user.created_at),
+  role: user.role,
+});
 
 export default function AdminAnalytics({ portalName, navItems, activeNav, onNavChange }) {
   const [activeTab, setActiveTab] = useState("students");
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [mentorModalOpen, setMentorModalOpen] = useState(false);
+  const [mentors, setMentors] = useState([]);
+  const [loadingMentors, setLoadingMentors] = useState(false);
+  const [mentorsError, setMentorsError] = useState("");
 
-  const filteredMentors = MENTORS.filter((mentor) =>
-    matchesPortalCentre(mentor.centre, portalName)
-  );
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadMentors = async () => {
+      setLoadingMentors(true);
+      setMentorsError("");
+
+      try {
+        const [users, attendanceByDate] = await Promise.all([
+          fetchUsers(),
+          Promise.all(
+            lastNDates(7).map(async (date) => {
+              try {
+                const records = await fetchMitraAttendance(date);
+                return Array.isArray(records) ? records : [];
+              } catch {
+                return [];
+              }
+            })
+          ),
+        ]);
+
+        if (!isMounted) return;
+
+        const presentDaysByUser = new Map();
+        for (const dayRecords of attendanceByDate) {
+          for (const record of dayRecords) {
+            const key = String(record.userId);
+            const present = Boolean(record.arrivalTime || record.arrivalPhotoUrl);
+            if (!present) continue;
+            presentDaysByUser.set(key, (presentDaysByUser.get(key) || 0) + 1);
+          }
+        }
+
+        const mapped = (Array.isArray(users) ? users : [])
+          .filter(
+            (user) =>
+              String(user.role || "").toUpperCase() === "SATHEE MITRA" &&
+              matchesPortalCentre(user.centre, portalName)
+          )
+          .map((user) => {
+            const presentDays = presentDaysByUser.get(String(user.id)) || 0;
+            const attendanceRate = Math.round((presentDays / 7) * 100);
+            return mapUserToMentor(user, attendanceRate);
+          });
+
+        setMentors(mapped);
+      } catch (error) {
+        console.error("Analytics mentors error:", error);
+        if (!isMounted) return;
+        setMentorsError("Unable to load mentors");
+        setMentors([]);
+      } finally {
+        if (isMounted) setLoadingMentors(false);
+      }
+    };
+
+    loadMentors();
+    return () => {
+      isMounted = false;
+    };
+  }, [portalName]);
+
+  const filteredMentors = useMemo(() => mentors, [mentors]);
 
   return (
     <MainLayout
@@ -105,6 +171,8 @@ export default function AdminAnalytics({ portalName, navItems, activeNav, onNavC
         ) : (
           <TeachersTab
             mentors={filteredMentors}
+            loading={loadingMentors}
+            error={mentorsError}
             onViewMentor={(mentor) => {
               setSelectedMentor(mentor);
               setMentorModalOpen(true);
