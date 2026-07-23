@@ -71,3 +71,74 @@ export const getStudentProgressRates = (student) => {
 
   return scores;
 };
+
+export const getProgressColor = (progress) => {
+  if (progress >= 80) return "#15803D";
+  if (progress >= 60) return "#22C55E";
+  if (progress >= 40) return "#FACC15";
+  if (progress >= 25) return "#F97316";
+  return "#EF4444";
+};
+
+const EXAM_BATCHES = [
+  { key: "JEE", exam: "JEE Exams" },
+  { key: "NEET", exam: "NEET" },
+  { key: "SSC", exam: "SSC" },
+  { key: "CLAT", exam: "CLAT" },
+  { key: "IBPS", exam: "IBPS" },
+  { key: "ICAR", exam: "ICAR" },
+  { key: "CUET", exam: "CUET" },
+  { key: "RRB", exam: "RRB" },
+];
+
+const normalizeCourseKey = (course = "") => {
+  const normalized = String(course)
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+
+  if (normalized.includes("JEE")) return "JEE";
+  if (normalized.includes("NEET")) return "NEET";
+  if (normalized.includes("SSC")) return "SSC";
+  if (normalized.includes("CLAT")) return "CLAT";
+  if (normalized.includes("IBPS") || normalized.includes("IPBS")) return "IBPS";
+  if (normalized.includes("ICAR")) return "ICAR";
+  if (normalized.includes("CUET")) return "CUET";
+  if (normalized.includes("RRB")) return "RRB";
+  return normalized;
+};
+
+/** Always returns every exam batch; empty courses stay at 0% with noStudents. */
+export const getCourseExamProgress = (students = []) => {
+  const byCourse = new Map(EXAM_BATCHES.map((batch) => [batch.key, []]));
+
+  for (const student of students) {
+    const key = normalizeCourseKey(student.course);
+    if (!byCourse.has(key)) continue;
+    byCourse.get(key).push(student);
+  }
+
+  return EXAM_BATCHES.map((batch) => {
+    const courseStudents = byCourse.get(batch.key) || [];
+    if (!courseStudents.length) {
+      return {
+        exam: batch.exam,
+        progress: 0,
+        color: "#94A3B8",
+        noStudents: true,
+        studentCount: 0,
+      };
+    }
+
+    const scores = courseStudents.flatMap(getStudentProgressRates);
+    const progress = average(scores);
+    const rounded = progress == null ? 0 : Math.round(progress);
+
+    return {
+      exam: batch.exam,
+      progress: rounded,
+      color: getProgressColor(rounded),
+      noStudents: false,
+      studentCount: courseStudents.length,
+    };
+  });
+};

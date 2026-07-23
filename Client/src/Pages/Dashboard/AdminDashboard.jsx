@@ -73,6 +73,7 @@ export default function AdminDashboard({
       activeToday,
       attendanceAvg: average(attendanceRates),
       progressAvg: average(progressRates),
+      centreStudents,
     };
   }, [students, portalName]);
 
@@ -136,7 +137,7 @@ export default function AdminDashboard({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AttendanceChart />
-          <ExamProgress />
+          <ExamProgress students={stats.centreStudents} loading={loadingStats} />
         </div>
 
         <div className="h-8" />
