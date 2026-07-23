@@ -65,6 +65,15 @@ const AppContent = () => {
     if (path) navigate(path);
   };
 
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    setUserName("");
+    setUserCentre(null);
+    setUserRole("");
+    setSelectedPortal("");
+    navigate("/", { replace: true });
+  };
+
   // Invite link must work without login
   if (location.pathname === "/create-password") {
     return <CreatePassword />;
@@ -117,6 +126,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />
@@ -129,6 +139,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />
@@ -141,6 +152,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />
@@ -153,6 +165,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />
@@ -165,6 +178,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />
@@ -178,6 +192,7 @@ const AppContent = () => {
             navItems={navItems}
             activeNav={activeNav}
             onNavChange={handleNavChange}
+            onLogout={handleLogout}
           />
         }
       />

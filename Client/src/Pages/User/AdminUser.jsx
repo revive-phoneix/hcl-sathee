@@ -37,7 +37,7 @@ const normalizeUser = (user) => ({
   avatar: getAvatar(user.name),
 });
 
-export default function AdminUser({ portalName, navItems, activeNav, onNavChange }) {
+export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout }) {
   const [activeFilter, setActiveFilter] = useState("All Users");
   const [search, setSearch] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -45,6 +45,8 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submittingUser, setSubmittingUser] = useState(false);
   const [usersError, setUsersError] = useState("");
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [deletingUser, setDeletingUser] = useState(false);
 
   const loadUsers = useCallback(async ({ showRefreshSpinner = false } = {}) => {
     if (showRefreshSpinner) {
@@ -118,15 +120,29 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
     }
   };
 
-  const handleDeleteUser = async (id) => {
+  const handleDeleteUser = (user) => {
+    setUsersError("");
+    setUserToDelete(user);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setDeletingUser(true);
+    setUsersError("");
+
     try {
-      await removeUser(id);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
+      await removeUser(userToDelete.id);
+      setUsers((prev) => prev.filter((u) => u.id !== userToDelete.id));
+      setUserToDelete(null);
     } catch (error) {
       console.error("Delete User Error:", error);
       setUsersError(
         error.response?.data?.message || "Unable to delete the user right now"
       );
+      setUserToDelete(null);
+    } finally {
+      setDeletingUser(false);
     }
   };
 
@@ -136,6 +152,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <div className="max-w-7xl mx-auto px-2 space-y-8">
         <div>
@@ -177,6 +194,36 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
           loading={loadingUsers}
         />
       </div>
+
+      {userToDelete ? (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-8 text-center shadow-xl">
+            <h3 className="text-xl font-bold text-slate-900">Delete User?</h3>
+            <p className="mt-3 text-sm text-slate-600">
+              Are you sure you want to delete the user{" "}
+              <strong className="text-slate-900">{userToDelete.name}</strong>?
+            </p>
+            <div className="mt-8 flex justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => setUserToDelete(null)}
+                disabled={deletingUser}
+                className="rounded-2xl border border-slate-200 px-6 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteUser}
+                disabled={deletingUser}
+                className="rounded-2xl bg-red-600 px-6 py-2.5 text-sm font-semibold text-white hover:bg-red-700 disabled:opacity-60"
+              >
+                {deletingUser ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </MainLayout>
   );
 }

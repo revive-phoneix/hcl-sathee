@@ -86,6 +86,7 @@ export default function AdminAttendance({
   navItems,
   activeNav,
   onNavChange,
+  onLogout,
 }) {
   const [activeTab, setActiveTab] = useState("daily");
   const [search, setSearch] = useState("");
@@ -172,6 +173,7 @@ export default function AdminAttendance({
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <div className="grid-cols-4 gap-6 w-full mx-auto px-6 space-y-8">
         <div className="mb-6">

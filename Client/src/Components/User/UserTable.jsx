@@ -100,7 +100,7 @@ const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser,
                 {/* Delete Button */}
                 <div>
                   <button
-                    onClick={() => onDeleteUser(user.id)}
+                    onClick={() => onDeleteUser(user)}
                     className="text-slate-400 hover:text-red-600 transition-colors p-1"
                     title="Delete user"
                   >

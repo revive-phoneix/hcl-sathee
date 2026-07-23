@@ -24,6 +24,7 @@ export default function AdminDashboard({
   navItems,
   activeNav,
   onNavChange,
+  onLogout,
 }) {
   const [students, setStudents] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -82,6 +83,7 @@ export default function AdminDashboard({
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <div className="max-w-7xl mx-auto space-y-8">
         <WelcomeBanner portalName={portalName} userName={userName} />

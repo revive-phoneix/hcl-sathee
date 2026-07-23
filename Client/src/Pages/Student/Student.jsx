@@ -10,7 +10,7 @@ import { fetchStudents, createStudent } from "../../services/students";
 
 const PAGE_SIZE = 8;
 
-export default function Student({ portalName, navItems, activeNav, onNavChange }) {
+export default function Student({ portalName, navItems, activeNav, onNavChange, onLogout }) {
   const [search, setSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("All Courses");
   const [showNewStudent, setShowNewStudent] = useState(false);
@@ -115,6 +115,7 @@ export default function Student({ portalName, navItems, activeNav, onNavChange }
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <div style={{ minHeight: "100vh", fontFamily: "Inter, sans-serif", background: "#f5f7fa", padding: "28px 28px 40px" }}>
         <div style={{ marginBottom: 24 }}>

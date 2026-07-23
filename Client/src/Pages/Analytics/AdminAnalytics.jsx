@@ -52,7 +52,7 @@ const mapUserToMentor = (user, attendanceRate) => ({
   role: user.role,
 });
 
-export default function AdminAnalytics({ portalName, navItems, activeNav, onNavChange }) {
+export default function AdminAnalytics({ portalName, navItems, activeNav, onNavChange, onLogout }) {
   const [activeTab, setActiveTab] = useState("students");
   const [selectedMentor, setSelectedMentor] = useState(null);
   const [mentorModalOpen, setMentorModalOpen] = useState(false);
@@ -131,6 +131,7 @@ export default function AdminAnalytics({ portalName, navItems, activeNav, onNavC
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <main
         className="min-h-screen overflow-y-auto p-8 bg-gray-50"

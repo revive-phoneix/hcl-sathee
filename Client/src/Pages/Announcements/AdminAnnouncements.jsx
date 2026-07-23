@@ -33,6 +33,7 @@ export default function AdminAnnouncements({
   navItems,
   activeNav,
   onNavChange,
+  onLogout,
 }) {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -175,6 +176,7 @@ export default function AdminAnnouncements({
       navItems={navItems}
       activeNav={activeNav}
       onNavChange={onNavChange}
+      onLogout={onLogout}
     >
       <div className="bg-white min-h-[calc(100vh-62px)]">
         <div className="bg-gradient-to-br from-sky-50 to-blue-50 border-b border-sky-100 px-9 py-7">

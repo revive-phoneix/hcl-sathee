@@ -2,7 +2,7 @@ import { useState } from "react";
 import { LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 import HCLLogo from "../assets/HCL.svg";
 
-export function MainLayout({ portalName, navItems, activeNav, onNavChange, children }) {
+export function MainLayout({ portalName, navItems, activeNav, onNavChange, onLogout, children }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -18,7 +18,11 @@ export function MainLayout({ portalName, navItems, activeNav, onNavChange, child
           </div>
         </div>
 
-        <button className="bg-[#3B82F6] hover:bg-blue-600 px-6 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors">
+        <button
+          type="button"
+          onClick={onLogout}
+          className="bg-[#3B82F6] hover:bg-blue-600 px-6 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors"
+        >
           <LogOut size={18} /> Logout
         </button>
       </header>
