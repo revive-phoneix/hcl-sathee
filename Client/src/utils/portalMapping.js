@@ -1,0 +1,64 @@
+const normalizeCentreValue = (value = "") =>
+  value
+    .toString()
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z]/g, "");
+
+const getCanonicalCentreKey = (value = "") => {
+  const normalized = normalizeCentreValue(value);
+
+  if (normalized.includes("RAJASTHAN") || normalized.includes("RAJATHAN")) return "HCLRAJASTHAN";
+  if (normalized.includes("JHARKHAND")) return "HCLJHARKHAND";
+  if (normalized.includes("MADHYAPRADESH")) return "HCLMADHYAPRADESH";
+
+  return normalized;
+};
+
+export const getCentreValueFromPortal = (portalName = "") => {
+  const normalizedPortal = normalizeCentreValue(portalName);
+
+  if (normalizedPortal.includes("RAJASTHAN") || normalizedPortal.includes("RAJATHAN")) return "HCL RAJASTHAN";
+  if (normalizedPortal.includes("JHARKHAND")) return "HCL JHARKHAND";
+  if (normalizedPortal.includes("MADHYAPRADESH")) return "HCL MADHYA PRADESH";
+
+  return null;
+};
+
+export const matchesPortalCentre = (centreValue, portalName = "") => {
+  const targetCentre = getCentreValueFromPortal(portalName);
+
+  if (!targetCentre) return true;
+
+  return getCanonicalCentreKey(centreValue) === getCanonicalCentreKey(targetCentre);
+};
+
+export const canAccessPortal = (userCentre, portalName = "", userRole = "") => {
+  const role = String(userRole || "").trim().toUpperCase();
+
+  if (role === "ADMIN") return true;
+  if (!userCentre) return false;
+
+  return matchesPortalCentre(userCentre, portalName);
+};
+
+export const isAdminRole = (userRole = "") =>
+  String(userRole || "").trim().toUpperCase() === "ADMIN";
+
+/** Only ADMIN may enter the current admin dashboard pages. */
+export const canEnterAdminDashboard = (userRole = "") => isAdminRole(userRole);
+
+export const PORTAL_OPTIONS = [
+  {
+    title: "HCL SATHEE RAJASTHAN",
+    subtitle: "Rajasthan Learning Portal",
+  },
+  {
+    title: "HCL SATHEE JHARKHAND",
+    subtitle: "Jharkhand Learning Portal",
+  },
+  {
+    title: "HCL SATHEE MADHYA PRADESH",
+    subtitle: "Madhya Pradesh Learning Portal",
+  },
+];

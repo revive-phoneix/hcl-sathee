@@ -1,0 +1,13 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+**/firebase-service-account.json
+**/*-firebase-adminsdk-*.jsonnode_modules/
+dist/
+.env
+.env.*
+!.env.example
+**/firebase-service-account.json
+**/*-firebase-adminsdk-*.json
