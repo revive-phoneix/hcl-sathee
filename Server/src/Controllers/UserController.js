@@ -46,7 +46,7 @@ exports.getUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
   try {
-    const { name, email, phone, role, centre } = req.body;
+    const { name, email, phone, role, centre, availableDays } = req.body;
 
     if (!name || !email || !phone || !role) {
       return res.status(400).json({
@@ -64,6 +64,7 @@ exports.addUser = async (req, res) => {
 
     const normalizedEmail = email.trim().toLowerCase();
     const normalizedCentre = centre?.trim() || null;
+    const normalizedDays = User.normalizeAvailableDays(availableDays);
 
     if (!normalizedCentre) {
       return res.status(400).json({
@@ -76,6 +77,13 @@ exports.addUser = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Invalid centre selected",
+      });
+    }
+
+    if (String(role).toUpperCase() === "SATHEE MITRA" && normalizedDays.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Select at least one available day for Sathee Mitra",
       });
     }
 
@@ -101,6 +109,8 @@ exports.addUser = async (req, res) => {
       phone: phone.trim(),
       role,
       centre: normalizedCentre,
+      availableDays:
+        String(role).toUpperCase() === "SATHEE MITRA" ? normalizedDays : [],
       password: null,
     });
 
@@ -122,6 +132,66 @@ exports.addUser = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Failed to create user",
+    });
+  }
+};
+
+exports.updateUser = async (req, res) => {
+  try {
+    const { availableDays, name, phone, centre } = req.body;
+    const existing = await User.findById(req.params.id);
+
+    if (!existing) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+
+    const patch = {};
+
+    if (name != null) patch.name = String(name).trim();
+    if (phone != null) patch.phone = String(phone).trim();
+    if (centre != null) {
+      const normalizedCentre = String(centre).trim();
+      if (!VALID_CENTRES.includes(normalizedCentre)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid centre selected",
+        });
+      }
+      patch.centre = normalizedCentre;
+    }
+
+    if (availableDays != null) {
+      const normalizedDays = User.normalizeAvailableDays(availableDays);
+      if (
+        String(existing.role || "").toUpperCase() === "SATHEE MITRA" &&
+        normalizedDays.length === 0
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Select at least one available day for Sathee Mitra",
+        });
+      }
+      patch.availableDays = normalizedDays;
+    }
+
+    if (!Object.keys(patch).length) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid fields to update",
+      });
+    }
+
+    const updated = await User.update(req.params.id, patch);
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully",
+      user: toPublicUser(updated),
+    });
+  } catch (error) {
+    console.error("Update User Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update user",
     });
   }
 };

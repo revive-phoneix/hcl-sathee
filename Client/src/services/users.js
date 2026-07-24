@@ -10,6 +10,11 @@ export const createUser = async (payload) => {
   return response.data.user;
 };
 
+export const updateUser = async (id, payload) => {
+  const response = await api.patch(`/api/users/${id}`, payload);
+  return response.data.user;
+};
+
 export const removeUser = async (id) => {
   await api.delete(`/api/users/${id}`);
 };

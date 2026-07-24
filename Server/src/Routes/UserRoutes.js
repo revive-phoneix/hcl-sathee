@@ -2,6 +2,7 @@ const express = require("express");
 const {
   getUsers,
   addUser,
+  updateUser,
   deleteUser,
 } = require("../Controllers/UserController");
 const {
@@ -15,9 +16,10 @@ const router = express.Router();
 router.use(authenticate);
 
 // Partners may list Sathee Mitra in their centre (for attendance view).
-// Create/delete remain admin-only.
+// Create/update/delete remain admin-only.
 router.get("/", requireAdminOrPartner, getUsers);
 router.post("/", requireAdmin, addUser);
+router.patch("/:id", requireAdmin, updateUser);
 router.delete("/:id", requireAdmin, deleteUser);
 
 module.exports = router;

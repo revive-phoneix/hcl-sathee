@@ -49,6 +49,7 @@ const mapUserToMentor = (user, attendanceRate) => ({
   experience: "—",
   specialization: "Sathee Mitra",
   joinDate: formatJoinDate(user.created_at),
+  availableDays: Array.isArray(user.availableDays) ? user.availableDays : [],
   role: user.role,
 });
 
@@ -195,6 +196,14 @@ export default function AdminAnalytics({
           open={mentorModalOpen}
           readOnly={readOnly}
           onClose={() => setMentorModalOpen(false)}
+          onUpdated={(updatedMentor) => {
+            setSelectedMentor(updatedMentor);
+            setMentors((prev) =>
+              prev.map((m) =>
+                String(m.id) === String(updatedMentor.id) ? updatedMentor : m
+              )
+            );
+          }}
         />
       </main>
     </MainLayout>

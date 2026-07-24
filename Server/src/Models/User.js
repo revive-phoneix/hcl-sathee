@@ -11,6 +11,35 @@ const toDate = (value) => {
   return new Date(value);
 };
 
+const WEEKDAYS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const normalizeAvailableDays = (value) => {
+  if (!Array.isArray(value)) return [];
+  const allowed = new Set(WEEKDAYS.map((d) => d.toLowerCase()));
+  const seen = new Set();
+  const days = [];
+
+  for (const entry of value) {
+    const raw = String(entry || "").trim();
+    if (!raw) continue;
+    const key = raw.toLowerCase();
+    if (!allowed.has(key) || seen.has(key)) continue;
+    seen.add(key);
+    const match = WEEKDAYS.find((d) => d.toLowerCase() === key);
+    if (match) days.push(match);
+  }
+
+  return WEEKDAYS.filter((day) => days.includes(day));
+};
+
 const toApiUser = (docId, data) => ({
   id: Number(docId) || docId,
   name: data.name,
@@ -19,6 +48,7 @@ const toApiUser = (docId, data) => ({
   phone: data.phone ?? null,
   role: data.role,
   centre: data.centre ?? null,
+  availableDays: normalizeAvailableDays(data.availableDays),
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
 });
@@ -90,6 +120,7 @@ const create = async (data) => {
     password: data.password == null ? null : String(data.password),
     role: data.role,
     centre: data.centre ?? null,
+    availableDays: normalizeAvailableDays(data.availableDays),
     created_at: now,
     updated_at: now,
   };
@@ -103,6 +134,9 @@ const update = async (id, data) => {
   if (!ref) return null;
 
   const updated = { ...data, updated_at: new Date() };
+  if (Object.prototype.hasOwnProperty.call(data, "availableDays")) {
+    updated.availableDays = normalizeAvailableDays(data.availableDays);
+  }
   await ref.update(updated);
   const doc = await ref.get();
   return toApiUser(doc.id, doc.data());
@@ -126,6 +160,7 @@ const importFromMysql = async (row) => {
     phone: row.phone ?? null,
     role: row.role,
     centre: row.centre ?? null,
+    availableDays: normalizeAvailableDays(row.availableDays),
     created_at: toDate(row.created_at) || new Date(),
     updated_at: toDate(row.updated_at) || new Date(),
   };
@@ -135,6 +170,8 @@ const importFromMysql = async (row) => {
 };
 
 module.exports = {
+  WEEKDAYS,
+  normalizeAvailableDays,
   findAll,
   findByEmail,
   findById,

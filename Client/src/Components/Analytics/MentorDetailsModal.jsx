@@ -1,19 +1,69 @@
 import { useEffect, useState } from "react";
+import { updateUser } from "../../services/users";
+import { WEEKDAYS, formatAvailableDays } from "../../utils/availableDays";
 
-export default function MentorDetailsModal({ mentor, open, onClose, readOnly = false }) {
+export default function MentorDetailsModal({
+  mentor,
+  open,
+  onClose,
+  readOnly = false,
+  onUpdated,
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(mentor || {});
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     setFormData(mentor || {});
     setIsEditing(false);
+    setError("");
   }, [mentor, open]);
 
   if (!open || !mentor) return null;
 
-  const handleSave = () => {
-    console.log("Saving mentor details:", formData);
-    setIsEditing(false);
+  const toggleDay = (day) => {
+    setFormData((prev) => {
+      const current = Array.isArray(prev.availableDays) ? prev.availableDays : [];
+      const has = current.includes(day);
+      return {
+        ...prev,
+        availableDays: has
+          ? current.filter((d) => d !== day)
+          : [...current, day],
+      };
+    });
+  };
+
+  const handleSave = async () => {
+    const days = Array.isArray(formData.availableDays)
+      ? formData.availableDays
+      : [];
+
+    if (days.length === 0) {
+      setError("Select at least one available day");
+      return;
+    }
+
+    setSaving(true);
+    setError("");
+    try {
+      const updated = await updateUser(mentor.id, {
+        availableDays: days,
+        phone: formData.phone || mentor.phone,
+      });
+      onUpdated?.({
+        ...mentor,
+        availableDays: updated.availableDays || days,
+        phone: updated.phone || formData.phone,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Update mentor error:", err);
+      setError(err.response?.data?.message || "Unable to save mentor details");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleChange = (e, field) => {
@@ -27,6 +77,10 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
       .filter(Boolean)
       .pop()?.[0]
       ?.toUpperCase() || "?";
+
+  const displayDays = isEditing
+    ? formData.availableDays
+    : mentor.availableDays;
 
   return (
     <div
@@ -126,21 +180,7 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
                 Contact & Location
               </h3>
               <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Email:</strong>{" "}
-                {isEditing ? (
-                  <input
-                    value={formData.email || ""}
-                    onChange={(e) => handleChange(e, "email")}
-                    style={{
-                      width: "100%",
-                      padding: "6px",
-                      borderRadius: 4,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                ) : (
-                  mentor.email || "—"
-                )}
+                <strong>Email:</strong> {mentor.email || "—"}
               </p>
 
               <p style={{ color: "#1f2937", marginBottom: 8 }}>
@@ -166,21 +206,7 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
               </p>
 
               <p style={{ color: "#1f2937" }}>
-                <strong>Address:</strong>{" "}
-                {isEditing ? (
-                  <input
-                    value={formData.address || ""}
-                    onChange={(e) => handleChange(e, "address")}
-                    style={{
-                      width: "100%",
-                      padding: "6px",
-                      borderRadius: 4,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                ) : (
-                  mentor.address || "—"
-                )}
+                <strong>Address:</strong> {mentor.address || "—"}
               </p>
             </div>
 
@@ -203,34 +229,77 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
                 <strong>Attendance (7d):</strong>{" "}
                 {mentor.attendance == null ? "—" : `${mentor.attendance}%`}
               </p>
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Experience:</strong>{" "}
+              <div style={{ color: "#1f2937", marginBottom: 8 }}>
+                <strong>Days Available:</strong>
                 {isEditing ? (
-                  <input
-                    value={formData.experience || ""}
-                    onChange={(e) => handleChange(e, "experience")}
+                  <div
                     style={{
-                      width: "100%",
-                      padding: "6px",
-                      borderRadius: 4,
-                      border: "1px solid #d1d5db",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      marginTop: 8,
                     }}
-                  />
+                  >
+                    {WEEKDAYS.map((day) => {
+                      const selected = (formData.availableDays || []).includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleDay(day)}
+                          style={{
+                            padding: "6px 10px",
+                            borderRadius: 8,
+                            border: selected
+                              ? "1px solid #059669"
+                              : "1px solid #e5e7eb",
+                            background: selected ? "#059669" : "#fff",
+                            color: selected ? "#fff" : "#374151",
+                            fontSize: 12,
+                            fontWeight: 600,
+                            cursor: "pointer",
+                          }}
+                        >
+                          {day.slice(0, 3)}
+                        </button>
+                      );
+                    })}
+                  </div>
                 ) : (
-                  mentor.experience || "—"
+                  <span style={{ marginLeft: 6 }}>
+                    {formatAvailableDays(displayDays)}
+                  </span>
                 )}
-              </p>
-              <p style={{ color: "#1f2937" }}>
-                <strong>Join Date:</strong> {mentor.joinDate || "—"}
-              </p>
+              </div>
             </div>
           </div>
+
+          {error ? (
+            <p
+              style={{
+                marginTop: 16,
+                color: "#b91c1c",
+                background: "#fef2f2",
+                border: "1px solid #fecaca",
+                borderRadius: 8,
+                padding: "10px 12px",
+                fontSize: 13,
+              }}
+            >
+              {error}
+            </p>
+          ) : null}
 
           <div style={{ textAlign: "center", marginTop: 32 }}>
             {!readOnly ? (
               <>
                 <button
-                  onClick={() => setIsEditing(!isEditing)}
+                  onClick={() => {
+                    setIsEditing(!isEditing);
+                    setError("");
+                    setFormData(mentor || {});
+                  }}
+                  disabled={saving}
                   style={{
                     background: isEditing ? "#ef4444" : "#1e40af",
                     color: "#fff",
@@ -241,12 +310,13 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
                     cursor: "pointer",
                   }}
                 >
-                  {isEditing ? "Cancel" : "Add / Edit Details"}
+                  {isEditing ? "Cancel" : "Edit Days Available"}
                 </button>
 
                 {isEditing && (
                   <button
                     onClick={handleSave}
+                    disabled={saving}
                     style={{
                       background: "#10b981",
                       color: "#fff",
@@ -258,7 +328,7 @@ export default function MentorDetailsModal({ mentor, open, onClose, readOnly = f
                       cursor: "pointer",
                     }}
                   >
-                    Save Changes
+                    {saving ? "Saving..." : "Save Changes"}
                   </button>
                 )}
               </>

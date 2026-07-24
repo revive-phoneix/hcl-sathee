@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
+import { WEEKDAYS } from "../../utils/availableDays";
 
 export default function NewUser({ onClose, onAddUser, submittingUser, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
@@ -12,9 +13,22 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
     role: "ADMIN",
     designation: "",
     centre: defaultCentre,
+    availableDays: [],
   });
 
   const [error, setError] = useState("");
+
+  const toggleDay = (day) => {
+    setForm((prev) => {
+      const has = prev.availableDays.includes(day);
+      return {
+        ...prev,
+        availableDays: has
+          ? prev.availableDays.filter((d) => d !== day)
+          : [...prev.availableDays, day],
+      };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -33,12 +47,22 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
       return;
     }
 
+    if (
+      form.role === "SATHEE MITRA" &&
+      (!form.availableDays || form.availableDays.length === 0)
+    ) {
+      setError("Select at least one available day for Sathee Mitra");
+      return;
+    }
+
     setError("");
 
     try {
       const payload = {
         ...form,
         centre: form.centre || defaultCentre,
+        availableDays:
+          form.role === "SATHEE MITRA" ? form.availableDays : [],
       };
 
       await onAddUser(payload);
@@ -50,7 +74,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b bg-slate-50">
           <h2 className="text-lg font-semibold text-slate-900">Add New User</h2>
           <button
@@ -61,10 +84,8 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="space-y-5 text-black">
-            {/* Name */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Name
@@ -79,7 +100,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
               />
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Email Address
@@ -94,7 +114,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
               />
             </div>
 
-            {/* Phone */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Phone Number
@@ -109,7 +128,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
               />
             </div>
 
-            {/* Role */}
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1.5">
                 Role
@@ -121,6 +139,8 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                     ...prev,
                     role: e.target.value,
                     centre: prev.centre || defaultCentre,
+                    availableDays:
+                      e.target.value === "SATHEE MITRA" ? prev.availableDays : [],
                   }))
                 }
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -131,6 +151,35 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
               </select>
             </div>
 
+            {form.role === "SATHEE MITRA" ? (
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Days Available
+                </label>
+                <p className="text-xs text-slate-400 mb-2">
+                  Select days this Sathee Vishist / Mitra is available
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {WEEKDAYS.map((day) => {
+                    const selected = form.availableDays.includes(day);
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => toggleDay(day)}
+                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                          selected
+                            ? "bg-emerald-600 text-white border-emerald-600"
+                            : "bg-white text-slate-600 border-slate-200 hover:border-emerald-300"
+                        }`}
+                      >
+                        {day.slice(0, 3)}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
 
           {error && (
@@ -139,7 +188,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
             </p>
           )}
 
-          {/* Footer Actions */}
           <div className="flex gap-3 pt-4 border-t">
             <button
               type="button"
