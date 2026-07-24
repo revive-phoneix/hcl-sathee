@@ -4,11 +4,20 @@ const {
   addUser,
   deleteUser,
 } = require("../Controllers/UserController");
+const {
+  authenticate,
+  requireAdminOrPartner,
+  requireAdmin,
+} = require("../Middleware/auth");
 
 const router = express.Router();
 
-router.get("/", getUsers);
-router.post("/", addUser);
-router.delete("/:id", deleteUser);
+router.use(authenticate);
+
+// Partners may list Sathee Mitra in their centre (for attendance view).
+// Create/delete remain admin-only.
+router.get("/", requireAdminOrPartner, getUsers);
+router.post("/", requireAdmin, addUser);
+router.delete("/:id", requireAdmin, deleteUser);
 
 module.exports = router;

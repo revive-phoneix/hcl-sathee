@@ -34,6 +34,8 @@ export default function AdminAnnouncements({
   activeNav,
   onNavChange,
   onLogout,
+  readOnly = false,
+  roleLabel = "Admin Portal",
 }) {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -177,6 +179,7 @@ export default function AdminAnnouncements({
       activeNav={activeNav}
       onNavChange={onNavChange}
       onLogout={onLogout}
+      roleLabel={roleLabel}
     >
       <div className="bg-white min-h-[calc(100vh-62px)]">
         <div className="bg-gradient-to-br from-sky-50 to-blue-50 border-b border-sky-100 px-9 py-7">
@@ -190,20 +193,24 @@ export default function AdminAnnouncements({
                   Announcements
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  Manage announcements for students and faculty
+                  {readOnly
+                    ? "View announcements for students and faculty"
+                    : "Manage announcements for students and faculty"}
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={() => {
-                setEditId(null);
-                setShowModal(true);
-              }}
-              className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95"
-            >
-              <span className="text-lg">+</span> New Announcement
-            </button>
+            {!readOnly ? (
+              <button
+                onClick={() => {
+                  setEditId(null);
+                  setShowModal(true);
+                }}
+                className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-sky-500 to-blue-600 text-white rounded-2xl font-semibold shadow-lg hover:shadow-xl transition-all active:scale-95"
+              >
+                <span className="text-lg">+</span> New Announcement
+              </button>
+            ) : null}
           </div>
         </div>
 
@@ -244,7 +251,9 @@ export default function AdminAnnouncements({
                 No announcements found
               </h3>
               <p className="text-slate-500 mt-2">
-                Add a new announcement to get started
+                {readOnly
+                  ? "No announcements available for this centre."
+                  : "Add a new announcement to get started"}
               </p>
             </div>
           ) : (
@@ -253,6 +262,7 @@ export default function AdminAnnouncements({
                 <AnnouncementCard
                   key={ann.id}
                   announcement={ann}
+                  readOnly={readOnly}
                   onEdit={(id) => {
                     setEditId(id);
                     setShowModal(true);
@@ -265,7 +275,7 @@ export default function AdminAnnouncements({
           )}
         </div>
 
-        {showModal && (
+        {!readOnly && showModal ? (
           <NewAnnouncementModal
             onClose={() => {
               if (submitting) return;
@@ -279,9 +289,9 @@ export default function AdminAnnouncements({
               editId ? centreAnnouncements.find((a) => a.id === editId) : null
             }
           />
-        )}
+        ) : null}
 
-        {deleteConfirmId && (
+        {!readOnly && deleteConfirmId ? (
           <ConfirmDeleteModal
             title={
               centreAnnouncements.find((a) => a.id === deleteConfirmId)?.title ||
@@ -290,7 +300,7 @@ export default function AdminAnnouncements({
             onCancel={() => setDeleteConfirmId(null)}
             onConfirm={() => handleDelete(deleteConfirmId)}
           />
-        )}
+        ) : null}
 
         {viewId && (
           <ViewModal

@@ -5,9 +5,14 @@ const {
   addSubjectPerformance,
   addSubjectAttendance,
 } = require("../Controllers/StudentPerformanceController");
+const {
+  authenticate,
+  requireAdminOrPartner,
+  requireAdmin,
+} = require("../Middleware/auth");
 
-router.get("/", getStudentsWithPerformance);
-router.post("/performance", addSubjectPerformance);
-router.post("/attendance", addSubjectAttendance);
+router.get("/", authenticate, requireAdminOrPartner, getStudentsWithPerformance);
+router.post("/performance", authenticate, requireAdmin, addSubjectPerformance);
+router.post("/attendance", authenticate, requireAdmin, addSubjectAttendance);
 
 module.exports = router;

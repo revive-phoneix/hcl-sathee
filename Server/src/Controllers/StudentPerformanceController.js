@@ -1,6 +1,7 @@
 const Student = require("../Models/Student");
 const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
+const { filterByUserCentre } = require("../Utils/centreMatch");
 
 const groupByStudentId = (rows) => {
   const map = new Map();
@@ -12,9 +13,9 @@ const groupByStudentId = (rows) => {
   return map;
 };
 
-exports.getStudentsWithPerformance = async (_req, res) => {
+exports.getStudentsWithPerformance = async (req, res) => {
   try {
-    const students = await Student.findAll();
+    const students = filterByUserCentre(await Student.findAll(), req.user);
 
     const [performances, attendances] = await Promise.all([
       SubjectPerformance.findAll(),

@@ -25,6 +25,10 @@ export default function AdminDashboard({
   activeNav,
   onNavChange,
   onLogout,
+  readOnly = false,
+  roleLabel = "Admin Portal",
+  studentsNavIndex = 4,
+  attendanceNavIndex = 1,
 }) {
   const [students, setStudents] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -85,13 +89,15 @@ export default function AdminDashboard({
       activeNav={activeNav}
       onNavChange={onNavChange}
       onLogout={onLogout}
+      roleLabel={roleLabel}
     >
       <div className="max-w-7xl mx-auto space-y-8">
         <WelcomeBanner portalName={portalName} userName={userName} />
 
         <QuickActions
-          onViewStudents={() => onNavChange(4)}
-          onViewAttendance={() => onNavChange(1)}
+          readOnly={readOnly}
+          onViewStudents={() => onNavChange(studentsNavIndex)}
+          onViewAttendance={() => onNavChange(attendanceNavIndex)}
         />
 
         {statsError && (

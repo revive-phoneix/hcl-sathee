@@ -10,7 +10,15 @@ import { fetchStudents, createStudent } from "../../services/students";
 
 const PAGE_SIZE = 8;
 
-export default function Student({ portalName, navItems, activeNav, onNavChange, onLogout }) {
+export default function Student({
+  portalName,
+  navItems,
+  activeNav,
+  onNavChange,
+  onLogout,
+  readOnly = false,
+  roleLabel = "Admin Portal",
+}) {
   const [search, setSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("All Courses");
   const [showNewStudent, setShowNewStudent] = useState(false);
@@ -116,12 +124,15 @@ export default function Student({ portalName, navItems, activeNav, onNavChange, 
       activeNav={activeNav}
       onNavChange={onNavChange}
       onLogout={onLogout}
+      roleLabel={roleLabel}
     >
       <div style={{ minHeight: "100vh", fontFamily: "Inter, sans-serif", background: "#f5f7fa", padding: "28px 28px 40px" }}>
         <div style={{ marginBottom: 24 }}>
           <h1 style={{ fontSize: 22, fontWeight: 700, color: "#1a1f2e", margin: 0 }}>Students</h1>
           <p style={{ fontSize: 14, color: "#64748b", marginTop: 4 }}>
-            Manage student records, enrollment details, and assigned batches.
+            {readOnly
+              ? "View student records, enrollment details, and assigned batches."
+              : "Manage student records, enrollment details, and assigned batches."}
           </p>
         </div>
 
@@ -144,6 +155,7 @@ export default function Student({ portalName, navItems, activeNav, onNavChange, 
               loadStudents();
             }}
             onAddStudent={() => setShowNewStudent(true)}
+            readOnly={readOnly}
           />
 
           <StudentTable paginated={paginated} onViewDetails={(student) => {
@@ -153,23 +165,26 @@ export default function Student({ portalName, navItems, activeNav, onNavChange, 
         </div>
       </div>
 
-      <NewStudent
-        open={showNewStudent}
-        onClose={() => {
-          setShowNewStudent(false);
-          setCreateStudentError("");
-        }}
-        onSubmit={handleAddStudent}
-        error={createStudentError}
-        submitting={submittingStudent}
-        portalName={portalName}
-      />
+      {!readOnly ? (
+        <NewStudent
+          open={showNewStudent}
+          onClose={() => {
+            setShowNewStudent(false);
+            setCreateStudentError("");
+          }}
+          onSubmit={handleAddStudent}
+          error={createStudentError}
+          submitting={submittingStudent}
+          portalName={portalName}
+        />
+      ) : null}
 
       {showStudentDetails && selectedStudent && (
         <StudentDetailsModal
           student={selectedStudent}
           open={showStudentDetails}
-          onSave={handleUpdateStudent}
+          readOnly={readOnly}
+          onSave={readOnly ? undefined : handleUpdateStudent}
           onClose={() => {
             setShowStudentDetails(false);
             setSelectedStudent(null);

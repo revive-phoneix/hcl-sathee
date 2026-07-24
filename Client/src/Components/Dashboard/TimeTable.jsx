@@ -47,7 +47,7 @@ const timetableData = [
   },
 ];
 
-export default function TimeTable({ isOpen, onClose }) {
+export default function TimeTable({ isOpen, onClose, readOnly = false }) {
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
   const [uploadedFile, setUploadedFile] = useState(null);
@@ -173,21 +173,25 @@ export default function TimeTable({ isOpen, onClose }) {
         </div>
 
         <div className="p-6 border-t flex flex-wrap items-center justify-end gap-3">
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.csv"
-            className="hidden"
-            onChange={handleFileChange}
-          />
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="px-6 py-3 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2"
-          >
-            <Upload size={18} />
-            Upload
-          </button>
+          {!readOnly ? (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.csv"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-6 py-3 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2"
+              >
+                <Upload size={18} />
+                Upload
+              </button>
+            </>
+          ) : null}
           <button
             onClick={onClose}
             className="px-8 py-3 bg-[#0F172A] text-white rounded-2xl hover:bg-black transition-colors font-medium"

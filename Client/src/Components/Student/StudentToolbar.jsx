@@ -7,6 +7,7 @@ export default function StudentToolbar({
   onCourseChange, 
   onRefresh,
   onAddStudent,
+  readOnly = false,
 }) {
   return (
     <div style={{ 
@@ -97,27 +98,29 @@ export default function StudentToolbar({
       </button>
 
       {/* Add Student Button */}
-      <button
-        type="button"
-        onClick={onAddStudent}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "9px 16px",
-          borderRadius: 8,
-          border: "none",
-          background: "linear-gradient(135deg,#1e40af,#3b82f6)",
-          color: "#fff",
-          fontSize: 13,
-          fontWeight: 600,
-          marginLeft: "auto",
-          cursor: "pointer",
-        }}
-      >
-        <UserPlus size={15} />
-        Add Student
-      </button>
+      {!readOnly ? (
+        <button
+          type="button"
+          onClick={onAddStudent}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            padding: "9px 16px",
+            borderRadius: 8,
+            border: "none",
+            background: "linear-gradient(135deg,#1e40af,#3b82f6)",
+            color: "#fff",
+            fontSize: 13,
+            fontWeight: 600,
+            marginLeft: "auto",
+            cursor: "pointer",
+          }}
+        >
+          <UserPlus size={15} />
+          Add Student
+        </button>
+      ) : null}
     </div>
   );
 }

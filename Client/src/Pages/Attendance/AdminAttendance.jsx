@@ -87,6 +87,8 @@ export default function AdminAttendance({
   activeNav,
   onNavChange,
   onLogout,
+  readOnly = false,
+  roleLabel = "Admin Portal",
 }) {
   const [activeTab, setActiveTab] = useState("daily");
   const [search, setSearch] = useState("");
@@ -174,6 +176,7 @@ export default function AdminAttendance({
       activeNav={activeNav}
       onNavChange={onNavChange}
       onLogout={onLogout}
+      roleLabel={roleLabel}
     >
       <div className="grid-cols-4 gap-6 w-full mx-auto px-6 space-y-8">
         <div className="mb-6">
@@ -210,6 +213,7 @@ export default function AdminAttendance({
               loading={loadingMitras}
               search={search}
               selectedDate={selectedDate}
+              readOnly={readOnly}
             />
           ) : (
             <AttendanceTable

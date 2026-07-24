@@ -3,6 +3,7 @@ import { Eye, EyeOff, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import { getAuthErrorMessage, postWithColdStartRetry } from "../../utils/apiRequest";
+import { setAuthToken } from "../../utils/authToken";
 
 const REMEMBER_ME_KEY = "hcl_sathee_remember_me";
 
@@ -72,6 +73,9 @@ export default function AdminLoginCard({ onLoginSuccess }) {
       }
 
       const loggedInUser = response.data?.user || {};
+      if (response.data?.token) {
+        setAuthToken(response.data.token);
+      }
       if (onLoginSuccess) {
         onLoginSuccess({
           name: loggedInUser.name || formData.name,

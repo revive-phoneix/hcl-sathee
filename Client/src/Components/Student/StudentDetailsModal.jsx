@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-export default function StudentDetailsModal({ student, open, onClose, onSave }) {
+export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(null);
 
@@ -205,38 +205,58 @@ export default function StudentDetailsModal({ student, open, onClose, onSave }) 
           </div>
 
           <div style={{ textAlign: "center", marginTop: 32 }}>
-            <button 
-              onClick={() => setIsEditing(!isEditing)}
-              style={{
-                background: isEditing ? "#ef4444" : "#1e40af",
-                color: "#fff",
-                border: "none",
-                padding: "12px 32px",
-                borderRadius: 8,
-                fontSize: 16,
-                fontWeight: 600,
-                cursor: "pointer",
-                marginRight: 12
-              }}
-            >
-              {isEditing ? "Cancel" : "Edit Details"}
-            </button>
-            
-            {isEditing && (
-              <button 
-                onClick={handleSave}
+            {!readOnly ? (
+              <>
+                <button 
+                  onClick={() => setIsEditing(!isEditing)}
+                  style={{
+                    background: isEditing ? "#ef4444" : "#1e40af",
+                    color: "#fff",
+                    border: "none",
+                    padding: "12px 32px",
+                    borderRadius: 8,
+                    fontSize: 16,
+                    fontWeight: 600,
+                    cursor: "pointer",
+                    marginRight: 12
+                  }}
+                >
+                  {isEditing ? "Cancel" : "Edit Details"}
+                </button>
+                
+                {isEditing && (
+                  <button 
+                    onClick={handleSave}
+                    style={{
+                      background: "#10b981",
+                      color: "#fff",
+                      border: "none",
+                      padding: "12px 28px",
+                      borderRadius: 8,
+                      fontSize: 16,
+                      fontWeight: 600,
+                      cursor: "pointer"
+                    }}
+                  >
+                    Save Changes
+                  </button>
+                )}
+              </>
+            ) : (
+              <button
+                onClick={onClose}
                 style={{
-                  background: "#10b981",
+                  background: "#1e40af",
                   color: "#fff",
                   border: "none",
-                  padding: "12px 28px",
+                  padding: "12px 32px",
                   borderRadius: 8,
                   fontSize: 16,
                   fontWeight: 600,
-                  cursor: "pointer"
+                  cursor: "pointer",
                 }}
               >
-                Save Changes
+                Close
               </button>
             )}
           </div>

@@ -4,14 +4,14 @@ import { SectionHeader } from "./SectionHeader";
 import Schedule from "./Schedule";
 import TimeTable from "./TimeTable";
 
-export function QuickActions({ onViewStudents, onViewAttendance }) {
+export function QuickActions({ onViewStudents, onViewAttendance, readOnly = false }) {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isTimetableOpen, setIsTimetableOpen] = useState(false);
 
   const quickActions = [
     {
-      icon: Plus,
-      label: "Add Students",
+      icon: readOnly ? Eye : Plus,
+      label: readOnly ? "View Students" : "Add Students",
       color: "text-blue-400",
       bg: "hover:bg-blue-500/10 hover:border-blue-500/30",
       onClick: onViewStudents,
@@ -63,11 +63,19 @@ export function QuickActions({ onViewStudents, onViewAttendance }) {
       </div>
 
       {isScheduleOpen && (
-        <Schedule isOpen={isScheduleOpen} onClose={() => setIsScheduleOpen(false)} />
+        <Schedule
+          isOpen={isScheduleOpen}
+          onClose={() => setIsScheduleOpen(false)}
+          readOnly={readOnly}
+        />
       )}
 
       {isTimetableOpen && (
-        <TimeTable isOpen={isTimetableOpen} onClose={() => setIsTimetableOpen(false)} />
+        <TimeTable
+          isOpen={isTimetableOpen}
+          onClose={() => setIsTimetableOpen(false)}
+          readOnly={readOnly}
+        />
       )}
     </>
   );

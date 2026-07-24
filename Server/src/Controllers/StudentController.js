@@ -1,8 +1,9 @@
 const Student = require("../Models/Student");
+const { filterByUserCentre } = require("../Utils/centreMatch");
 
-exports.getStudents = async (_req, res) => {
+exports.getStudents = async (req, res) => {
   try {
-    const students = await Student.findAll();
+    const students = filterByUserCentre(await Student.findAll(), req.user);
     res.status(200).json({ success: true, students });
   } catch (error) {
     console.error("Get Students Error:", error);

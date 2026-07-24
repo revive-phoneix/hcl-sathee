@@ -1,18 +1,15 @@
-import axios from "axios";
-import { API_URL } from "../config/api";
-
-const USERS_API_URL = `${API_URL}/api/users`;
+import api from "./apiClient";
 
 export const fetchUsers = async () => {
-  const response = await axios.get(USERS_API_URL);
+  const response = await api.get("/api/users");
   return response.data.users ?? [];
 };
 
 export const createUser = async (payload) => {
-  const response = await axios.post(USERS_API_URL, payload);
+  const response = await api.post("/api/users", payload);
   return response.data.user;
 };
 
 export const removeUser = async (id) => {
-  await axios.delete(`${USERS_API_URL}/${id}`);
+  await api.delete(`/api/users/${id}`);
 };

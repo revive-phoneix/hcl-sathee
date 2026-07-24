@@ -1,5 +1,10 @@
 const User = require("../Models/User");
 const { sendWelcomeEmail } = require("../Utils/sendEmail");
+const {
+  filterByUserCentre,
+  isAdminRole,
+  isHclPartnerRole,
+} = require("../Utils/centreMatch");
 
 const VALID_ROLES = ["ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 const VALID_CENTRES = [
@@ -10,10 +15,29 @@ const VALID_CENTRES = [
 ];
 const TEST_EMAIL_DOMAIN = "@example.com";
 
-exports.getUsers = async (_req, res) => {
+const toPublicUser = (user) => {
+  if (!user) return user;
+  const { password, ...safe } = user;
+  return safe;
+};
+
+exports.getUsers = async (req, res) => {
   try {
-    const users = await User.findAll();
-    res.status(200).json({ success: true, users });
+    let users = await User.findAll();
+
+    // Partners only see Sathee Mitra in their own centre (for view/export).
+    if (isHclPartnerRole(req.user?.role)) {
+      users = filterByUserCentre(users, req.user).filter(
+        (user) => String(user.role || "").toUpperCase() === "SATHEE MITRA"
+      );
+    } else if (!isAdminRole(req.user?.role)) {
+      users = [];
+    }
+
+    res.status(200).json({
+      success: true,
+      users: users.map(toPublicUser),
+    });
   } catch (error) {
     console.error("Get Users Error:", error);
     res.status(500).json({ success: false, message: "Failed to fetch users" });
@@ -91,7 +115,7 @@ exports.addUser = async (req, res) => {
     res.status(201).json({
       success: true,
       message: "User created successfully",
-      user: createdUser,
+      user: toPublicUser(createdUser),
     });
   } catch (error) {
     console.error("Add User Error:", error);

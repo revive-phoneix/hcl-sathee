@@ -45,8 +45,17 @@ export const canAccessPortal = (userCentre, portalName = "", userRole = "") => {
 export const isAdminRole = (userRole = "") =>
   String(userRole || "").trim().toUpperCase() === "ADMIN";
 
-/** Only ADMIN may enter the current admin dashboard pages. */
+export const isHclPartnerRole = (userRole = "") =>
+  String(userRole || "").trim().toUpperCase() === "HCL PARTNER";
+
+export const isSatheeMitraRole = (userRole = "") =>
+  String(userRole || "").trim().toUpperCase() === "SATHEE MITRA";
+
+/** Only ADMIN may enter the admin dashboard pages. */
 export const canEnterAdminDashboard = (userRole = "") => isAdminRole(userRole);
+
+/** HCL PARTNER may enter the partner (view-only) dashboard pages. */
+export const canEnterPartnerDashboard = (userRole = "") => isHclPartnerRole(userRole);
 
 export const PORTAL_OPTIONS = [
   {

@@ -1,7 +1,4 @@
-import axios from "axios";
-import { API_URL } from "../config/api";
-
-const ANNOUNCEMENTS_API_URL = `${API_URL}/api/announcements`;
+import api from "./apiClient";
 
 const formatPostedOn = (value) => {
   if (!value) return "";
@@ -21,20 +18,20 @@ const normalizeAnnouncement = (announcement) => ({
 });
 
 export const fetchAnnouncements = async () => {
-  const response = await axios.get(ANNOUNCEMENTS_API_URL);
+  const response = await api.get("/api/announcements");
   return (response.data.announcements ?? []).map(normalizeAnnouncement);
 };
 
 export const createAnnouncement = async (payload) => {
-  const response = await axios.post(ANNOUNCEMENTS_API_URL, payload);
+  const response = await api.post("/api/announcements", payload);
   return normalizeAnnouncement(response.data.announcement);
 };
 
 export const updateAnnouncement = async (id, payload) => {
-  const response = await axios.put(`${ANNOUNCEMENTS_API_URL}/${id}`, payload);
+  const response = await api.put(`/api/announcements/${id}`, payload);
   return normalizeAnnouncement(response.data.announcement);
 };
 
 export const removeAnnouncement = async (id) => {
-  await axios.delete(`${ANNOUNCEMENTS_API_URL}/${id}`);
+  await api.delete(`/api/announcements/${id}`);
 };

@@ -1,8 +1,12 @@
 const Announcement = require("../Models/Announcement");
+const { filterByUserCentre } = require("../Utils/centreMatch");
 
-exports.getAnnouncements = async (_req, res) => {
+exports.getAnnouncements = async (req, res) => {
   try {
-    const announcements = await Announcement.findAll();
+    const announcements = filterByUserCentre(
+      await Announcement.findAll(),
+      req.user
+    );
     res.status(200).json({ success: true, announcements });
   } catch (error) {
     console.error("Get Announcements Error:", error);

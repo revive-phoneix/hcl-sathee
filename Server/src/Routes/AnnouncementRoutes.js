@@ -6,10 +6,15 @@ const {
   updateAnnouncement,
   deleteAnnouncement,
 } = require("../Controllers/AnnouncementController");
+const {
+  authenticate,
+  requireAdminOrPartner,
+  requireAdmin,
+} = require("../Middleware/auth");
 
-router.get("/", getAnnouncements);
-router.post("/", addAnnouncement);
-router.put("/:id", updateAnnouncement);
-router.delete("/:id", deleteAnnouncement);
+router.get("/", authenticate, requireAdminOrPartner, getAnnouncements);
+router.post("/", authenticate, requireAdmin, addAnnouncement);
+router.put("/:id", authenticate, requireAdmin, updateAnnouncement);
+router.delete("/:id", authenticate, requireAdmin, deleteAnnouncement);
 
 module.exports = router;

@@ -3,6 +3,8 @@ import { MapPin, ArrowRight, ShieldAlert, Construction } from "lucide-react";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
+  canEnterPartnerDashboard,
+  isSatheeMitraRole,
   PORTAL_OPTIONS,
 } from "../../utils/portalMapping";
 
@@ -17,16 +19,16 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
       return;
     }
 
-    // Admin dashboard pages are ready; other roles come later
-    if (!canEnterAdminDashboard(userRole)) {
+    if (canEnterAdminDashboard(userRole) || canEnterPartnerDashboard(userRole)) {
       setAccessMessage("");
-      setComingSoon(true);
+      setComingSoon(false);
+      openDashboard(portalTitle);
       return;
     }
 
+    // Sathee Mitra (and any other non-ready roles)
     setAccessMessage("");
-    setComingSoon(false);
-    openDashboard(portalTitle);
+    setComingSoon(true);
   };
 
   return (
@@ -51,7 +53,9 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
           <div>
             <p className="text-sm font-bold tracking-wide">COMING SOON</p>
             <p className="text-xs mt-0.5 text-amber-700">
-              This is admin dashboard functionality. Other roles will be available in future updates.
+              {isSatheeMitraRole(userRole)
+                ? "Sathee Mitra pages are under development. Please check back later."
+                : "This portal experience is not available for your role yet."}
             </p>
           </div>
         </div>

@@ -1,10 +1,7 @@
-import axios from "axios";
-import { API_URL } from "../config/api";
-
-const MITRA_ATTENDANCE_URL = `${API_URL}/api/mitra-attendance`;
+import api from "./apiClient";
 
 export const fetchMitraAttendance = async (date) => {
-  const response = await axios.get(MITRA_ATTENDANCE_URL, {
+  const response = await api.get("/api/mitra-attendance", {
     params: { date },
   });
   return response.data.records ?? [];
@@ -28,7 +25,7 @@ export const uploadMitraAttendancePhoto = async ({
   formData.append("date", date);
   formData.append("type", type);
 
-  const response = await axios.post(`${MITRA_ATTENDANCE_URL}/upload`, formData, {
+  const response = await api.post("/api/mitra-attendance/upload", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 

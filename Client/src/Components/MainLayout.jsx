@@ -2,7 +2,15 @@ import { useState } from "react";
 import { LogOut, ChevronLeft, ChevronRight } from "lucide-react";
 import HCLLogo from "../assets/HCL.svg";
 
-export function MainLayout({ portalName, navItems, activeNav, onNavChange, onLogout, children }) {
+export function MainLayout({
+  portalName,
+  navItems,
+  activeNav,
+  onNavChange,
+  onLogout,
+  roleLabel = "Admin Portal",
+  children,
+}) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   return (
@@ -14,7 +22,7 @@ export function MainLayout({ portalName, navItems, activeNav, onNavChange, onLog
             <p className="font-semibold tracking-tight text-black">
               {portalName ? `${portalName} PORTAL` : "HCL SATHEE"}
             </p>
-            <p className="text-xs text-[#101011]">Admin Portal</p>
+            <p className="text-xs text-[#101011]">{roleLabel}</p>
           </div>
         </div>
 

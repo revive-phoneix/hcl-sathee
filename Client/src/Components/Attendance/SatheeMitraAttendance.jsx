@@ -46,27 +46,31 @@ function PhotoTimeCell({
         <span className="font-medium tabular-nums">{formatTime(time)}</span>
       </div>
 
-      <label
-        htmlFor={inputId}
-        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-          disabled || uploading
-            ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed"
-            : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-100 cursor-pointer"
-        }`}
-      >
-        <Camera size={12} />
-        {uploading ? "Uploading…" : photoUrl ? "Replace" : "Upload"}
-      </label>
+      {!disabled ? (
+        <>
+          <label
+            htmlFor={inputId}
+            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+              uploading
+                ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed"
+                : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-100 cursor-pointer"
+            }`}
+          >
+            <Camera size={12} />
+            {uploading ? "Uploading…" : photoUrl ? "Replace" : "Upload"}
+          </label>
 
-      <input
-        id={inputId}
-        type="file"
-        accept="image/*"
-        capture="environment"
-        className="hidden"
-        disabled={disabled || uploading}
-        onChange={onUpload}
-      />
+          <input
+            id={inputId}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            className="hidden"
+            disabled={uploading}
+            onChange={onUpload}
+          />
+        </>
+      ) : null}
     </div>
   );
 }
@@ -76,6 +80,7 @@ export default function SatheeMitraAttendance({
   loading = false,
   search = "",
   selectedDate,
+  readOnly = false,
 }) {
   const [recordsByUser, setRecordsByUser] = useState({});
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -243,6 +248,7 @@ export default function SatheeMitraAttendance({
                         time={record.arrivalTime}
                         inputId={`arrival-${mitra.id}`}
                         uploading={uploadingKey === `${mitra.id}-arrival`}
+                        disabled={readOnly}
                         onUpload={(e) => handlePhoto(mitra, "arrival", e)}
                       />
                     </td>
@@ -253,6 +259,7 @@ export default function SatheeMitraAttendance({
                         time={record.departureTime}
                         inputId={`departure-${mitra.id}`}
                         uploading={uploadingKey === `${mitra.id}-departure`}
+                        disabled={readOnly}
                         onUpload={(e) => handlePhoto(mitra, "departure", e)}
                       />
                     </td>

@@ -1,4 +1,10 @@
-export default function AnnouncementCard({ announcement, onEdit, onDelete, onView }) {
+export default function AnnouncementCard({
+  announcement,
+  onEdit,
+  onDelete,
+  onView,
+  readOnly = false,
+}) {
   const priorityConfig = {
     High: { bg: "bg-red-100 text-red-700", label: "HIGH" },
     Medium: { bg: "bg-amber-100 text-amber-700", label: "MEDIUM" },
@@ -42,20 +48,24 @@ export default function AnnouncementCard({ announcement, onEdit, onDelete, onVie
             onClick={() => onView(announcement.id)}
             className="w-full text-xs text-blue-600 font-medium bg-white border border-sky-200 hover:bg-sky-50 py-2 rounded-xl flex items-center justify-center gap-2"
           >
-            👁️ View
+            View
           </button>
-          <button
-            onClick={() => onEdit(announcement.id)}
-            className="w-full text-xs text-black font-medium bg-white border border-blue-200 hover:bg-blue-50 py-2 rounded-xl flex items-center justify-center gap-2"
-          >
-            ✏️ Edit
-          </button>
-          <button
-            onClick={() => onDelete(announcement.id)}
-            className="w-full text-xs font-medium bg-white border border-red-200 hover:bg-red-50 py-2 rounded-xl flex items-center justify-center gap-2 text-red-600"
-          >
-            🗑️ Delete
-          </button>
+          {!readOnly ? (
+            <>
+              <button
+                onClick={() => onEdit(announcement.id)}
+                className="w-full text-xs text-black font-medium bg-white border border-blue-200 hover:bg-blue-50 py-2 rounded-xl flex items-center justify-center gap-2"
+              >
+                Edit
+              </button>
+              <button
+                onClick={() => onDelete(announcement.id)}
+                className="w-full text-xs font-medium bg-white border border-red-200 hover:bg-red-50 py-2 rounded-xl flex items-center justify-center gap-2 text-red-600"
+              >
+                Delete
+              </button>
+            </>
+          ) : null}
         </div>
       </div>
     </div>

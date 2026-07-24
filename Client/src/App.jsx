@@ -11,14 +11,24 @@ import CreatePassword from "./Components/Auth/CreatePassword";
 import CardSelector_1 from "./Pages/Selector/CardSelector_1";
 import CardSelector_2 from "./Pages/Selector/CardSelector_2";
 import Dashboard from "./Pages/Dashboard/AdminDashboard";
+import HCLPartnerDashboard from "./Pages/Dashboard/HCLPartnerDashboard";
 import AdminAttendance from "./Pages/Attendance/AdminAttendance";
+import HCLPartnerAttendance from "./Pages/Attendance/HCLPartnerAttendance";
 import AdminUser from "./Pages/User/AdminUser";
 import Student from "./Pages/Student/Student";
+import PartnerStudents from "./Pages/Student/View";
 import AdminAnnouncements from "./Pages/Announcements/AdminAnnouncements";
+import HCLPartnerAnnouncements from "./Pages/Announcements/HCLPartnerAnnouncements";
 import AdminAnalytics from "./Pages/Analytics/AdminAnalytics";
-import { canEnterAdminDashboard } from "./utils/portalMapping";
+import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
+import {
+  canAccessPortal,
+  canEnterAdminDashboard,
+  canEnterPartnerDashboard,
+} from "./utils/portalMapping";
+import { clearAuthToken } from "./utils/authToken";
 
-const PATH_TO_NAV = {
+const ADMIN_PATH_TO_NAV = {
   "/dashboard": 0,
   "/attendance": 1,
   "/analytics": 2,
@@ -27,7 +37,7 @@ const PATH_TO_NAV = {
   "/announcements": 5,
 };
 
-const NAV_PATHS = [
+const ADMIN_NAV_PATHS = [
   "/dashboard",
   "/attendance",
   "/analytics",
@@ -36,7 +46,24 @@ const NAV_PATHS = [
   "/announcements",
 ];
 
-const ADMIN_PATHS = new Set(NAV_PATHS);
+const PARTNER_PATH_TO_NAV = {
+  "/partner/dashboard": 0,
+  "/partner/attendance": 1,
+  "/partner/analytics": 2,
+  "/partner/students": 3,
+  "/partner/announcements": 4,
+};
+
+const PARTNER_NAV_PATHS = [
+  "/partner/dashboard",
+  "/partner/attendance",
+  "/partner/analytics",
+  "/partner/students",
+  "/partner/announcements",
+];
+
+const ADMIN_PATHS = new Set(ADMIN_NAV_PATHS);
+const PARTNER_PATHS = new Set(PARTNER_NAV_PATHS);
 
 const AppContent = () => {
   const location = useLocation();
@@ -49,9 +76,9 @@ const AppContent = () => {
   const [selectedPortal, setSelectedPortal] = useState("");
 
   const isAdmin = canEnterAdminDashboard(userRole);
-  const activeNav = PATH_TO_NAV[location.pathname] ?? 0;
+  const isPartner = canEnterPartnerDashboard(userRole);
 
-  const navItems = [
+  const adminNavItems = [
     { icon: LayoutDashboard, label: "Dashboard" },
     { icon: CalendarDays, label: "Attendance Record" },
     { icon: TrendingUp, label: "Progress and Analytics" },
@@ -60,12 +87,30 @@ const AppContent = () => {
     { icon: Megaphone, label: "Announcements" },
   ];
 
-  const handleNavChange = (index) => {
-    const path = NAV_PATHS[index];
+  const partnerNavItems = [
+    { icon: LayoutDashboard, label: "Dashboard" },
+    { icon: CalendarDays, label: "Attendance Record" },
+    { icon: TrendingUp, label: "Progress and Analytics" },
+    { icon: IdCard, label: "Students" },
+    { icon: Megaphone, label: "Announcements" },
+  ];
+
+  const activeNav = isPartner
+    ? PARTNER_PATH_TO_NAV[location.pathname] ?? 0
+    : ADMIN_PATH_TO_NAV[location.pathname] ?? 0;
+
+  const handleAdminNavChange = (index) => {
+    const path = ADMIN_NAV_PATHS[index];
+    if (path) navigate(path);
+  };
+
+  const handlePartnerNavChange = (index) => {
+    const path = PARTNER_NAV_PATHS[index];
     if (path) navigate(path);
   };
 
   const handleLogout = () => {
+    clearAuthToken();
     setIsLoggedIn(false);
     setUserName("");
     setUserCentre(null);
@@ -74,7 +119,6 @@ const AppContent = () => {
     navigate("/", { replace: true });
   };
 
-  // Invite link must work without login
   if (location.pathname === "/create-password") {
     return <CreatePassword />;
   }
@@ -93,9 +137,18 @@ const AppContent = () => {
     );
   }
 
-  // Non-admins cannot open admin pages via URL
+  // Role-based route guards
   if (ADMIN_PATHS.has(location.pathname) && (!isAdmin || !selectedPortal)) {
     return <Navigate to="/portals" replace />;
+  }
+
+  if (PARTNER_PATHS.has(location.pathname)) {
+    if (!isPartner || !selectedPortal) {
+      return <Navigate to="/portals" replace />;
+    }
+    if (!canAccessPortal(userCentre, selectedPortal, userRole)) {
+      return <Navigate to="/portals" replace />;
+    }
   }
 
   return (
@@ -109,89 +162,158 @@ const AppContent = () => {
             userCentre={userCentre}
             userRole={userRole}
             openDashboard={(name) => {
-              if (!canEnterAdminDashboard(userRole)) return;
-              setSelectedPortal(name);
-              navigate("/dashboard");
+              if (!canAccessPortal(userCentre, name, userRole)) return;
+
+              if (canEnterAdminDashboard(userRole)) {
+                setSelectedPortal(name);
+                navigate("/dashboard");
+                return;
+              }
+
+              if (canEnterPartnerDashboard(userRole)) {
+                setSelectedPortal(name);
+                navigate("/partner/dashboard");
+              }
             }}
           />
         }
       />
 
+      {/* Admin routes */}
       <Route
         path="/dashboard"
         element={
           <Dashboard
             portalName={selectedPortal}
             userName={userName}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
             onLogout={handleLogout}
           />
         }
       />
-
       <Route
         path="/attendance"
         element={
           <AdminAttendance
             portalName={selectedPortal}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
             onLogout={handleLogout}
           />
         }
       />
-
       <Route
         path="/analytics"
         element={
           <AdminAnalytics
             portalName={selectedPortal}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
             onLogout={handleLogout}
           />
         }
       />
-
       <Route
         path="/users"
         element={
           <AdminUser
             portalName={selectedPortal}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
             onLogout={handleLogout}
           />
         }
       />
-
       <Route
         path="/students"
         element={
           <Student
             portalName={selectedPortal}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
             onLogout={handleLogout}
           />
         }
       />
-
       <Route
         path="/announcements"
         element={
           <AdminAnnouncements
             portalName={selectedPortal}
             userName={userName}
-            navItems={navItems}
+            navItems={adminNavItems}
             activeNav={activeNav}
-            onNavChange={handleNavChange}
+            onNavChange={handleAdminNavChange}
+            onLogout={handleLogout}
+          />
+        }
+      />
+
+      {/* HCL Partner routes (no Users page) */}
+      <Route
+        path="/partner/dashboard"
+        element={
+          <HCLPartnerDashboard
+            portalName={selectedPortal}
+            userName={userName}
+            navItems={partnerNavItems}
+            activeNav={activeNav}
+            onNavChange={handlePartnerNavChange}
+            onLogout={handleLogout}
+          />
+        }
+      />
+      <Route
+        path="/partner/attendance"
+        element={
+          <HCLPartnerAttendance
+            portalName={selectedPortal}
+            navItems={partnerNavItems}
+            activeNav={activeNav}
+            onNavChange={handlePartnerNavChange}
+            onLogout={handleLogout}
+          />
+        }
+      />
+      <Route
+        path="/partner/analytics"
+        element={
+          <HCLPartnerAnalytics
+            portalName={selectedPortal}
+            navItems={partnerNavItems}
+            activeNav={activeNav}
+            onNavChange={handlePartnerNavChange}
+            onLogout={handleLogout}
+          />
+        }
+      />
+      <Route
+        path="/partner/students"
+        element={
+          <PartnerStudents
+            portalName={selectedPortal}
+            navItems={partnerNavItems}
+            activeNav={activeNav}
+            onNavChange={handlePartnerNavChange}
+            onLogout={handleLogout}
+          />
+        }
+      />
+      <Route
+        path="/partner/announcements"
+        element={
+          <HCLPartnerAnnouncements
+            portalName={selectedPortal}
+            userName={userName}
+            navItems={partnerNavItems}
+            activeNav={activeNav}
+            onNavChange={handlePartnerNavChange}
             onLogout={handleLogout}
           />
         }

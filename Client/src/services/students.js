@@ -1,8 +1,5 @@
-import axios from "axios";
+import api from "./apiClient";
 import { parseJsonField } from "../utils/studentMetrics";
-import { API_URL } from "../config/api";
-
-const STUDENTS_API_URL = `${API_URL}/api/students`;
 
 const parseStudent = (student) => ({
   ...student,
@@ -13,11 +10,11 @@ const parseStudent = (student) => ({
 });
 
 export const fetchStudents = async () => {
-  const response = await axios.get(STUDENTS_API_URL);
+  const response = await api.get("/api/students");
   return (response.data.students ?? []).map(parseStudent);
 };
 
 export const createStudent = async (payload) => {
-  const response = await axios.post(STUDENTS_API_URL, payload);
+  const response = await api.post("/api/students", payload);
   return parseStudent(response.data.student);
 };

@@ -1,4 +1,5 @@
 const MitraAttendance = require("../Models/MitraAttendance");
+const { filterByUserCentre } = require("../Utils/centreMatch");
 
 const VALID_TYPES = new Set(["arrival", "departure"]);
 
@@ -12,7 +13,10 @@ exports.getMitraAttendance = async (req, res) => {
       });
     }
 
-    const records = await MitraAttendance.findByDate(date);
+    const records = filterByUserCentre(
+      await MitraAttendance.findByDate(date),
+      req.user
+    );
     res.status(200).json({ success: true, records });
   } catch (error) {
     console.error("Get Mitra Attendance Error:", error);
