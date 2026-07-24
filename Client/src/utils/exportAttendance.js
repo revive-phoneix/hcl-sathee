@@ -1,19 +1,12 @@
 import { downloadTableSvg, downloadTableXlsx } from "./exportTable";
 
-const getStatusLabel = (value) => {
-  const num = parseInt(value, 10);
-  if (num >= 90) return "Excellent";
-  if (num >= 85) return "Good";
-  if (num >= 80) return "Average";
-  return "Low";
-};
-
 const buildAttendanceTable = ({
   records = [],
-  columnLabel = "Period",
+  columnLabel = "Student",
   activeTab = "daily",
   portalName = "HCL SATHEE",
   selectedDate = null,
+  periodLabel = null,
 }) => {
   const tabTitle =
     activeTab.charAt(0).toUpperCase() + activeTab.slice(1).toLowerCase();
@@ -30,8 +23,11 @@ const buildAttendanceTable = ({
   const rows = records.map((row, index) => [
     String(index + 1).padStart(2, "0"),
     row.label,
-    row.value,
-    getStatusLabel(row.value),
+    row.value ??
+      (row.percent == null || Number.isNaN(row.percent)
+        ? "—"
+        : `${Math.round(row.percent)}%`),
+    row.statusLabel || "—",
   ]);
 
   const safePortal = (portalName || "HCL-SATHEE")
@@ -45,7 +41,7 @@ const buildAttendanceTable = ({
     "Attendance Record",
     portalName,
     tabTitle,
-    formattedSelectedDate ? `Date ${formattedSelectedDate}` : null,
+    periodLabel || (formattedSelectedDate ? `Date ${formattedSelectedDate}` : null),
   ].filter(Boolean);
 
   return {

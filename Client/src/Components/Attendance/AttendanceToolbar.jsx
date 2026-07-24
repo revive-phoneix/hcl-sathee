@@ -29,7 +29,10 @@ export default function AttendanceToolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        {(activeTab === "daily" || activeTab === "sathee-mitra") && (
+        {(activeTab === "daily" ||
+          activeTab === "weekly" ||
+          activeTab === "monthly" ||
+          activeTab === "sathee-mitra") && (
           <label className="relative inline-flex items-center cursor-pointer">
             <Calendar
               size={14}
