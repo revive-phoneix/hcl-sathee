@@ -33,9 +33,9 @@ export default function TeachersTab({
             <thead>
               <tr style={{ backgroundColor: "#CCD2DD" }}>
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase">Mentor</th>
-                <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">Email</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">Role</th>
                 <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">Centre</th>
-                <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">Days Available</th>
+                <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">Email</th>
                 <th className="text-center px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase">Attendance (7d)</th>
               </tr>
             </thead>
@@ -74,11 +74,9 @@ export default function TeachersTab({
                         </span>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-gray-600 text-xs">{mentor.email || "—"}</td>
+                    <td className="px-4 py-4 font-medium text-blue-700">{mentor.subject || "Sathee Mitra"}</td>
                     <td className="px-4 py-4 font-medium text-gray-700">{mentor.centre}</td>
-                    <td className="px-4 py-4 text-gray-700 text-xs">
-                      {formatAvailableDays(mentor.availableDays)}
-                    </td>
+                    <td className="px-4 py-4 text-gray-500 text-xs">{mentor.email}</td>
                     <td className="px-5 py-4 text-center">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-semibold ${attendanceBadge(mentor.attendance)}`}>
                         {mentor.attendance == null ? "—" : `${mentor.attendance}%`}
