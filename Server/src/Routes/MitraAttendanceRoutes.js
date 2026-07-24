@@ -7,7 +7,7 @@ const {
 const {
   authenticate,
   requireAdminOrPartner,
-  requireAdmin,
+  requireSatheeMitra,
 } = require("../Middleware/auth");
 
 const router = express.Router();
@@ -24,7 +24,7 @@ const upload = multer({
 });
 
 router.get("/", authenticate, requireAdminOrPartner, getMitraAttendance);
-router.post("/upload", authenticate, requireAdmin, (req, res, next) => {
+router.post("/upload", authenticate, requireSatheeMitra, (req, res, next) => {
   upload.single("photo")(req, res, (err) => {
     if (err) {
       return res.status(400).json({

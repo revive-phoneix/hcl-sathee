@@ -1,5 +1,9 @@
 const jwt = require("jsonwebtoken");
-const { isAdminRole, isHclPartnerRole } = require("../Utils/centreMatch");
+const {
+  isAdminRole,
+  isHclPartnerRole,
+  isSatheeMitraRole,
+} = require("../Utils/centreMatch");
 
 const authenticate = (req, res, next) => {
   try {
@@ -56,8 +60,18 @@ const requireAdmin = (req, res, next) => {
   });
 };
 
+/** Only SATHEE MITRA may upload their own attendance photos. */
+const requireSatheeMitra = (req, res, next) => {
+  if (isSatheeMitraRole(req.user?.role)) return next();
+  return res.status(403).json({
+    success: false,
+    message: "Sathee Mitra access required to upload attendance photos",
+  });
+};
+
 module.exports = {
   authenticate,
   requireAdminOrPartner,
   requireAdmin,
+  requireSatheeMitra,
 };

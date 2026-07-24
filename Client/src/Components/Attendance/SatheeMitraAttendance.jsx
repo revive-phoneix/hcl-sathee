@@ -1,9 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { Camera, Clock, ImageOff, Loader2 } from "lucide-react";
-import {
-  fetchMitraAttendance,
-  uploadMitraAttendancePhoto,
-} from "../../services/mitraAttendance";
+import { Clock, ImageOff } from "lucide-react";
+import { fetchMitraAttendance } from "../../services/mitraAttendance";
 
 const formatTime = (value) => {
   if (!value) return "—";
@@ -14,15 +11,7 @@ const formatTime = (value) => {
   });
 };
 
-function PhotoTimeCell({
-  label,
-  photoUrl,
-  time,
-  inputId,
-  uploading,
-  disabled,
-  onUpload,
-}) {
+function PhotoTimeCell({ label, photoUrl, time }) {
   return (
     <div className="flex flex-col items-center gap-2 py-1">
       <div className="relative w-24 h-24 rounded-xl border border-dashed border-slate-300 bg-slate-50 overflow-hidden flex items-center justify-center">
@@ -34,57 +23,25 @@ function PhotoTimeCell({
             <span className="text-[10px] font-medium uppercase tracking-wide">No photo</span>
           </div>
         )}
-        {uploading ? (
-          <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-            <Loader2 size={22} className="text-white animate-spin" />
-          </div>
-        ) : null}
       </div>
 
       <div className="flex items-center gap-1 text-xs text-slate-600">
         <Clock size={12} className="text-slate-400" />
         <span className="font-medium tabular-nums">{formatTime(time)}</span>
       </div>
-
-      {!disabled ? (
-        <>
-          <label
-            htmlFor={inputId}
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-              uploading
-                ? "text-slate-400 bg-slate-100 border-slate-200 cursor-not-allowed"
-                : "text-blue-700 bg-blue-50 hover:bg-blue-100 border-blue-100 cursor-pointer"
-            }`}
-          >
-            <Camera size={12} />
-            {uploading ? "Uploading…" : photoUrl ? "Replace" : "Upload"}
-          </label>
-
-          <input
-            id={inputId}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            className="hidden"
-            disabled={uploading}
-            onChange={onUpload}
-          />
-        </>
-      ) : null}
     </div>
   );
 }
 
+/** View-only Sathee Mitra attendance. Photos are uploaded from the Mitra portal. */
 export default function SatheeMitraAttendance({
   mitras = [],
   loading = false,
   search = "",
   selectedDate,
-  readOnly = false,
 }) {
   const [recordsByUser, setRecordsByUser] = useState({});
   const [loadingRecords, setLoadingRecords] = useState(false);
-  const [uploadingKey, setUploadingKey] = useState(null);
   const [error, setError] = useState("");
 
   const rows = useMemo(() => {
@@ -99,30 +56,37 @@ export default function SatheeMitraAttendance({
     });
   }, [mitras, search]);
 
-  const loadRecords = async () => {
-    if (!selectedDate) return;
-    setLoadingRecords(true);
-    setError("");
-    try {
-      const records = await fetchMitraAttendance(selectedDate);
-      const map = {};
-      for (const record of records) {
-        map[String(record.userId)] = record;
-      }
-      setRecordsByUser(map);
-    } catch (err) {
-      console.error("Load mitra attendance error:", err);
-      setError(
-        err.response?.data?.message || "Unable to load Sathee Mitra attendance"
-      );
-      setRecordsByUser({});
-    } finally {
-      setLoadingRecords(false);
-    }
-  };
-
   useEffect(() => {
+    let isMounted = true;
+
+    const loadRecords = async () => {
+      if (!selectedDate) return;
+      setLoadingRecords(true);
+      setError("");
+      try {
+        const records = await fetchMitraAttendance(selectedDate);
+        if (!isMounted) return;
+        const map = {};
+        for (const record of records) {
+          map[String(record.userId)] = record;
+        }
+        setRecordsByUser(map);
+      } catch (err) {
+        console.error("Load mitra attendance error:", err);
+        if (!isMounted) return;
+        setError(
+          err.response?.data?.message || "Unable to load Sathee Mitra attendance"
+        );
+        setRecordsByUser({});
+      } finally {
+        if (isMounted) setLoadingRecords(false);
+      }
+    };
+
     loadRecords();
+    return () => {
+      isMounted = false;
+    };
   }, [selectedDate]);
 
   const getRecord = (userId) =>
@@ -133,41 +97,6 @@ export default function SatheeMitraAttendance({
       departureTime: null,
       centreId: null,
     };
-
-  const handlePhoto = async (mitra, type, event) => {
-    const file = event.target.files?.[0];
-    event.target.value = "";
-    if (!file || !selectedDate) return;
-
-    const key = `${mitra.id}-${type}`;
-    setUploadingKey(key);
-    setError("");
-
-    try {
-      const record = await uploadMitraAttendancePhoto({
-        userId: mitra.id,
-        name: mitra.name,
-        centre: mitra.centre,
-        centreId: null,
-        date: selectedDate,
-        type,
-        file,
-      });
-
-      setRecordsByUser((prev) => ({
-        ...prev,
-        [String(mitra.id)]: record,
-      }));
-    } catch (err) {
-      console.error("Upload mitra photo error:", err);
-      setError(
-        err.response?.data?.message ||
-          `Unable to upload ${type} photo. Check Firebase Storage is enabled.`
-      );
-    } finally {
-      setUploadingKey(null);
-    }
-  };
 
   const busy = loading || loadingRecords;
 
@@ -246,10 +175,6 @@ export default function SatheeMitraAttendance({
                         label="Arrival"
                         photoUrl={record.arrivalPhotoUrl}
                         time={record.arrivalTime}
-                        inputId={`arrival-${mitra.id}`}
-                        uploading={uploadingKey === `${mitra.id}-arrival`}
-                        disabled={readOnly}
-                        onUpload={(e) => handlePhoto(mitra, "arrival", e)}
                       />
                     </td>
                     <td className="px-5 py-4 align-middle">
@@ -257,10 +182,6 @@ export default function SatheeMitraAttendance({
                         label="Departure"
                         photoUrl={record.departurePhotoUrl}
                         time={record.departureTime}
-                        inputId={`departure-${mitra.id}`}
-                        uploading={uploadingKey === `${mitra.id}-departure`}
-                        disabled={readOnly}
-                        onUpload={(e) => handlePhoto(mitra, "departure", e)}
                       />
                     </td>
                   </tr>

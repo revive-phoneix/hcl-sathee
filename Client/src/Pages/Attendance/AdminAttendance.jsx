@@ -213,7 +213,6 @@ export default function AdminAttendance({
               loading={loadingMitras}
               search={search}
               selectedDate={selectedDate}
-              readOnly={readOnly}
             />
           ) : (
             <AttendanceTable

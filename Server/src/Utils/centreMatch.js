@@ -28,6 +28,9 @@ const isAdminRole = (role = "") =>
 const isHclPartnerRole = (role = "") =>
   String(role || "").trim().toUpperCase() === "HCL PARTNER";
 
+const isSatheeMitraRole = (role = "") =>
+  String(role || "").trim().toUpperCase() === "SATHEE MITRA";
+
 /** Partners only see their centre; admins see everything. */
 const filterByUserCentre = (items, user, centreField = "centre") => {
   if (!user || isAdminRole(user.role)) return items;
@@ -41,5 +44,6 @@ module.exports = {
   matchesCentre,
   isAdminRole,
   isHclPartnerRole,
+  isSatheeMitraRole,
   filterByUserCentre,
 };

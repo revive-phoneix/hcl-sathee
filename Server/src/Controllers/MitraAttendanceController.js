@@ -29,12 +29,14 @@ exports.getMitraAttendance = async (req, res) => {
 
 exports.uploadMitraPhoto = async (req, res) => {
   try {
-    const { userId, name, centre, centreId, date, type } = req.body;
+    const { name, centre, centreId, date, type } = req.body;
+    // Mitra can only upload for their own account
+    const userId = req.user?.id;
 
     if (!userId || !date || !type) {
       return res.status(400).json({
         success: false,
-        message: "userId, date and type are required",
+        message: "date and type are required",
       });
     }
 
@@ -54,8 +56,8 @@ exports.uploadMitraPhoto = async (req, res) => {
 
     const record = await MitraAttendance.upsertCheckIn({
       userId,
-      name,
-      centre,
+      name: name || req.user?.email || null,
+      centre: centre || req.user?.centre || null,
       centreId: centreId || null,
       date,
       type,
