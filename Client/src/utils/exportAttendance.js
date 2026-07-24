@@ -2,7 +2,7 @@ import { downloadTableSvg, downloadTableXlsx } from "./exportTable";
 
 const buildAttendanceTable = ({
   records = [],
-  columnLabel = "Student",
+  columnLabel = "Period",
   activeTab = "daily",
   portalName = "HCL SATHEE",
   selectedDate = null,

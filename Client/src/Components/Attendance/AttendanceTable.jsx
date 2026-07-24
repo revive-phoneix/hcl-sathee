@@ -1,9 +1,6 @@
 import { getPercentColor, getBarWidth } from "./utils";
 
 const STATUS_STYLES = {
-  present: "bg-emerald-50 text-emerald-700 border-emerald-200",
-  late: "bg-amber-50 text-amber-700 border-amber-200",
-  absent: "bg-red-50 text-red-600 border-red-200",
   excellent: "bg-emerald-50 text-emerald-700 border-emerald-200",
   good: "bg-blue-50 text-blue-700 border-blue-200",
   average: "bg-amber-50 text-amber-700 border-amber-200",
@@ -21,10 +18,8 @@ const barColor = (num) => {
 
 export default function AttendanceTable({
   filtered = [],
-  columnLabel = "Student",
+  columnLabel = "Day",
   loading = false,
-  canMark = false,
-  onStatusChange,
 }) {
   return (
     <div className="overflow-x-auto">
@@ -58,7 +53,7 @@ export default function AttendanceTable({
           ) : filtered.length === 0 ? (
             <tr>
               <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
-                No students match your search.
+                No attendance records for this period.
               </td>
             </tr>
           ) : (
@@ -81,10 +76,7 @@ export default function AttendanceTable({
                     {String(i + 1).padStart(2, "0")}
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-800">
-                    <div>{row.label}</div>
-                    {row.subLabel ? (
-                      <div className="text-xs text-slate-400 mt-0.5">{row.subLabel}</div>
-                    ) : null}
+                    {row.label}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span
@@ -108,24 +100,11 @@ export default function AttendanceTable({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    {canMark && onStatusChange ? (
-                      <select
-                        value={row.rawStatus || ""}
-                        onChange={(e) => onStatusChange(row, e.target.value)}
-                        className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 outline-none focus:border-blue-400"
-                      >
-                        <option value="">Not marked</option>
-                        <option value="present">Present</option>
-                        <option value="late">Late</option>
-                        <option value="absent">Absent</option>
-                      </select>
-                    ) : (
-                      <span
-                        className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyle}`}
-                      >
-                        {row.statusLabel || "—"}
-                      </span>
-                    )}
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${statusStyle}`}
+                    >
+                      {row.statusLabel || "—"}
+                    </span>
                   </td>
                 </tr>
               );

@@ -8,24 +8,39 @@ import SummaryCards from "../../Components/Attendance/SummaryCards";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import { fetchUsers } from "../../services/users";
 import { fetchStudents } from "../../services/students";
-import {
-  fetchStudentAttendanceByDate,
-  fetchStudentAttendanceRange,
-  upsertStudentAttendance,
-} from "../../services/studentAttendance";
+import { fetchStudentAttendanceRange } from "../../services/studentAttendance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import {
   downloadAttendanceSvg,
   downloadAttendanceXlsx,
 } from "../../utils/exportAttendance";
 
-const COLUMN_LABEL = { daily: "Student", weekly: "Student", monthly: "Student" };
+const COLUMN_LABEL = { daily: "Day", weekly: "Week", monthly: "Month" };
 
-const STATUS_LABEL = {
-  present: "Present",
-  late: "Late",
-  absent: "Absent",
-};
+const WEEKDAY_LABELS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+
+const MONTH_LABELS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const toInputDate = (date = new Date()) => {
   const year = date.getFullYear();
@@ -62,11 +77,16 @@ const getMonthRange = (dateStr) => {
   const d = new Date(`${dateStr}T00:00:00`);
   const from = new Date(d.getFullYear(), d.getMonth(), 1);
   const to = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { from: toInputDate(from), to: toInputDate(to) };
+};
+
+const getYearRange = (dateStr) => {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const year = d.getFullYear();
   return {
-    from: toInputDate(from),
-    to: toInputDate(to),
-    dayCount: to.getDate(),
-    monthLabel: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
+    from: `${year}-01-01`,
+    to: `${year}-12-31`,
+    year,
   };
 };
 
@@ -91,16 +111,85 @@ const percentStatusMeta = (percent) => {
   return { statusKey: "low", statusLabel: "Low" };
 };
 
-const recordKey = (studentId, date) => `${String(studentId)}_${date}`;
+const buildRow = (label, percent) => {
+  const meta = percentStatusMeta(percent);
+  return {
+    id: label,
+    label,
+    percent,
+    statusKey: meta.statusKey,
+    statusLabel: meta.statusLabel,
+    value:
+      percent == null || Number.isNaN(percent)
+        ? "—"
+        : `${Math.round(percent)}%`,
+  };
+};
 
-const averagePercent = (studentId, recordsMap, dates) => {
-  if (!dates.length) return 0;
+/**
+ * Centre daily % = average of all centre students' daily %.
+ * Students with no record for that day count as 0.
+ */
+const centrePercentForDate = (date, studentIds, recordsByStudentDate) => {
+  if (!studentIds.length) return null;
+
   let sum = 0;
-  for (const date of dates) {
-    const rec = recordsMap[recordKey(studentId, date)];
-    sum += rec ? Number(rec.dailyAttendancePercentage) || 0 : 0;
+  let hasAnyRecord = false;
+  for (const studentId of studentIds) {
+    const rec = recordsByStudentDate.get(`${studentId}_${date}`);
+    if (rec) {
+      hasAnyRecord = true;
+      sum += Number(rec.dailyAttendancePercentage) || 0;
+    }
   }
-  return sum / dates.length;
+
+  if (!hasAnyRecord) return null;
+  return sum / studentIds.length;
+};
+
+const averageOfPercents = (percents) => {
+  const valid = percents.filter((p) => p != null && !Number.isNaN(p));
+  if (!valid.length) return null;
+  return valid.reduce((a, b) => a + b, 0) / valid.length;
+};
+
+/** Calendar weeks (Mon–Sun) that intersect the selected month. */
+const getWeeksInMonth = (dateStr) => {
+  const d = new Date(`${dateStr}T00:00:00`);
+  const year = d.getFullYear();
+  const month = d.getMonth();
+  const monthStart = new Date(year, month, 1);
+  const monthEnd = new Date(year, month + 1, 0);
+
+  const firstMonday = new Date(monthStart);
+  const startDay = firstMonday.getDay();
+  const mondayOffset = startDay === 0 ? -6 : 1 - startDay;
+  firstMonday.setDate(firstMonday.getDate() + mondayOffset);
+
+  const weeks = [];
+  let cursor = new Date(firstMonday);
+  let weekIndex = 1;
+
+  while (cursor <= monthEnd) {
+    const weekStart = new Date(cursor);
+    const weekEnd = new Date(cursor);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+
+    const clippedFrom = weekStart < monthStart ? monthStart : weekStart;
+    const clippedTo = weekEnd > monthEnd ? monthEnd : weekEnd;
+
+    weeks.push({
+      label: `Week ${weekIndex}`,
+      from: toInputDate(clippedFrom),
+      to: toInputDate(clippedTo),
+      dates: eachDateInclusive(toInputDate(clippedFrom), toInputDate(clippedTo)),
+    });
+
+    cursor.setDate(cursor.getDate() + 7);
+    weekIndex += 1;
+  }
+
+  return weeks;
 };
 
 export default function AdminAttendance({
@@ -123,10 +212,8 @@ export default function AdminAttendance({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
-  const [savingId, setSavingId] = useState(null);
 
   const isMitraTab = activeTab === "sathee-mitra";
-  const canMark = !readOnly && activeTab === "daily";
 
   const centreStudents = useMemo(
     () =>
@@ -134,6 +221,11 @@ export default function AdminAttendance({
         matchesPortalCentre(student.centre, portalName)
       ),
     [students, portalName]
+  );
+
+  const centreStudentIds = useMemo(
+    () => centreStudents.map((s) => String(s.id)),
+    [centreStudents]
   );
 
   const centreMitras = useMemo(
@@ -146,98 +238,91 @@ export default function AdminAttendance({
     [mitras, portalName]
   );
 
-  const recordsMap = useMemo(() => {
-    const map = {};
+  const recordsByStudentDate = useMemo(() => {
+    const map = new Map();
     for (const record of attendanceRecords) {
-      map[recordKey(record.studentId, record.date)] = record;
+      map.set(`${String(record.studentId)}_${record.date}`, record);
     }
     return map;
   }, [attendanceRecords]);
 
   const periodMeta = useMemo(() => {
-    if (activeTab === "weekly") {
+    if (activeTab === "daily") {
       const range = getWeekRange(selectedDate);
       return {
         ...range,
-        dates: eachDateInclusive(range.from, range.to),
         label: `${formatDisplayDate(range.from)} – ${formatDisplayDate(range.to)}`,
       };
     }
-    if (activeTab === "monthly") {
+    if (activeTab === "weekly") {
       const range = getMonthRange(selectedDate);
+      const d = new Date(`${selectedDate}T00:00:00`);
       return {
         ...range,
-        dates: eachDateInclusive(range.from, range.to),
-        label: range.monthLabel,
+        label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
       };
     }
-    return {
-      from: selectedDate,
-      to: selectedDate,
-      dates: [selectedDate],
-      label: formatDisplayDate(selectedDate),
-    };
+    if (activeTab === "monthly") {
+      const range = getYearRange(selectedDate);
+      return { ...range, label: String(range.year) };
+    }
+    return { from: selectedDate, to: selectedDate, label: formatDisplayDate(selectedDate) };
   }, [activeTab, selectedDate]);
 
   const tableRows = useMemo(() => {
     if (isMitraTab) return [];
 
-    return centreStudents.map((student) => {
-      const id = student.id;
-      if (activeTab === "daily") {
-        const record = recordsMap[recordKey(id, selectedDate)];
-        const status = record?.status || "";
-        const percent = record
-          ? Number(record.dailyAttendancePercentage)
-          : null;
+    if (activeTab === "daily") {
+      const { from } = getWeekRange(selectedDate);
+      const monday = new Date(`${from}T00:00:00`);
+      return WEEKDAY_LABELS.map((label, index) => {
+        const day = new Date(monday);
+        day.setDate(monday.getDate() + index);
+        const date = toInputDate(day);
+        const percent = centrePercentForDate(
+          date,
+          centreStudentIds,
+          recordsByStudentDate
+        );
+        return buildRow(label, percent);
+      });
+    }
 
-        return {
-          id,
-          label: student.name || "—",
-          subLabel: student.course || student.centre || "",
-          student,
-          percent,
-          rawStatus: status,
-          statusKey: status || "none",
-          statusLabel: status ? STATUS_LABEL[status] || status : "Not marked",
-          value:
-            percent == null || Number.isNaN(percent)
-              ? "—"
-              : `${Math.round(percent)}%`,
-        };
-      }
+    if (activeTab === "weekly") {
+      return getWeeksInMonth(selectedDate).map((week) => {
+        const dayPercents = week.dates.map((date) =>
+          centrePercentForDate(date, centreStudentIds, recordsByStudentDate)
+        );
+        return buildRow(week.label, averageOfPercents(dayPercents));
+      });
+    }
 
-      const percent = averagePercent(id, recordsMap, periodMeta.dates);
-      const meta = percentStatusMeta(percent);
-      return {
-        id,
-        label: student.name || "—",
-        subLabel: student.course || student.centre || "",
-        student,
-        percent,
-        rawStatus: "",
-        statusKey: meta.statusKey,
-        statusLabel: meta.statusLabel,
-        value: `${Math.round(percent)}%`,
-      };
-    });
+    if (activeTab === "monthly") {
+      const year = new Date(`${selectedDate}T00:00:00`).getFullYear();
+      return MONTH_LABELS.map((label, monthIndex) => {
+        const from = toInputDate(new Date(year, monthIndex, 1));
+        const to = toInputDate(new Date(year, monthIndex + 1, 0));
+        const dates = eachDateInclusive(from, to);
+        const dayPercents = dates.map((date) =>
+          centrePercentForDate(date, centreStudentIds, recordsByStudentDate)
+        );
+        return buildRow(label, averageOfPercents(dayPercents));
+      });
+    }
+
+    return [];
   }, [
     isMitraTab,
-    centreStudents,
     activeTab,
-    recordsMap,
     selectedDate,
-    periodMeta.dates,
+    centreStudentIds,
+    recordsByStudentDate,
   ]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase().trim();
     if (!q) return tableRows;
-    return tableRows.filter(
-      (row) =>
-        (row.label || "").toLowerCase().includes(q) ||
-        (row.subLabel || "").toLowerCase().includes(q)
-    );
+    return tableRows.filter((row) => row.label.toLowerCase().includes(q));
   }, [tableRows, search]);
 
   const summary = useMemo(() => {
@@ -297,21 +382,17 @@ export default function AdminAttendance({
     setLoadingAttendance(true);
     setError("");
     try {
-      let records;
-      if (activeTab === "daily") {
-        records = await fetchStudentAttendanceByDate(selectedDate);
-      } else {
-        const range =
-          activeTab === "weekly"
-            ? getWeekRange(selectedDate)
-            : getMonthRange(selectedDate);
-        records = await fetchStudentAttendanceRange(range.from, range.to);
-      }
+      let range;
+      if (activeTab === "daily") range = getWeekRange(selectedDate);
+      else if (activeTab === "weekly") range = getMonthRange(selectedDate);
+      else range = getYearRange(selectedDate);
+
+      const records = await fetchStudentAttendanceRange(range.from, range.to);
       setAttendanceRecords(records);
     } catch (err) {
       console.error("Load student attendance error:", err);
       setError(
-        err.response?.data?.message || "Unable to load student attendance"
+        err.response?.data?.message || "Unable to load centre attendance"
       );
       setAttendanceRecords([]);
     } finally {
@@ -327,40 +408,6 @@ export default function AdminAttendance({
   useEffect(() => {
     loadAttendance();
   }, [loadAttendance]);
-
-  const handleStatusChange = async (row, status) => {
-    if (!canMark || !status) return;
-
-    setSavingId(row.id);
-    setError("");
-    try {
-      const saved = await upsertStudentAttendance({
-        studentId: row.id,
-        name: row.label,
-        centre: row.student?.centre,
-        date: selectedDate,
-        status,
-      });
-
-      setAttendanceRecords((prev) => {
-        const without = prev.filter(
-          (r) =>
-            !(
-              String(r.studentId) === String(row.id) &&
-              r.date === selectedDate
-            )
-        );
-        return [...without, saved];
-      });
-    } catch (err) {
-      console.error("Save student attendance error:", err);
-      setError(
-        err.response?.data?.message || "Unable to save student attendance"
-      );
-    } finally {
-      setSavingId(null);
-    }
-  };
 
   const runAttendanceExport = (format) => {
     if (isMitraTab) {
@@ -405,7 +452,7 @@ export default function AdminAttendance({
           <p className="mt-1 text-sm text-gray-500">
             {isMitraTab
               ? "Track Sathee Mitra presence with arrival and departure photo proof."
-              : "View and mark student attendance. Weekly and monthly rates average daily percentages."}
+              : "Combined centre attendance by day, week, and month."}
           </p>
         </div>
 
@@ -448,8 +495,6 @@ export default function AdminAttendance({
               filtered={filtered}
               columnLabel={COLUMN_LABEL[activeTab]}
               loading={busy}
-              canMark={canMark && savingId == null}
-              onStatusChange={handleStatusChange}
             />
           )}
 
@@ -463,7 +508,7 @@ export default function AdminAttendance({
                 </>
               ) : (
                 <>
-                  Showing {filtered.length} of {centreStudents.length} students
+                  Showing {filtered.length} of {tableRows.length} records
                   {periodMeta.label ? (
                     <>
                       {" "}
@@ -473,17 +518,26 @@ export default function AdminAttendance({
                       </span>
                     </>
                   ) : null}
+                  {centreStudentIds.length ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="font-medium text-gray-600">
+                        {centreStudentIds.length} students
+                      </span>
+                    </>
+                  ) : null}
                 </>
               )}
             </p>
             <p className="text-xs text-gray-400">
-              {activeTab === "weekly"
-                ? "Weekly = average of 7 daily %"
-                : activeTab === "monthly"
-                  ? "Monthly = average of all days in month"
-                  : canMark
-                    ? "Select status to mark attendance"
-                    : "View only"}
+              {activeTab === "daily"
+                ? "Centre % = average of all students that day"
+                : activeTab === "weekly"
+                  ? "Week % = average of centre daily %"
+                  : activeTab === "monthly"
+                    ? "Month % = average of centre daily %"
+                    : null}
             </p>
           </div>
         </div>
