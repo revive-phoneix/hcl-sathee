@@ -1,5 +1,6 @@
 import { API_URL } from "../../config/api";
 import { getAuthErrorMessage, postWithColdStartRetry } from "../../utils/apiRequest";
+import { getPasswordRuleStatus } from "../../utils/passwordPolicy";
 
 export const inputClass =
   "w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-blue-500";
@@ -53,6 +54,21 @@ export function AuthCard({ title, subtitle, children }) {
         {children}
       </div>
     </div>
+  );
+}
+
+export function PasswordRequirements({ password }) {
+  const rules = getPasswordRuleStatus(password);
+  if (!password) return null;
+
+  return (
+    <ul className="space-y-1 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
+      {rules.map((rule) => (
+        <li key={rule.id} className={rule.met ? "text-emerald-700" : "text-slate-500"}>
+          {rule.met ? "✓" : "•"} {rule.label}
+        </li>
+      ))}
+    </ul>
   );
 }
 

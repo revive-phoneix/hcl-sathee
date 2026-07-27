@@ -1,6 +1,10 @@
 const User = require("../Models/User");
 const generateToken = require("../Utils/GenerateToken");
-const { hashPassword, verifyPassword } = require("../Utils/password");
+const {
+  hashPassword,
+  verifyPassword,
+  validatePasswordPolicy,
+} = require("../Utils/password");
 
 const fail = (res, status, message) =>
   res.status(status).json({ success: false, message });
@@ -38,6 +42,9 @@ exports.createPassword = async (req, res) => {
       return fail(res, 400, "Password already set for this account");
     }
 
+    const policy = validatePasswordPolicy(password);
+    if (!policy.valid) return fail(res, 400, policy.message);
+
     await User.update(user.id, { password: await hashPassword(password) });
     return ok(res, { message: "Password created successfully" });
   } catch (err) {
@@ -67,9 +74,8 @@ exports.forgotPasswordReset = async (req, res) => {
     if (!name || !email || !role || !password) {
       return fail(res, 400, "Name, email, role and new password are required");
     }
-    if (String(password).length < 6) {
-      return fail(res, 400, "Password must be at least 6 characters long");
-    }
+    const policy = validatePasswordPolicy(password);
+    if (!policy.valid) return fail(res, 400, policy.message);
 
     const user = await findUserOrFail(res, email);
     if (!user) return;
@@ -93,12 +99,23 @@ exports.forgotPasswordReset = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const name = String(req.body.name || "").trim();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const password = req.body.password;
+
+    if (!name || !email || !password) {
+      return fail(res, 400, "Name, email and password are required");
+    }
+
     const user = await User.findByEmail(email);
     if (!user) return fail(res, 401, "Invalid credentials");
 
+    if (user.name?.trim() !== name) {
+      return fail(res, 401, "Invalid credentials");
+    }
+
     const { valid, needsRehash } = await verifyPassword(password, user.password);
-    if (!valid) return fail(res, 401, "Invalid email or password");
+    if (!valid) return fail(res, 401, "Invalid credentials");
 
     if (needsRehash) {
       await User.update(user.id, { password: await hashPassword(password) });

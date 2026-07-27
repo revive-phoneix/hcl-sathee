@@ -9,6 +9,8 @@ const REMEMBER_ME_KEY = "hcl_sathee_remember_me";
 const fieldClass =
   "h-12 w-full rounded-2xl bg-white/10 px-5 outline-none placeholder:text-white/50 focus:bg-white/20";
 
+const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
+
 export default function AdminLoginCard({ onLoginSuccess }) {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -35,12 +37,22 @@ export default function AdminLoginCard({ onLoginSuccess }) {
   const handleLogin = async () => {
     setError("");
     setStatusText("");
+
+    const name = formData.name.trim();
+    const email = formData.email.trim().toLowerCase();
+    const password = formData.password;
+
+    if (!name) return setError("Full name is required.");
+    if (!email) return setError("Email address is required.");
+    if (!isValidEmail(email)) return setError("Enter a valid email address.");
+    if (!password) return setError("Password is required.");
+
     setLoading(true);
 
     try {
       const response = await postWithColdStartRetry(
         `${API_URL}/api/auth/login`,
-        formData,
+        { name, email, password },
         {
           onStatus: (status) =>
             setStatusText(
@@ -51,13 +63,14 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         }
       );
 
-      if (rememberMe) localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(formData));
-      else localStorage.removeItem(REMEMBER_ME_KEY);
+      if (rememberMe) {
+        localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ name, email, password: "" }));
+      } else localStorage.removeItem(REMEMBER_ME_KEY);
 
       const user = response.data?.user || {};
       if (response.data?.token) setAuthToken(response.data.token);
       onLoginSuccess?.({
-        name: user.name || formData.name,
+        name: user.name || name,
         role: user.role || "",
         centre: user.centre || null,
       });
@@ -93,6 +106,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               onChange={setField(key)}
               placeholder={placeholder}
               className={fieldClass}
+              required
             />
           </div>
         ))}
@@ -108,6 +122,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               onChange={setField("password")}
               placeholder="Enter your password"
               className={`${fieldClass} pr-12`}
+              required
             />
             <button
               type="button"
@@ -127,8 +142,16 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               onChange={(e) => {
                 const checked = e.target.checked;
                 setRememberMe(checked);
-                if (checked) localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify(formData));
-                else localStorage.removeItem(REMEMBER_ME_KEY);
+                if (checked) {
+                  localStorage.setItem(
+                    REMEMBER_ME_KEY,
+                    JSON.stringify({
+                      name: formData.name,
+                      email: formData.email,
+                      password: "",
+                    })
+                  );
+                } else localStorage.removeItem(REMEMBER_ME_KEY);
               }}
               className="h-4 w-4 rounded border-white/40 bg-white/10 accent-[#fbbf24]"
             />

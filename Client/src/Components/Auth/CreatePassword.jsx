@@ -4,12 +4,14 @@ import {
   AuthAlerts,
   AuthCard,
   Field,
+  PasswordRequirements,
   authPost,
   btnPrimaryClass,
   getAuthErrorMessage,
   inputClass,
   lockedInputClass,
 } from "./authUi";
+import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 export default function CreatePassword() {
   const navigate = useNavigate();
@@ -36,9 +38,8 @@ export default function CreatePassword() {
     if (!form.name || !form.email) {
       return setError("The invite link is missing user details.");
     }
-    if (!form.password || form.password.length < 6) {
-      return setError("Password must be at least 6 characters long.");
-    }
+    const policy = validatePasswordPolicy(form.password);
+    if (!policy.valid) return setError(policy.message);
     if (form.password !== form.confirmPassword) {
       return setError("Passwords do not match.");
     }
@@ -80,9 +81,10 @@ export default function CreatePassword() {
             value={form.password}
             onChange={set("password")}
             className={inputClass}
-            placeholder="At least 6 characters"
+            placeholder="Create a strong password"
             required
           />
+          <PasswordRequirements password={form.password} />
         </Field>
         <Field label="Confirm Password">
           <input

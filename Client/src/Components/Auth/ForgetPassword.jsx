@@ -4,6 +4,7 @@ import {
   AuthAlerts,
   AuthCard,
   Field,
+  PasswordRequirements,
   authPost,
   btnPrimaryClass,
   btnSecondaryClass,
@@ -11,6 +12,7 @@ import {
   inputClass,
   lockedInputClass,
 } from "./authUi";
+import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 export default function ForgetPassword() {
   const navigate = useNavigate();
@@ -68,9 +70,8 @@ export default function ForgetPassword() {
   const handleReset = (e) => {
     e.preventDefault();
     resetAlerts();
-    if (!password || password.length < 6) {
-      return setError("Password must be at least 6 characters long.");
-    }
+    const policy = validatePasswordPolicy(password);
+    if (!policy.valid) return setError(policy.message);
     if (password !== confirmPassword) return setError("Passwords do not match.");
 
     run(async () => {
@@ -132,9 +133,10 @@ export default function ForgetPassword() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className={inputClass}
-              placeholder="At least 6 characters"
+              placeholder="Create a strong password"
               required
             />
+            <PasswordRequirements password={password} />
           </Field>
           <Field label="Confirm New Password">
             <input
