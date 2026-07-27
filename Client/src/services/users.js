@@ -11,6 +11,7 @@ export const createUser = async (payload) => {
     user: response.data.user,
     emailSent: Boolean(response.data.emailSent),
     emailError: response.data.emailError || null,
+    passwordSetupLink: response.data.passwordSetupLink || null,
     message: response.data.message || null,
   };
 };

@@ -38,6 +38,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submittingUser, setSubmittingUser] = useState(false);
   const [usersError, setUsersError] = useState("");
+  const [passwordSetupLink, setPasswordSetupLink] = useState("");
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
@@ -95,6 +96,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   const handleAddUser = async (newUser) => {
     setSubmittingUser(true);
     setUsersError("");
+    setPasswordSetupLink("");
 
     try {
       const result = await createUser(newUser);
@@ -109,6 +111,9 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
             ? `User saved, but email failed: ${result.emailError}`
             : "User saved, but the welcome email was not sent."
         );
+        if (result.passwordSetupLink) {
+          setPasswordSetupLink(result.passwordSetupLink);
+        }
       }
 
       return true;
@@ -181,7 +186,28 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
 
         {usersError && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {usersError}
+            <p>{usersError}</p>
+            {passwordSetupLink ? (
+              <div className="mt-3 rounded-xl border border-red-200 bg-white px-3 py-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Password setup link
+                </p>
+                <p className="mt-1 break-all text-slate-700">{passwordSetupLink}</p>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(passwordSetupLink);
+                    } catch (error) {
+                      console.error("Copy failed:", error);
+                    }
+                  }}
+                  className="mt-2 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Copy link
+                </button>
+              </div>
+            ) : null}
           </div>
         )}
 

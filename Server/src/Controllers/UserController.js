@@ -1,5 +1,6 @@
 const User = require("../Models/User");
 const { sendWelcomeEmail } = require("../Utils/sendEmail");
+const { createPasswordLink } = require("../Utils/createPasswordLink");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
   VALID_CENTRES,
@@ -11,6 +12,19 @@ const {
 const VALID_ROLES = ["ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 const TEST_EMAIL_DOMAIN = "@example.com";
 const isMitra = (role) => String(role).toUpperCase() === "SATHEE MITRA";
+
+const formatEmailError = (err) => {
+  const oauthError =
+    err?.response?.data?.error_description ||
+    err?.response?.data?.error?.message ||
+    (typeof err?.response?.data?.error === "string" ? err.response.data.error : null);
+
+  const raw = oauthError || err?.message || "Failed to send welcome email";
+  if (String(raw).toLowerCase().includes("invalid_grant")) {
+    return "Gmail authorization expired (invalid_grant). Update EMAIL_REFRESH_TOKEN on the server.";
+  }
+  return raw;
+};
 
 const toPublicUser = (user) => {
   if (!user) return user;
@@ -77,6 +91,7 @@ exports.addUser = wrap(
 
     let emailSent = false;
     let emailError = null;
+    const passwordSetupLink = createPasswordLink(name.trim(), normalizedEmail);
 
     if (normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
       emailError = "Skipped welcome email for @example.com addresses";
@@ -85,10 +100,7 @@ exports.addUser = wrap(
         await sendWelcomeEmail(normalizedEmail, name.trim(), role);
         emailSent = true;
       } catch (err) {
-        emailError =
-          err?.response?.data?.error?.message ||
-          err?.message ||
-          "Failed to send welcome email";
+        emailError = formatEmailError(err);
         console.error("Welcome email failed:", emailError, err);
       }
     }
@@ -99,6 +111,7 @@ exports.addUser = wrap(
         : "User created successfully, but welcome email could not be sent.",
       emailSent,
       emailError,
+      passwordSetupLink: emailSent ? null : passwordSetupLink,
       user: toPublicUser(createdUser),
     });
   },
