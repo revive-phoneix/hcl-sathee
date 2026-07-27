@@ -80,13 +80,6 @@ exports.addUser = async (req, res) => {
       });
     }
 
-    if (String(role).toUpperCase() === "SATHEE MITRA" && normalizedDays.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Select at least one available day for Sathee Mitra",
-      });
-    }
-
     const existingUser = await User.findByEmail(normalizedEmail);
     if (existingUser) {
       return res.status(409).json({
@@ -176,17 +169,7 @@ exports.updateUser = async (req, res) => {
     }
 
     if (availableDays != null) {
-      const normalizedDays = User.normalizeAvailableDays(availableDays);
-      if (
-        String(existing.role || "").toUpperCase() === "SATHEE MITRA" &&
-        normalizedDays.length === 0
-      ) {
-        return res.status(400).json({
-          success: false,
-          message: "Select at least one available day for Sathee Mitra",
-        });
-      }
-      patch.availableDays = normalizedDays;
+      patch.availableDays = User.normalizeAvailableDays(availableDays);
     }
 
     if (!Object.keys(patch).length) {

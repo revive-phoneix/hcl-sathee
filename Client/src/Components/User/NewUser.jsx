@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
-import { WEEKDAYS } from "../../utils/availableDays";
 
 export default function NewUser({ onClose, onAddUser, submittingUser, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
@@ -13,22 +12,9 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
     role: "ADMIN",
     designation: "",
     centre: defaultCentre,
-    availableDays: [],
   });
 
   const [error, setError] = useState("");
-
-  const toggleDay = (day) => {
-    setForm((prev) => {
-      const has = prev.availableDays.includes(day);
-      return {
-        ...prev,
-        availableDays: has
-          ? prev.availableDays.filter((d) => d !== day)
-          : [...prev.availableDays, day],
-      };
-    });
-  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -47,25 +33,13 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
       return;
     }
 
-    if (
-      form.role === "SATHEE MITRA" &&
-      (!form.availableDays || form.availableDays.length === 0)
-    ) {
-      setError("Select at least one available day for Sathee Mitra");
-      return;
-    }
-
     setError("");
 
     try {
-      const payload = {
+      await onAddUser({
         ...form,
         centre: form.centre || defaultCentre,
-        availableDays:
-          form.role === "SATHEE MITRA" ? form.availableDays : [],
-      };
-
-      await onAddUser(payload);
+      });
     } catch (submitError) {
       setError(submitError.message || "Unable to add user");
     }
@@ -139,8 +113,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                     ...prev,
                     role: e.target.value,
                     centre: prev.centre || defaultCentre,
-                    availableDays:
-                      e.target.value === "SATHEE MITRA" ? prev.availableDays : [],
                   }))
                 }
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -150,36 +122,6 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                 <option value="HCL PARTNER">HCL PARTNER</option>
               </select>
             </div>
-
-            {form.role === "SATHEE MITRA" ? (
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                  Days Available
-                </label>
-                <p className="text-xs text-slate-400 mb-2">
-                  Select days this Sathee Vishist / Mitra is available
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {WEEKDAYS.map((day) => {
-                    const selected = form.availableDays.includes(day);
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => toggleDay(day)}
-                        className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                          selected
-                            ? "bg-emerald-600 text-white border-emerald-600"
-                            : "bg-white text-slate-600 border-slate-200 hover:border-emerald-300"
-                        }`}
-                      >
-                        {day.slice(0, 3)}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            ) : null}
           </div>
 
           {error && (

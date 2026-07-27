@@ -40,11 +40,6 @@ export default function MentorDetailsModal({
       ? formData.availableDays
       : [];
 
-    if (days.length === 0) {
-      setError("Select at least one available day");
-      return;
-    }
-
     setSaving(true);
     setError("");
     try {

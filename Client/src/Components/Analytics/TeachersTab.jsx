@@ -1,4 +1,4 @@
-import { formatAvailableDays } from "../../utils/availableDays";
+import { WEEKDAYS } from "../../utils/availableDays";
 
 function attendanceBadge(val) {
   if (val == null) return "bg-gray-100 text-gray-600 border border-gray-200";
@@ -13,11 +13,49 @@ const mentorInitial = (name = "") => {
   return parts[parts.length - 1][0].toUpperCase();
 };
 
+function DayToggles({
+  mentor,
+  disabled = false,
+  saving = false,
+  onToggleDay,
+}) {
+  const selected = Array.isArray(mentor.availableDays)
+    ? mentor.availableDays
+    : [];
+
+  return (
+    <div className="flex flex-wrap gap-1.5 min-w-[220px]">
+      {WEEKDAYS.map((day) => {
+        const active = selected.includes(day);
+        return (
+          <button
+            key={day}
+            type="button"
+            disabled={disabled || saving}
+            title={day}
+            onClick={() => onToggleDay?.(mentor, day)}
+            className={`px-2 py-1 rounded-md text-[11px] font-semibold border transition-colors ${
+              active
+                ? "bg-emerald-600 text-white border-emerald-600"
+                : "bg-white text-slate-500 border-slate-200 hover:border-emerald-300"
+            } disabled:opacity-50 disabled:cursor-not-allowed`}
+          >
+            {day.slice(0, 3)}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function TeachersTab({
   mentors = [],
   onViewMentor,
+  onToggleAvailableDay,
   loading = false,
   error = "",
+  readOnly = false,
+  savingMentorId = null,
 }) {
   return (
     <div className="space-y-8">
@@ -93,7 +131,9 @@ export default function TeachersTab({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="px-6 py-5 border-b border-gray-100">
           <h2 className="text-base font-bold text-gray-900">SATHEE Vishist Schedule</h2>
-          <p className="text-sm text-gray-500">Mentors assigned to this centre</p>
+          <p className="text-sm text-gray-500">
+            Toggle days when each Sathee Mitra (Vishist) is available for special lectures
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -133,8 +173,13 @@ export default function TeachersTab({
                     <td className="px-4 py-4 text-gray-600 text-xs">{mentor.email || "—"}</td>
                     <td className="px-4 py-4 font-medium text-gray-700">{mentor.centre}</td>
                     <td className="px-4 py-4 text-gray-700">{mentor.phone || "—"}</td>
-                    <td className="px-5 py-4 text-gray-700 text-xs">
-                      {formatAvailableDays(mentor.availableDays)}
+                    <td className="px-5 py-4">
+                      <DayToggles
+                        mentor={mentor}
+                        disabled={readOnly}
+                        saving={String(savingMentorId) === String(mentor.id)}
+                        onToggleDay={onToggleAvailableDay}
+                      />
                     </td>
                   </tr>
                 ))

@@ -4,8 +4,9 @@ import { matchesPortalCentre } from "../../utils/portalMapping";
 import TeachersTab from "../../Components/Analytics/TeachersTab";
 import MentorDetailsModal from "../../Components/Analytics/MentorDetailsModal";
 import { MainLayout } from "../../Components/MainLayout";
-import { fetchUsers } from "../../services/users";
+import { fetchUsers, updateUser } from "../../services/users";
 import { fetchMitraAttendance } from "../../services/mitraAttendance";
+import { WEEKDAYS } from "../../utils/availableDays";
 
 const toInputDate = (date = new Date()) => {
   const year = date.getFullYear();
@@ -68,6 +69,7 @@ export default function AdminAnalytics({
   const [mentors, setMentors] = useState([]);
   const [loadingMentors, setLoadingMentors] = useState(false);
   const [mentorsError, setMentorsError] = useState("");
+  const [savingMentorId, setSavingMentorId] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -134,6 +136,62 @@ export default function AdminAnalytics({
 
   const filteredMentors = useMemo(() => mentors, [mentors]);
 
+  const handleToggleAvailableDay = async (mentor, day) => {
+    if (readOnly) return;
+
+    const current = Array.isArray(mentor.availableDays)
+      ? mentor.availableDays
+      : [];
+    const next = current.includes(day)
+      ? current.filter((d) => d !== day)
+      : WEEKDAYS.filter((d) => current.includes(d) || d === day);
+
+    // Optimistic UI update
+    setMentors((prev) =>
+      prev.map((m) =>
+        String(m.id) === String(mentor.id)
+          ? { ...m, availableDays: next }
+          : m
+      )
+    );
+    if (selectedMentor && String(selectedMentor.id) === String(mentor.id)) {
+      setSelectedMentor((prev) => ({ ...prev, availableDays: next }));
+    }
+
+    setSavingMentorId(mentor.id);
+    setMentorsError("");
+    try {
+      const updated = await updateUser(mentor.id, { availableDays: next });
+      setMentors((prev) =>
+        prev.map((m) =>
+          String(m.id) === String(mentor.id)
+            ? {
+                ...m,
+                availableDays: Array.isArray(updated.availableDays)
+                  ? updated.availableDays
+                  : next,
+              }
+            : m
+        )
+      );
+    } catch (error) {
+      console.error("Toggle available day error:", error);
+      // Revert optimistic update
+      setMentors((prev) =>
+        prev.map((m) =>
+          String(m.id) === String(mentor.id)
+            ? { ...m, availableDays: current }
+            : m
+        )
+      );
+      setMentorsError(
+        error.response?.data?.message || "Unable to update available days"
+      );
+    } finally {
+      setSavingMentorId(null);
+    }
+  };
+
   return (
     <MainLayout
       portalName={portalName}
@@ -184,6 +242,9 @@ export default function AdminAnalytics({
             mentors={filteredMentors}
             loading={loadingMentors}
             error={mentorsError}
+            readOnly={readOnly}
+            savingMentorId={savingMentorId}
+            onToggleAvailableDay={handleToggleAvailableDay}
             onViewMentor={(mentor) => {
               setSelectedMentor(mentor);
               setMentorModalOpen(true);
