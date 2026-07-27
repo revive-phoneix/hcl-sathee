@@ -10,6 +10,7 @@ import {
   removeAnnouncement,
   updateAnnouncement,
 } from "../../services/announcements";
+import { getApiErrorMessage } from "../../utils/apiRequest";
 import {
   getCentreValueFromPortal,
   matchesPortalCentre,
@@ -57,9 +58,7 @@ export default function AdminAnnouncements({
       setAnnouncements(data);
     } catch (loadError) {
       console.error("Fetch announcements error:", loadError);
-      setError(
-        loadError.response?.data?.message || "Unable to load announcements"
-      );
+      setError(getApiErrorMessage(loadError, "Unable to load announcements"));
       setAnnouncements([]);
     } finally {
       setLoading(false);
@@ -76,20 +75,21 @@ export default function AdminAnnouncements({
     [announcements, portalName]
   );
 
+  const findAnnouncement = (id) => centreAnnouncements.find((item) => item.id === id);
+
   const filtered = useMemo(() => {
-    return centreAnnouncements.filter((a) => {
-      const q = search.toLowerCase();
-      const matchSearch =
-        !q ||
-        a.title.toLowerCase().includes(q) ||
-        a.description.toLowerCase().includes(q) ||
-        a.category.toLowerCase().includes(q) ||
-        (a.postedOn || "").toLowerCase().includes(q);
-
-      const matchCategory =
-        filterCategory === "All Courses" || a.category === filterCategory;
-
-      return matchSearch && matchCategory;
+    const q = search.toLowerCase();
+    return centreAnnouncements.filter((announcement) => {
+      if (filterCategory !== "All Courses" && announcement.category !== filterCategory) {
+        return false;
+      }
+      if (!q) return true;
+      return (
+        announcement.title.toLowerCase().includes(q) ||
+        announcement.description.toLowerCase().includes(q) ||
+        announcement.category.toLowerCase().includes(q) ||
+        (announcement.postedOn || "").toLowerCase().includes(q)
+      );
     });
   }, [centreAnnouncements, search, filterCategory]);
 
@@ -146,9 +146,7 @@ export default function AdminAnnouncements({
       setShowModal(false);
     } catch (submitError) {
       console.error("Save announcement error:", submitError);
-      setError(
-        submitError.response?.data?.message || "Unable to save announcement"
-      );
+      setError(getApiErrorMessage(submitError, "Unable to save announcement"));
     } finally {
       setSubmitting(false);
     }
@@ -163,9 +161,7 @@ export default function AdminAnnouncements({
       setDeleteConfirmId(null);
     } catch (deleteError) {
       console.error("Delete announcement error:", deleteError);
-      setError(
-        deleteError.response?.data?.message || "Unable to delete announcement"
-      );
+      setError(getApiErrorMessage(deleteError, "Unable to delete announcement"));
       setDeleteConfirmId(null);
     }
   };
@@ -285,18 +281,13 @@ export default function AdminAnnouncements({
             onSubmit={handleSubmit}
             submitting={submitting}
             defaultCentre={getCentreValueFromPortal(portalName)}
-            editData={
-              editId ? centreAnnouncements.find((a) => a.id === editId) : null
-            }
+            editData={editId ? findAnnouncement(editId) : null}
           />
         ) : null}
 
         {!readOnly && deleteConfirmId ? (
           <ConfirmDeleteModal
-            title={
-              centreAnnouncements.find((a) => a.id === deleteConfirmId)?.title ||
-              ""
-            }
+            title={findAnnouncement(deleteConfirmId)?.title || ""}
             onCancel={() => setDeleteConfirmId(null)}
             onConfirm={() => handleDelete(deleteConfirmId)}
           />
@@ -304,7 +295,7 @@ export default function AdminAnnouncements({
 
         {viewId && (
           <ViewModal
-            announcement={centreAnnouncements.find((a) => a.id === viewId)}
+            announcement={findAnnouncement(viewId)}
             onClose={() => setViewId(null)}
           />
         )}

@@ -7,6 +7,8 @@ import UserTable from "../../Components/User/UserTable";
 import { MainLayout } from "../../Components/MainLayout";
 import { createUser, fetchUsers, removeUser } from "../../services/users";
 import { matchesPortalCentre } from "../../utils/portalMapping";
+import { getApiErrorMessage } from "../../utils/apiRequest";
+import { getInitials } from "../../utils/studentMetrics";
 
 const ROLE_FILTERS = ["All Users", "ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 
@@ -22,19 +24,10 @@ const avatarColor = {
   "HCL PARTNER": "bg-purple-600",
 };
 
-const getAvatar = (name = "") =>
-  name
-    .trim()
-    .split(/\s+/)
-    .map((part) => part[0])
-    .join("")
-    .toUpperCase()
-    .slice(0, 2);
-
 const normalizeUser = (user) => ({
   ...user,
   role: user.role?.toUpperCase() || user.role,
-  avatar: getAvatar(user.name),
+  avatar: getInitials(user.name),
 });
 
 export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout }) {
@@ -60,9 +53,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       setUsersError("");
     } catch (error) {
       console.error("Fetch Users Error:", error);
-      setUsersError(
-        error.response?.data?.message || "Unable to load users from the database"
-      );
+      setUsersError(getApiErrorMessage(error, "Unable to load users from the database"));
     } finally {
       setLoadingUsers(false);
       setRefreshing(false);
@@ -73,30 +64,33 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
     loadUsers();
   }, [loadUsers]);
 
+  const isVisibleOnPortal = useCallback(
+    (user) => user.role === "ADMIN" || matchesPortalCentre(user.centre, portalName),
+    [portalName]
+  );
+
+  const visibleUsers = useMemo(
+    () => users.filter(isVisibleOnPortal),
+    [users, isVisibleOnPortal]
+  );
+
   const filtered = useMemo(() => {
-    return users.filter((u) => {
-      // Admins are visible on every portal; others only on their centre
-      const matchesPortal =
-        u.role === "ADMIN" || matchesPortalCentre(u.centre, portalName);
-      const matchesRole = activeFilter === "All Users" || u.role === activeFilter;
-      const q = search.toLowerCase().trim();
+    const q = search.toLowerCase().trim();
+    return visibleUsers.filter((user) => {
+      const matchesRole = activeFilter === "All Users" || user.role === activeFilter;
       const matchesSearch =
         !q ||
-        (u.name || "").toLowerCase().includes(q) ||
-        (u.email || "").toLowerCase().includes(q) ||
-        (u.phone || "").toLowerCase().includes(q);
-      return matchesPortal && matchesRole && matchesSearch;
+        (user.name || "").toLowerCase().includes(q) ||
+        (user.email || "").toLowerCase().includes(q) ||
+        (user.phone || "").toLowerCase().includes(q);
+      return matchesRole && matchesSearch;
     });
-  }, [users, activeFilter, search, portalName]);
+  }, [visibleUsers, activeFilter, search]);
 
-  const roleCount = (role) => {
-    const visibleUsers = users.filter(
-      (u) => u.role === "ADMIN" || matchesPortalCentre(u.centre, portalName)
-    );
-    return role === "All Users"
+  const roleCount = (role) =>
+    role === "All Users"
       ? visibleUsers.length
-      : visibleUsers.filter((u) => u.role === role).length;
-  };
+      : visibleUsers.filter((user) => user.role === role).length;
 
   const handleAddUser = async (newUser) => {
     setSubmittingUser(true);
@@ -120,10 +114,9 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       return true;
     } catch (error) {
       console.error("Create User Error:", error);
-      throw new Error(
-        error.response?.data?.message || "Unable to save the user to the database",
-        { cause: error }
-      );
+      throw new Error(getApiErrorMessage(error, "Unable to save the user to the database"), {
+        cause: error,
+      });
     } finally {
       setSubmittingUser(false);
     }
@@ -146,9 +139,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       setUserToDelete(null);
     } catch (error) {
       console.error("Delete User Error:", error);
-      setUsersError(
-        error.response?.data?.message || "Unable to delete the user right now"
-      );
+      setUsersError(getApiErrorMessage(error, "Unable to delete the user right now"));
       setUserToDelete(null);
     } finally {
       setDeletingUser(false);

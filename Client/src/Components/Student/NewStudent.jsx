@@ -2,73 +2,38 @@ import { useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 
-const courses = [
-  "JEE",
-  "NEET",
-  "CLAT",
-  "SSC",
-  "IBPS",
-  "RRB",
-  "ICAR",
-  "CUET",
-];
-
+const courses = ["JEE", "NEET", "CLAT", "SSC", "IBPS", "RRB", "ICAR", "CUET"];
 const casteCategories = ["General", "OBC", "SC", "ST", "EWS"];
+
+const createEmptyForm = (centre) => ({
+  studentId: "",
+  firstName: "",
+  lastName: "",
+  gender: "Male",
+  email: "",
+  phone: "",
+  centreName: centre,
+  centreId: centre,
+  course: "JEE",
+  category: "General",
+  fatherName: "",
+  fatherPhone: "",
+  motherName: "",
+  motherPhone: "",
+});
 
 export default function NewStudent({ open, onClose, onSubmit, error, submitting, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
-
-  const [form, setForm] = useState({
-    studentId: "",
-    firstName: "",
-    lastName: "",
-    gender: "Male",
-    email: "",
-    phone: "",
-    centreName: defaultCentre,
-    centreId: defaultCentre,
-    course: "JEE",
-    category: "General",
-    fatherName: "",
-    fatherPhone: "",
-    motherName: "",
-    motherPhone: "",
-  });
-
-
+  const [form, setForm] = useState(() => createEmptyForm(defaultCentre));
 
   if (!open) return null;
 
-  const handleChange = (field, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+  const handleChange = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    const success = onSubmit ? await onSubmit(form) : true;
-    if (!success) return;
-
-    setForm({
-      studentId: "",
-      firstName: "",
-      lastName: "",
-      gender: "Male",
-      email: "",
-      phone: "",
-      centreName: defaultCentre,
-      centreId: defaultCentre,
-      course: "JEE",
-      category: "General",
-      fatherName: "",
-      fatherPhone: "",
-      motherName: "",
-      motherPhone: "",
-    });
-
+    if (!(await onSubmit?.(form))) return;
+    setForm(createEmptyForm(defaultCentre));
     onClose();
   };
 
@@ -157,12 +122,8 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
           </button>
         </div>
 
-        <form
-          onSubmit={handleSubmit}
-          style={{
-            padding: 36,
-          }}
-        >
+        <form onSubmit={handleSubmit} className="new-student-form" style={{ padding: 36 }}>
+          <FormStyles />
           {error ? (
             <div
               style={{
@@ -375,91 +336,50 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
   );
 }
 
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-  type = "text",
-  readOnly = false,
-}) {
+function FormStyles() {
   return (
-    <>
-      <style>{`
-  input::placeholder {
-    color: #000000;
-    opacity: 1;
-  }
-
-  select {
-    color: #000000;
-  }
-
-  option {
-    color: #000000;
-    background: #ffffff;
-  }
-
-  input:focus,
-  select:focus {
-    outline: none;
-    border-color: #3b82f6;
-  }
-`}</style>
-      <div>
-        <label
-          style={{
-            display: "block",
-            marginBottom: 10,
-            fontWeight: 600,
-            color: "#1e3a5f",
-          }}
-        >
-          {label}
-        </label>
-
-        <input
-          type={type}
-          readOnly={readOnly}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChange?.(e.target.value)}
-          style={{
-            width: "100%",
-            padding: "14px 18px",
-            borderRadius: 12,
-            border: "1px solid #dbe3ef",
-            background: readOnly ? "#f8fafc" : "#fff",
-            color: "#000000",          // Text color
-            fontSize: 15,
-            boxSizing: "border-box",
-            outline: "none",
-          }}
-        />
-      </div>
-    </>
+    <style>{`
+      .new-student-form input::placeholder { color: #000000; opacity: 1; }
+      .new-student-form select, .new-student-form option { color: #000000; background: #ffffff; }
+      .new-student-form input:focus, .new-student-form select:focus { outline: none; border-color: #3b82f6; }
+    `}</style>
   );
 }
 
-function SelectField({
-  label,
-  value,
-  options,
-  onChange,
-}) {
+function Field({ label, value, onChange, placeholder, type = "text", readOnly = false }) {
   return (
     <div>
-      <label
-        style={{
-          display: "block",
-          marginBottom: 10,
-          fontWeight: 600,
-          color: "#1e3a5f",
-        }}
-      >
+      <label style={{ display: "block", marginBottom: 10, fontWeight: 600, color: "#1e3a5f" }}>
         {label}
       </label>
+      <input
+        type={type}
+        readOnly={readOnly}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => onChange?.(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "14px 18px",
+          borderRadius: 12,
+          border: "1px solid #dbe3ef",
+          background: readOnly ? "#f8fafc" : "#fff",
+          color: "#000000",
+          fontSize: 15,
+          boxSizing: "border-box",
+          outline: "none",
+        }}
+      />
+    </div>
+  );
+}
 
+function SelectField({ label, value, options, onChange }) {
+  return (
+    <div>
+      <label style={{ display: "block", marginBottom: 10, fontWeight: 600, color: "#1e3a5f" }}>
+        {label}
+      </label>
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}

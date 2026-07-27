@@ -10,8 +10,20 @@ const TYPE_OPTIONS = [
   { value: "monthly", label: "Monthly" },
 ];
 
+const PARTNER_TABS = [
+  ...TYPE_OPTIONS,
+  { value: "sathee-mitra", label: "Sathee Mitra" },
+];
+
 const selectClass =
   "min-w-[160px] px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors";
+
+const pillClass = (active) =>
+  `px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+    active
+      ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+      : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
+  }`;
 
 /** Admin: type + centre dropdowns + Sathee Mitra. Partner: original tab pills. */
 export default function TabSelector({
@@ -22,25 +34,14 @@ export default function TabSelector({
   adminFilters = false,
 }) {
   if (!adminFilters) {
-    const tabs = [
-      { key: "daily", label: "Daily" },
-      { key: "weekly", label: "Weekly" },
-      { key: "monthly", label: "Monthly" },
-      { key: "sathee-mitra", label: "Sathee Mitra" },
-    ];
-
     return (
       <div className="flex flex-wrap items-center gap-2 mb-5">
-        {tabs.map((tab) => (
+        {PARTNER_TABS.map((tab) => (
           <button
-            key={tab.key}
+            key={tab.value}
             type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-              activeTab === tab.key
-                ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-                : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
-            }`}
+            onClick={() => setActiveTab(tab.value)}
+            className={pillClass(activeTab === tab.value)}
           >
             {tab.label}
           </button>
@@ -49,10 +50,9 @@ export default function TabSelector({
     );
   }
 
-  const typeValue =
-    activeTab === "daily" || activeTab === "weekly" || activeTab === "monthly"
-      ? activeTab
-      : "";
+  const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
+    ? activeTab
+    : "";
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5">
@@ -87,11 +87,7 @@ export default function TabSelector({
       <button
         type="button"
         onClick={() => setActiveTab("sathee-mitra")}
-        className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-          activeTab === "sathee-mitra"
-            ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-            : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
-        }`}
+        className={pillClass(activeTab === "sathee-mitra")}
       >
         Sathee Mitra
       </button>

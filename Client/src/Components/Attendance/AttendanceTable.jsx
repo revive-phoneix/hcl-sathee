@@ -1,4 +1,5 @@
 import { getPercentColor, getBarWidth } from "./utils";
+import TableStatusRow from "../common/TableStatusRow";
 
 const STATUS_STYLES = {
   excellent: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -45,17 +46,13 @@ export default function AttendanceTable({
         </thead>
         <tbody>
           {loading ? (
-            <tr>
-              <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
-                Loading attendance…
-              </td>
-            </tr>
+            <TableStatusRow colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
+              Loading attendance…
+            </TableStatusRow>
           ) : filtered.length === 0 ? (
-            <tr>
-              <td colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
-                No attendance records for this period.
-              </td>
-            </tr>
+            <TableStatusRow colSpan={5} className="px-6 py-10 text-center text-sm text-gray-400">
+              No attendance records for this period.
+            </TableStatusRow>
           ) : (
             filtered.map((row, i) => {
               const num = row.percent;

@@ -19,25 +19,14 @@ export default function NewAnnouncementModal({
       ? [defaultCentre]
       : [];
 
-  const [form, setForm] = useState(
-    editData
-      ? {
-          title: editData.title || "",
-          category: editData.category || "JEE",
-          description: editData.description || "",
-          priority: editData.priority || "Medium",
-          attachment: null,
-          centres: initialCentres,
-        }
-      : {
-          title: "",
-          category: "JEE",
-          description: "",
-          priority: "Medium",
-          attachment: null,
-          centres: initialCentres,
-        }
-  );
+  const [form, setForm] = useState({
+    title: editData?.title || "",
+    category: editData?.category || "JEE",
+    description: editData?.description || "",
+    priority: editData?.priority || "Medium",
+    attachment: null,
+    centres: initialCentres,
+  });
   const [centreError, setCentreError] = useState("");
 
   const toggleCentre = (centre) => {

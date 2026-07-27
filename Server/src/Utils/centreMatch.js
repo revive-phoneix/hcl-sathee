@@ -1,3 +1,10 @@
+const VALID_CENTRES = [
+  "HCL RAJASTHAN",
+  "HCL RAJATHAN",
+  "HCL JHARKHAND",
+  "HCL MADHYA PRADESH",
+];
+
 const normalizeCentreValue = (value = "") =>
   value
     .toString()
@@ -39,6 +46,7 @@ const filterByUserCentre = (items, user, centreField = "centre") => {
 };
 
 module.exports = {
+  VALID_CENTRES,
   normalizeCentreValue,
   getCanonicalCentreKey,
   matchesCentre,

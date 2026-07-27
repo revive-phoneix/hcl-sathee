@@ -7,6 +7,8 @@ import StudentTable from "../../Components/Student/StudentTable";
 import NewStudent from "../../Components/Student/NewStudent";
 import StudentDetailsModal from "../../Components/Student/StudentDetailsModal";
 import { fetchStudents, createStudent } from "../../services/students";
+import { getApiErrorMessage } from "../../utils/apiRequest";
+import { AVATAR_COLORS, getInitials } from "../../utils/studentMetrics";
 
 const PAGE_SIZE = 8;
 
@@ -34,14 +36,6 @@ export default function Student({
     setCreateStudentError("");
 
     const fullName = `${student.firstName || ""} ${student.lastName || ""}`.trim();
-    const initials =
-      fullName
-        .split(" ")
-        .filter(Boolean)
-        .map((part) => part[0])
-        .join("")
-        .slice(0, 2)
-        .toUpperCase() || "ST";
 
     try {
       const created = await createStudent({
@@ -64,8 +58,8 @@ export default function Student({
         marks: {},
         attendance: {},
         qualifications: {},
-        avatarColor: ["#1e40af", "#0f766e", "#7c3aed", "#b45309", "#be123c"][students.length % 5],
-        initials,
+        avatarColor: AVATAR_COLORS[students.length % AVATAR_COLORS.length],
+        initials: getInitials(fullName, "ST"),
       });
 
       setStudents((prev) => [created, ...prev]);
@@ -73,7 +67,7 @@ export default function Student({
       return true;
     } catch (error) {
       console.error("Add Student Error:", error);
-      setCreateStudentError(error.response?.data?.message || "Unable to add student");
+      setCreateStudentError(getApiErrorMessage(error, "Unable to add student"));
       return false;
     } finally {
       setSubmittingStudent(false);
@@ -100,18 +94,18 @@ export default function Student({
   }, []);
 
   const filtered = useMemo(() => {
-    return students.filter((s) => {
-      const matchesPortal = matchesPortalCentre(s.centre, portalName);
-      const q = search.toLowerCase();
-      const matchesSearch =
-        !search ||
-        s.name.toLowerCase().includes(q) ||
-        (s.id && String(s.id).toLowerCase().includes(q)) ||
-        (s.enrollmentNo && s.enrollmentNo.toLowerCase().includes(q)) ||
-        (s.centre || "").toLowerCase().includes(q) ||
-        (s.course || "").toLowerCase().includes(q);
-      const matchesCourse = courseFilter === "All Courses" || s.course === courseFilter;
-      return matchesPortal && matchesSearch && matchesCourse;
+    const q = search.toLowerCase();
+    return students.filter((student) => {
+      if (!matchesPortalCentre(student.centre, portalName)) return false;
+      if (courseFilter !== "All Courses" && student.course !== courseFilter) return false;
+      if (!search) return true;
+      return (
+        student.name.toLowerCase().includes(q) ||
+        String(student.id || "").toLowerCase().includes(q) ||
+        (student.enrollmentNo || "").toLowerCase().includes(q) ||
+        (student.centre || "").toLowerCase().includes(q) ||
+        (student.course || "").toLowerCase().includes(q)
+      );
     });
   }, [search, courseFilter, students, portalName]);
 

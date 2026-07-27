@@ -1,15 +1,9 @@
 const { getDb } = require("../config/firebase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "studentAttendances";
 
 const attendancesRef = () => getDb().collection(COLLECTION);
-
-const toDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
-  return new Date(value);
-};
 
 const STATUS_PERCENT = {
   present: 100,

@@ -1,15 +1,10 @@
 const { getDb } = require("../config/firebase");
+const { toDate, getNextId: nextId } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "subjectPerformances";
 
 const performancesRef = () => getDb().collection(COLLECTION);
-
-const toDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
-  return new Date(value);
-};
+const getNextId = () => nextId(performancesRef());
 
 const toApiPerformance = (docId, data) => ({
   id: Number(docId) || docId,
@@ -33,21 +28,6 @@ const findByStudentId = async (studentId) => {
     .where("studentId", "==", Number(studentId) || studentId)
     .get();
   return snap.docs.map((doc) => toApiPerformance(doc.id, doc.data()));
-};
-
-const getNextId = async () => {
-  const snap = await performancesRef().get();
-  if (snap.empty) return 1;
-
-  let maxId = 0;
-  for (const doc of snap.docs) {
-    const docId = Number(doc.id);
-    const fieldId = Number(doc.data().id);
-    if (!Number.isNaN(docId)) maxId = Math.max(maxId, docId);
-    if (!Number.isNaN(fieldId)) maxId = Math.max(maxId, fieldId);
-  }
-
-  return maxId + 1;
 };
 
 const create = async (data) => {

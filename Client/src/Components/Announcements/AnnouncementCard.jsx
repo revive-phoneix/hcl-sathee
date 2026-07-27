@@ -1,3 +1,14 @@
+const PRIORITY_CONFIG = {
+  High: { bg: "bg-red-100 text-red-700", label: "HIGH" },
+  Medium: { bg: "bg-amber-100 text-amber-700", label: "MEDIUM" },
+  Low: { bg: "bg-sky-100 text-sky-700", label: "LOW" },
+};
+
+const CATEGORY_ICONS = {
+  Engineering: "⚙️",
+  Medical: "🏥",
+};
+
 export default function AnnouncementCard({
   announcement,
   onEdit,
@@ -5,24 +16,15 @@ export default function AnnouncementCard({
   onView,
   readOnly = false,
 }) {
-  const priorityConfig = {
-    High: { bg: "bg-red-100 text-red-700", label: "HIGH" },
-    Medium: { bg: "bg-amber-100 text-amber-700", label: "MEDIUM" },
-    Low: { bg: "bg-sky-100 text-sky-700", label: "LOW" },
-  };
-
-  const priority = priorityConfig[announcement.priority] || priorityConfig.Medium;
+  const priority = PRIORITY_CONFIG[announcement.priority] || PRIORITY_CONFIG.Medium;
+  const categoryIcon = CATEGORY_ICONS[announcement.category] || "📢";
 
   return (
     <div className="bg-sky-50 border border-sky-200 rounded-2xl p-6 flex gap-6 relative overflow-hidden hover:shadow-xl transition-all group">
       <div className="absolute left-0 top-0 bottom-0 w-1.5 rounded-l-2xl bg-sky-500" />
 
       <div className="w-12 h-12 rounded-full bg-white border border-sky-200 flex items-center justify-center text-2xl flex-shrink-0">
-        {announcement.category === "Engineering"
-          ? "⚙️"
-          : announcement.category === "Medical"
-            ? "🏥"
-            : "📢"}
+        {categoryIcon}
       </div>
 
       <div className="flex-1 min-w-0">

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock, ImageOff } from "lucide-react";
 import { fetchMitraAttendance } from "../../services/mitraAttendance";
+import TableStatusRow from "../common/TableStatusRow";
 
 const formatTime = (value) => {
   if (!value) return "—";
@@ -32,6 +33,14 @@ function PhotoTimeCell({ label, photoUrl, time }) {
     </div>
   );
 }
+
+const EMPTY_RECORD = {
+  arrivalPhotoUrl: null,
+  arrivalTime: null,
+  departurePhotoUrl: null,
+  departureTime: null,
+  centreId: null,
+};
 
 /** View-only Sathee Mitra attendance. Photos are uploaded from the Mitra portal. */
 export default function SatheeMitraAttendance({
@@ -89,14 +98,7 @@ export default function SatheeMitraAttendance({
     };
   }, [selectedDate]);
 
-  const getRecord = (userId) =>
-    recordsByUser[String(userId)] || {
-      arrivalPhotoUrl: null,
-      arrivalTime: null,
-      departurePhotoUrl: null,
-      departureTime: null,
-      centreId: null,
-    };
+  const getRecord = (userId) => recordsByUser[String(userId)] || EMPTY_RECORD;
 
   const busy = loading || loadingRecords;
 
@@ -134,17 +136,13 @@ export default function SatheeMitraAttendance({
           </thead>
           <tbody>
             {busy ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
-                  Loading Sathee Mitra attendance…
-                </td>
-              </tr>
+              <TableStatusRow colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
+                Loading Sathee Mitra attendance…
+              </TableStatusRow>
             ) : rows.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
-                  No Sathee Mitra found for this centre.
-                </td>
-              </tr>
+              <TableStatusRow colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
+                No Sathee Mitra found for this centre.
+              </TableStatusRow>
             ) : (
               rows.map((mitra, index) => {
                 const record = getRecord(mitra.id);

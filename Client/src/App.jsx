@@ -8,6 +8,7 @@ import {
 
 import Authentication from "./Pages/Auth/Authentication";
 import CreatePassword from "./Components/Auth/CreatePassword";
+import ForgetPassword from "./Components/Auth/ForgetPassword";
 import CardSelector_1 from "./Pages/Selector/CardSelector_1";
 import CardSelector_2 from "./Pages/Selector/CardSelector_2";
 import Dashboard from "./Pages/Dashboard/AdminDashboard";
@@ -99,16 +100,6 @@ const AppContent = () => {
     ? PARTNER_PATH_TO_NAV[location.pathname] ?? 0
     : ADMIN_PATH_TO_NAV[location.pathname] ?? 0;
 
-  const handleAdminNavChange = (index) => {
-    const path = ADMIN_NAV_PATHS[index];
-    if (path) navigate(path);
-  };
-
-  const handlePartnerNavChange = (index) => {
-    const path = PARTNER_NAV_PATHS[index];
-    if (path) navigate(path);
-  };
-
   const handleLogout = () => {
     clearAuthToken();
     setIsLoggedIn(false);
@@ -119,8 +110,38 @@ const AppContent = () => {
     navigate("/", { replace: true });
   };
 
+  const handleAdminNavChange = (index) => {
+    const path = ADMIN_NAV_PATHS[index];
+    if (path) navigate(path);
+  };
+
+  const handlePartnerNavChange = (index) => {
+    const path = PARTNER_NAV_PATHS[index];
+    if (path) navigate(path);
+  };
+
+  const adminLayout = {
+    portalName: selectedPortal,
+    navItems: adminNavItems,
+    activeNav,
+    onNavChange: handleAdminNavChange,
+    onLogout: handleLogout,
+  };
+
+  const partnerLayout = {
+    portalName: selectedPortal,
+    navItems: partnerNavItems,
+    activeNav,
+    onNavChange: handlePartnerNavChange,
+    onLogout: handleLogout,
+  };
+
   if (location.pathname === "/create-password") {
     return <CreatePassword />;
+  }
+
+  if (location.pathname === "/forgot-password") {
+    return <ForgetPassword />;
   }
 
   if (!isLoggedIn) {
@@ -180,143 +201,24 @@ const AppContent = () => {
       />
 
       {/* Admin routes */}
-      <Route
-        path="/dashboard"
-        element={
-          <Dashboard
-            portalName={selectedPortal}
-            userName={userName}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/attendance"
-        element={
-          <AdminAttendance
-            portalName={selectedPortal}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/analytics"
-        element={
-          <AdminAnalytics
-            portalName={selectedPortal}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/users"
-        element={
-          <AdminUser
-            portalName={selectedPortal}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/students"
-        element={
-          <Student
-            portalName={selectedPortal}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
+      <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
+      <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
+      <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
+      <Route path="/users" element={<AdminUser {...adminLayout} />} />
+      <Route path="/students" element={<Student {...adminLayout} />} />
       <Route
         path="/announcements"
-        element={
-          <AdminAnnouncements
-            portalName={selectedPortal}
-            userName={userName}
-            navItems={adminNavItems}
-            activeNav={activeNav}
-            onNavChange={handleAdminNavChange}
-            onLogout={handleLogout}
-          />
-        }
+        element={<AdminAnnouncements {...adminLayout} userName={userName} />}
       />
 
       {/* HCL Partner routes (no Users page) */}
-      <Route
-        path="/partner/dashboard"
-        element={
-          <HCLPartnerDashboard
-            portalName={selectedPortal}
-            userName={userName}
-            navItems={partnerNavItems}
-            activeNav={activeNav}
-            onNavChange={handlePartnerNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/partner/attendance"
-        element={
-          <HCLPartnerAttendance
-            portalName={selectedPortal}
-            navItems={partnerNavItems}
-            activeNav={activeNav}
-            onNavChange={handlePartnerNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/partner/analytics"
-        element={
-          <HCLPartnerAnalytics
-            portalName={selectedPortal}
-            navItems={partnerNavItems}
-            activeNav={activeNav}
-            onNavChange={handlePartnerNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
-      <Route
-        path="/partner/students"
-        element={
-          <PartnerStudents
-            portalName={selectedPortal}
-            navItems={partnerNavItems}
-            activeNav={activeNav}
-            onNavChange={handlePartnerNavChange}
-            onLogout={handleLogout}
-          />
-        }
-      />
+      <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
+      <Route path="/partner/attendance" element={<HCLPartnerAttendance {...partnerLayout} />} />
+      <Route path="/partner/analytics" element={<HCLPartnerAnalytics {...partnerLayout} />} />
+      <Route path="/partner/students" element={<PartnerStudents {...partnerLayout} />} />
       <Route
         path="/partner/announcements"
-        element={
-          <HCLPartnerAnnouncements
-            portalName={selectedPortal}
-            userName={userName}
-            navItems={partnerNavItems}
-            activeNav={activeNav}
-            onNavChange={handlePartnerNavChange}
-            onLogout={handleLogout}
-          />
-        }
+        element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
       />
 
       <Route path="*" element={<Navigate to="/" replace />} />

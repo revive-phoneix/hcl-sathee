@@ -18,6 +18,13 @@ import {
 const formatCount = (value) => value.toLocaleString("en-IN");
 const formatPercent = (value) => (value == null ? "—" : `${value.toFixed(1)}%`);
 
+const STAT_CARDS = (stats, loadingStats) => [
+  { icon: GraduationCap, label: "Total Students", value: formatCount(stats.totalStudents), iconBg: "bg-blue-500/10", iconColor: "text-blue-400" },
+  { icon: Users, label: "Active Today", value: formatCount(stats.activeToday), iconBg: "bg-emerald-500/10", iconColor: "text-emerald-400" },
+  { icon: CalendarDays, label: "Today's Attendance", value: formatPercent(stats.attendanceAvg), iconBg: "bg-violet-500/10", iconColor: "text-violet-400" },
+  { icon: TrendingUp, label: "Avg. Progress", value: formatPercent(stats.progressAvg), iconBg: "bg-amber-500/10", iconColor: "text-amber-400" },
+].map((card) => ({ ...card, loading: loadingStats }));
+
 export default function AdminDashboard({
   portalName,
   userName,
@@ -107,38 +114,9 @@ export default function AdminDashboard({
         )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          <StatCard
-            icon={GraduationCap}
-            label="Total Students"
-            value={formatCount(stats.totalStudents)}
-            loading={loadingStats}
-            iconBg="bg-blue-500/10"
-            iconColor="text-blue-400"
-          />
-          <StatCard
-            icon={Users}
-            label="Active Today"
-            value={formatCount(stats.activeToday)}
-            loading={loadingStats}
-            iconBg="bg-emerald-500/10"
-            iconColor="text-emerald-400"
-          />
-          <StatCard
-            icon={CalendarDays}
-            label="Today's Attendance"
-            value={formatPercent(stats.attendanceAvg)}
-            loading={loadingStats}
-            iconBg="bg-violet-500/10"
-            iconColor="text-violet-400"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Avg. Progress"
-            value={formatPercent(stats.progressAvg)}
-            loading={loadingStats}
-            iconBg="bg-amber-500/10"
-            iconColor="text-amber-400"
-          />
+          {STAT_CARDS(stats, loadingStats).map((card) => (
+            <StatCard key={card.label} {...card} />
+          ))}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

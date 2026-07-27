@@ -56,6 +56,17 @@ const mapUserToMentor = (user, attendanceRate) => ({
   role: user.role,
 });
 
+const patchMentor = (list, id, patch) =>
+  list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m));
+
+const replaceMentor = (list, replacement) =>
+  list.map((m) => (String(m.id) === String(replacement.id) ? replacement : m));
+
+const ANALYTICS_TABS = [
+  { key: "students", label: "Students" },
+  { key: "teachers", label: "Mentors" },
+];
+
 export default function AdminAnalytics({
   portalName,
   navItems,
@@ -157,13 +168,7 @@ export default function AdminAnalytics({
       : WEEKDAYS.filter((d) => current.includes(d) || d === day);
 
     // Optimistic UI update
-    setMentors((prev) =>
-      prev.map((m) =>
-        String(m.id) === String(mentor.id)
-          ? { ...m, availableDays: next }
-          : m
-      )
-    );
+    setMentors((prev) => patchMentor(prev, mentor.id, { availableDays: next }));
     if (selectedMentor && String(selectedMentor.id) === String(mentor.id)) {
       setSelectedMentor((prev) => ({ ...prev, availableDays: next }));
     }
@@ -173,27 +178,16 @@ export default function AdminAnalytics({
     try {
       const updated = await updateUser(mentor.id, { availableDays: next });
       setMentors((prev) =>
-        prev.map((m) =>
-          String(m.id) === String(mentor.id)
-            ? {
-                ...m,
-                availableDays: Array.isArray(updated.availableDays)
-                  ? updated.availableDays
-                  : next,
-              }
-            : m
-        )
+        patchMentor(prev, mentor.id, {
+          availableDays: Array.isArray(updated.availableDays)
+            ? updated.availableDays
+            : next,
+        })
       );
     } catch (error) {
       console.error("Toggle available day error:", error);
       // Revert optimistic update
-      setMentors((prev) =>
-        prev.map((m) =>
-          String(m.id) === String(mentor.id)
-            ? { ...m, availableDays: current }
-            : m
-        )
-      );
+      setMentors((prev) => patchMentor(prev, mentor.id, { availableDays: current }));
       setMentorsError(
         error.response?.data?.message || "Unable to update available days"
       );
@@ -222,26 +216,19 @@ export default function AdminAnalytics({
 
         <div className="mb-8">
           <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-            <button
-              onClick={() => setActiveTab("students")}
-              className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
-                activeTab === "students"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Students
-            </button>
-            <button
-              onClick={() => setActiveTab("teachers")}
-              className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
-                activeTab === "teachers"
-                  ? "bg-blue-600 text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Mentors
-            </button>
+            {ANALYTICS_TABS.map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => setActiveTab(key)}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  activeTab === key
+                    ? "bg-blue-600 text-white shadow-sm"
+                    : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
         </div>
 
@@ -272,11 +259,7 @@ export default function AdminAnalytics({
           onClose={() => setMentorModalOpen(false)}
           onUpdated={(updatedMentor) => {
             setSelectedMentor(updatedMentor);
-            setMentors((prev) =>
-              prev.map((m) =>
-                String(m.id) === String(updatedMentor.id) ? updatedMentor : m
-              )
-            );
+            setMentors((prev) => replaceMentor(prev, updatedMentor));
           }}
         />
       </main>

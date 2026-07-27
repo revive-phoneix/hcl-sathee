@@ -52,6 +52,9 @@ export async function postWithColdStartRetry(url, data, options = {}) {
   throw lastErr;
 }
 
+export const getApiErrorMessage = (err, fallback) =>
+  err?.response?.data?.message || fallback;
+
 export function getAuthErrorMessage(err, fallback = "Request failed. Please try again.") {
   const status = err.response?.status;
   const data = err.response?.data;

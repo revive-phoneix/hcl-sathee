@@ -9,8 +9,29 @@ const WARRANTY_STATUSES = [
   "Not Applicable",
 ];
 
+const EMPTY_FORM = {
+  name: "",
+  description: "",
+  warrantyStatus: "",
+  quantity: "",
+  expiryDate: "",
+  serialNumber: "",
+};
+
 const inputClass =
   "w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-lg text-sm text-slate-800 placeholder-slate-400 focus:outline-none focus:border-blue-500 transition-colors";
+
+function FormField({ label, required, hint, children }) {
+  return (
+    <div>
+      <label className="mb-1.5 block text-sm font-medium text-slate-700">
+        {label} {required ? <span className="text-red-500">*</span> : null}
+      </label>
+      {children}
+      {hint ? <p className="mt-1 text-xs text-red-500">{hint}</p> : null}
+    </div>
+  );
+}
 
 export default function AddEquipmentModal({
   open,
@@ -20,15 +41,7 @@ export default function AddEquipmentModal({
   portalName,
 }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
-
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    warrantyStatus: "",
-    quantity: "",
-    expiryDate: "",
-    serialNumber: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
 
   if (!open) return null;
@@ -76,14 +89,7 @@ export default function AddEquipmentModal({
         serialNumber: form.serialNumber.trim() || null,
         centre: defaultCentre,
       });
-      setForm({
-        name: "",
-        description: "",
-        warrantyStatus: "",
-        quantity: "",
-        expiryDate: "",
-        serialNumber: "",
-      });
+      setForm(EMPTY_FORM);
     } catch (submitError) {
       setError(submitError.message || "Unable to add equipment");
     }
@@ -104,10 +110,7 @@ export default function AddEquipmentModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Equipment Name <span className="text-red-500">*</span>
-            </label>
+          <FormField label="Equipment Name" required hint="Maximum Characters: 100">
             <input
               type="text"
               value={form.name}
@@ -117,13 +120,9 @@ export default function AddEquipmentModal({
               placeholder="Enter Equipment Name"
               required
             />
-            <p className="mt-1 text-xs text-red-500">Maximum Characters: 100</p>
-          </div>
+          </FormField>
 
-          <div>
-            <label className="mb-1.5 block text-sm font-medium text-slate-700">
-              Equipment Description <span className="text-red-500">*</span>
-            </label>
+          <FormField label="Equipment Description" required hint="Maximum Characters: 250">
             <textarea
               value={form.description}
               maxLength={250}
@@ -133,14 +132,10 @@ export default function AddEquipmentModal({
               placeholder="Enter Equipment Description"
               required
             />
-            <p className="mt-1 text-xs text-red-500">Maximum Characters: 250</p>
-          </div>
+          </FormField>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Warranty Status <span className="text-red-500">*</span>
-              </label>
+            <FormField label="Warranty Status" required>
               <select
                 value={form.warrantyStatus}
                 onChange={(e) => update("warrantyStatus", e.target.value)}
@@ -154,12 +149,9 @@ export default function AddEquipmentModal({
                   </option>
                 ))}
               </select>
-            </div>
+            </FormField>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Quantity <span className="text-red-500">*</span>
-              </label>
+            <FormField label="Quantity" required>
               <input
                 type="number"
                 min={1}
@@ -169,14 +161,11 @@ export default function AddEquipmentModal({
                 placeholder="Enter Quantity of Equipment"
                 required
               />
-            </div>
+            </FormField>
           </div>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Date of Expiry <span className="text-red-500">*</span>
-              </label>
+            <FormField label="Date of Expiry" required>
               <input
                 type="date"
                 value={form.expiryDate}
@@ -184,12 +173,9 @@ export default function AddEquipmentModal({
                 className={inputClass}
                 required
               />
-            </div>
+            </FormField>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-slate-700">
-                Serial Number
-              </label>
+            <FormField label="Serial Number">
               <input
                 type="text"
                 value={form.serialNumber}
@@ -197,7 +183,7 @@ export default function AddEquipmentModal({
                 className={inputClass}
                 placeholder="Enter Serial Number"
               />
-            </div>
+            </FormField>
           </div>
 
           {error ? (

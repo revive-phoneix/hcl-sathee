@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Clock } from "lucide-react";
 
 export function WelcomeBanner({ portalName, userName }) {
@@ -9,16 +9,14 @@ export function WelcomeBanner({ portalName, userName }) {
     return () => clearInterval(timer);
   }, []);
 
-  const formattedLastLogin = useMemo(() => {
-    return currentTime.toLocaleString("en-US", {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: true,
-    });
-  }, [currentTime]);
+  const formattedLastLogin = currentTime.toLocaleString("en-US", {
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  });
 
   return (
     <div className="relative rounded-3xl overflow-hidden border border-[#3B82F6]/30 bg-[#0F172A]">

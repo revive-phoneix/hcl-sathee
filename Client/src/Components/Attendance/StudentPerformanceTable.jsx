@@ -1,4 +1,27 @@
+import TableStatusRow from "../common/TableStatusRow";
+
+const HEADERS = ["Student", "Course", "Subject", "Marks", "Attendance"];
+
+const buildRows = (student) => [
+  ...(student.performances?.map((perf) => ({
+    type: "performance",
+    student,
+    subject: perf.subject,
+    marks: `${perf.marks}/${perf.maxMarks}`,
+    attendance: "—",
+  })) || []),
+  ...(student.attendances?.map((att) => ({
+    type: "attendance",
+    student,
+    subject: att.subject,
+    marks: "—",
+    attendance: `D ${att.dailyAttendancePercentage ?? 0}% · W ${att.weeklyAttendancePercentage ?? 0}% · M ${att.monthlyAttendancePercentage ?? 0}% (${att.classesAttended}/${att.totalClasses})`,
+  })) || []),
+];
+
 export default function StudentPerformanceTable({ students }) {
+  const rows = students.flatMap(buildRows);
+
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-[rgba(0,0,0,0.06)] overflow-hidden">
       <div className="px-6 py-4 border-b border-[rgba(0,0,0,0.05)] bg-[#f8fafc]">
@@ -9,40 +32,23 @@ export default function StudentPerformanceTable({ students }) {
         <table className="min-w-full text-left">
           <thead>
             <tr className="bg-white border-b border-[rgba(0,0,0,0.06)]">
-              <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-500">Student</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-500">Course</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-500">Subject</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-500">Marks</th>
-              <th className="px-6 py-4 text-xs font-semibold uppercase text-gray-500">Attendance</th>
+              {HEADERS.map((header) => (
+                <th
+                  key={header}
+                  className="px-6 py-4 text-xs font-semibold uppercase text-gray-500"
+                >
+                  {header}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
-            {students.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400">
-                  No performance records available.
-                </td>
-              </tr>
+            {rows.length === 0 ? (
+              <TableStatusRow colSpan={5} className="px-6 py-12 text-center text-sm text-gray-400">
+                No performance records available.
+              </TableStatusRow>
             ) : (
-              students.flatMap((student) => {
-                const performanceRows = student.performances?.map((perf) => ({
-                  type: "performance",
-                  student,
-                  subject: perf.subject,
-                  marks: `${perf.marks}/${perf.maxMarks}`,
-                  attendance: "—",
-                })) || [];
-
-                const attendanceRows = student.attendances?.map((att) => ({
-                  type: "attendance",
-                  student,
-                  subject: att.subject,
-                  marks: "—",
-                  attendance: `D ${att.dailyAttendancePercentage ?? 0}% · W ${att.weeklyAttendancePercentage ?? 0}% · M ${att.monthlyAttendancePercentage ?? 0}% (${att.classesAttended}/${att.totalClasses})`,
-                })) || [];
-
-                return [...performanceRows, ...attendanceRows];
-              }).map((row, index) => (
+              rows.map((row, index) => (
                 <tr
                   key={`${row.student.id}-${row.type}-${row.subject}-${index}`}
                   className={index % 2 === 0 ? "bg-white" : "bg-[#f8f9fb]"}

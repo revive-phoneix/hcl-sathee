@@ -1,19 +1,16 @@
 const User = require("../Models/User");
 const { sendWelcomeEmail } = require("../Utils/sendEmail");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
+  VALID_CENTRES,
   filterByUserCentre,
   isAdminRole,
   isHclPartnerRole,
 } = require("../Utils/centreMatch");
 
 const VALID_ROLES = ["ADMIN", "SATHEE MITRA", "HCL PARTNER"];
-const VALID_CENTRES = [
-  "HCL RAJASTHAN",
-  "HCL RAJATHAN",
-  "HCL JHARKHAND",
-  "HCL MADHYA PRADESH",
-];
 const TEST_EMAIL_DOMAIN = "@example.com";
+const isMitra = (role) => String(role).toUpperCase() === "SATHEE MITRA";
 
 const toPublicUser = (user) => {
   if (!user) return user;
@@ -21,46 +18,33 @@ const toPublicUser = (user) => {
   return safe;
 };
 
-exports.getUsers = async (req, res) => {
-  try {
+exports.getUsers = wrap(
+  async (req, res) => {
     let users = await User.findAll();
 
-    // Partners only see Sathee Mitra in their own centre (for view/export).
     if (isHclPartnerRole(req.user?.role)) {
-      users = filterByUserCentre(users, req.user).filter(
-        (user) => String(user.role || "").toUpperCase() === "SATHEE MITRA"
+      users = filterByUserCentre(users, req.user).filter((user) =>
+        isMitra(user.role)
       );
     } else if (!isAdminRole(req.user?.role)) {
       users = [];
     }
 
-    res.status(200).json({
-      success: true,
-      users: users.map(toPublicUser),
-    });
-  } catch (error) {
-    console.error("Get Users Error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch users" });
-  }
-};
+    return ok(res, { users: users.map(toPublicUser) });
+  },
+  { label: "Get Users Error", message: "Failed to fetch users" }
+);
 
-exports.addUser = async (req, res) => {
-  try {
+exports.addUser = wrap(
+  async (req, res) => {
     const { name, email, phone, role, centre, availableDays, isVishist } =
       req.body;
 
     if (!name || !email || !phone || !role) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, email, phone number and role are required",
-      });
+      return fail(res, 400, "Name, email, phone number and role are required");
     }
-
     if (!VALID_ROLES.includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid role selected",
-      });
+      return fail(res, 400, "Invalid role selected");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
@@ -68,33 +52,16 @@ exports.addUser = async (req, res) => {
     const normalizedDays = User.normalizeAvailableDays(availableDays);
 
     if (!normalizedCentre) {
-      return res.status(400).json({
-        success: false,
-        message: "Centre is required",
-      });
+      return fail(res, 400, "Centre is required");
     }
-
     if (!VALID_CENTRES.includes(normalizedCentre)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid centre selected",
-      });
+      return fail(res, 400, "Invalid centre selected");
     }
-
-    const existingUser = await User.findByEmail(normalizedEmail);
-    if (existingUser) {
-      return res.status(409).json({
-        success: false,
-        message: "Email already exists",
-      });
+    if (await User.findByEmail(normalizedEmail)) {
+      return fail(res, 409, "Email already exists");
     }
-
-    const existingPhone = await User.findByPhone(phone.trim());
-    if (existingPhone) {
-      return res.status(409).json({
-        success: false,
-        message: "Phone number already exists",
-      });
+    if (await User.findByPhone(phone.trim())) {
+      return fail(res, 409, "Phone number already exists");
     }
 
     const createdUser = await User.create({
@@ -103,10 +70,8 @@ exports.addUser = async (req, res) => {
       phone: phone.trim(),
       role,
       centre: normalizedCentre,
-      availableDays:
-        String(role).toUpperCase() === "SATHEE MITRA" ? normalizedDays : [],
-      isVishist:
-        String(role).toUpperCase() === "SATHEE MITRA" ? Boolean(isVishist) : false,
+      availableDays: isMitra(role) ? normalizedDays : [],
+      isVishist: isMitra(role) ? Boolean(isVishist) : false,
       password: null,
     });
 
@@ -114,7 +79,6 @@ exports.addUser = async (req, res) => {
     let emailError = null;
 
     if (normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
-      emailSent = false;
       emailError = "Skipped welcome email for @example.com addresses";
     } else {
       try {
@@ -129,8 +93,7 @@ exports.addUser = async (req, res) => {
       }
     }
 
-    res.status(201).json({
-      success: true,
+    return ok(res, 201, {
       message: emailSent
         ? "User created successfully. Welcome email sent."
         : "User created successfully, but welcome email could not be sent.",
@@ -138,80 +101,54 @@ exports.addUser = async (req, res) => {
       emailError,
       user: toPublicUser(createdUser),
     });
-  } catch (error) {
-    console.error("Add User Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create user",
-    });
-  }
-};
+  },
+  { label: "Add User Error", message: "Failed to create user" }
+);
 
-exports.updateUser = async (req, res) => {
-  try {
+exports.updateUser = wrap(
+  async (req, res) => {
     const { availableDays, name, phone, centre, isVishist } = req.body;
     const existing = await User.findById(req.params.id);
 
     if (!existing) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      return fail(res, 404, "User not found");
     }
 
     const patch = {};
-
     if (name != null) patch.name = String(name).trim();
     if (phone != null) patch.phone = String(phone).trim();
     if (centre != null) {
       const normalizedCentre = String(centre).trim();
       if (!VALID_CENTRES.includes(normalizedCentre)) {
-        return res.status(400).json({
-          success: false,
-          message: "Invalid centre selected",
-        });
+        return fail(res, 400, "Invalid centre selected");
       }
       patch.centre = normalizedCentre;
     }
-
     if (availableDays != null) {
       patch.availableDays = User.normalizeAvailableDays(availableDays);
     }
-
     if (isVishist != null) {
       patch.isVishist = User.normalizeIsVishist(existing.role, isVishist);
     }
-
     if (!Object.keys(patch).length) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid fields to update",
-      });
+      return fail(res, 400, "No valid fields to update");
     }
 
     const updated = await User.update(req.params.id, patch);
-    res.status(200).json({
-      success: true,
+    return ok(res, {
       message: "User updated successfully",
       user: toPublicUser(updated),
     });
-  } catch (error) {
-    console.error("Update User Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update user",
-    });
-  }
-};
+  },
+  { label: "Update User Error", message: "Failed to update user" }
+);
 
-exports.deleteUser = async (req, res) => {
-  try {
-    const deleted = await User.destroy(req.params.id);
-
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "User not found" });
+exports.deleteUser = wrap(
+  async (req, res) => {
+    if (!(await User.destroy(req.params.id))) {
+      return fail(res, 404, "User not found");
     }
-
-    res.status(200).json({ success: true, message: "User deleted successfully" });
-  } catch (error) {
-    console.error("Delete User Error:", error);
-    res.status(500).json({ success: false, message: "Failed to delete user" });
-  }
-};
+    return ok(res, { message: "User deleted successfully" });
+  },
+  { label: "Delete User Error", message: "Failed to delete user" }
+);

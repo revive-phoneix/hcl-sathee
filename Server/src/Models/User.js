@@ -1,15 +1,11 @@
 const { getDb } = require("../config/firebase");
+const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "users";
 
 const usersRef = () => getDb().collection(COLLECTION);
-
-const toDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
-  return new Date(value);
-};
+const findDocRefById = (id) => findRef(usersRef(), id);
+const getNextId = () => nextId(usersRef());
 
 const WEEKDAYS = [
   "Monday",
@@ -62,20 +58,6 @@ const toApiUser = (docId, data) => ({
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
 });
-
-const findDocRefById = async (id) => {
-  const ref = usersRef().doc(String(id));
-  const doc = await ref.get();
-  if (doc.exists) return ref;
-
-  const numericId = Number(id);
-  if (!Number.isNaN(numericId)) {
-    const snap = await usersRef().where("id", "==", numericId).limit(1).get();
-    if (!snap.empty) return snap.docs[0].ref;
-  }
-
-  return null;
-};
 
 let isVishistBackfillDone = false;
 
@@ -133,21 +115,6 @@ const findByPhone = async (phone) => {
   if (snap.empty) return null;
   const doc = snap.docs[0];
   return toApiUser(doc.id, doc.data());
-};
-
-const getNextId = async () => {
-  const snap = await usersRef().get();
-  if (snap.empty) return 1;
-
-  let maxId = 0;
-  for (const doc of snap.docs) {
-    const docId = Number(doc.id);
-    const fieldId = Number(doc.data().id);
-    if (!Number.isNaN(docId)) maxId = Math.max(maxId, docId);
-    if (!Number.isNaN(fieldId)) maxId = Math.max(maxId, fieldId);
-  }
-
-  return maxId + 1;
 };
 
 const create = async (data) => {

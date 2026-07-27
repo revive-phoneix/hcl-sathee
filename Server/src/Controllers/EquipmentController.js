@@ -1,28 +1,17 @@
 const Equipment = require("../Models/Equipment");
-const { filterByUserCentre, isAdminRole } = require("../Utils/centreMatch");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
+const { VALID_CENTRES, filterByUserCentre, isAdminRole } = require("../Utils/centreMatch");
 
-const VALID_CENTRES = [
-  "HCL RAJASTHAN",
-  "HCL RAJATHAN",
-  "HCL JHARKHAND",
-  "HCL MADHYA PRADESH",
-];
-
-exports.getEquipments = async (req, res) => {
-  try {
+exports.getEquipments = wrap(
+  async (req, res) => {
     const equipments = filterByUserCentre(await Equipment.findAll(), req.user);
-    res.status(200).json({ success: true, equipments });
-  } catch (error) {
-    console.error("Get Equipments Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch equipments",
-    });
-  }
-};
+    return ok(res, { equipments });
+  },
+  { label: "Get Equipments Error", message: "Failed to fetch equipments" }
+);
 
-exports.addEquipment = async (req, res) => {
-  try {
+exports.addEquipment = wrap(
+  async (req, res) => {
     const {
       name,
       description,
@@ -34,61 +23,32 @@ exports.addEquipment = async (req, res) => {
     } = req.body;
 
     if (!name?.trim() || !description?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Equipment name and description are required",
-      });
+      return fail(res, 400, "Equipment name and description are required");
     }
-
     if (String(name).trim().length > 100) {
-      return res.status(400).json({
-        success: false,
-        message: "Equipment name must be at most 100 characters",
-      });
+      return fail(res, 400, "Equipment name must be at most 100 characters");
     }
-
     if (String(description).trim().length > 250) {
-      return res.status(400).json({
-        success: false,
-        message: "Equipment description must be at most 250 characters",
-      });
+      return fail(res, 400, "Equipment description must be at most 250 characters");
     }
-
     if (!warrantyStatus || !Equipment.WARRANTY_STATUSES.includes(warrantyStatus)) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid warranty status is required",
-      });
+      return fail(res, 400, "Valid warranty status is required");
     }
 
     const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty < 1) {
-      return res.status(400).json({
-        success: false,
-        message: "Quantity must be a positive number",
-      });
+      return fail(res, 400, "Quantity must be a positive number");
     }
-
     if (!expiryDate) {
-      return res.status(400).json({
-        success: false,
-        message: "Date of expiry is required",
-      });
+      return fail(res, 400, "Date of expiry is required");
     }
 
     const normalizedCentre = centre?.trim() || null;
     if (!normalizedCentre || !VALID_CENTRES.includes(normalizedCentre)) {
-      return res.status(400).json({
-        success: false,
-        message: "Valid centre is required",
-      });
+      return fail(res, 400, "Valid centre is required");
     }
-
     if (!isAdminRole(req.user?.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Only admins can add equipment",
-      });
+      return fail(res, 403, "Only admins can add equipment");
     }
 
     const equipment = await Equipment.create({
@@ -101,16 +61,10 @@ exports.addEquipment = async (req, res) => {
       centre: normalizedCentre,
     });
 
-    res.status(201).json({
-      success: true,
+    return ok(res, 201, {
       message: "Equipment added successfully",
       equipment,
     });
-  } catch (error) {
-    console.error("Add Equipment Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create equipment",
-    });
-  }
-};
+  },
+  { label: "Add Equipment Error", message: "Failed to create equipment" }
+);

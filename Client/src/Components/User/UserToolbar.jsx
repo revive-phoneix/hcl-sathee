@@ -14,11 +14,7 @@ export default function UserToolbar({
   const [showNewUser, setShowNewUser] = useState(false);
 
   const handleAddUser = async (newUser) => {
-    const success = await onAddUser(newUser);
-
-    if (success) {
-      setShowNewUser(false);
-    }
+    if (await onAddUser(newUser)) setShowNewUser(false);
   };
 
   return (

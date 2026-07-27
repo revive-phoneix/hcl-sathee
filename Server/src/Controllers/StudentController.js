@@ -1,18 +1,17 @@
 const Student = require("../Models/Student");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 
-exports.getStudents = async (req, res) => {
-  try {
+exports.getStudents = wrap(
+  async (req, res) => {
     const students = filterByUserCentre(await Student.findAll(), req.user);
-    res.status(200).json({ success: true, students });
-  } catch (error) {
-    console.error("Get Students Error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch students" });
-  }
-};
+    return ok(res, { students });
+  },
+  { label: "Get Students Error", message: "Failed to fetch students" }
+);
 
-exports.addStudent = async (req, res) => {
-  try {
+exports.addStudent = wrap(
+  async (req, res) => {
     const {
       studentId,
       enrollmentNo,
@@ -33,27 +32,18 @@ exports.addStudent = async (req, res) => {
     } = req.body;
 
     if (!name || !gender || !email) {
-      return res.status(400).json({
-        success: false,
-        message: "Name, gender, and email are required",
-      });
+      return fail(res, 400, "Name, gender, and email are required");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
-    const existingStudent = await Student.findByEmail(normalizedEmail);
-    if (existingStudent) {
-      return res.status(409).json({
-        success: false,
-        message: "A student with this email already exists",
-      });
+    if (await Student.findByEmail(normalizedEmail)) {
+      return fail(res, 409, "A student with this email already exists");
     }
 
-    const studentIdValue = studentId?.trim() || `STU${Date.now().toString().slice(-6)}`;
-    const enrollmentNoValue = enrollmentNo?.trim() || `ENR${Date.now().toString().slice(-6)}`;
-
+    const suffix = Date.now().toString().slice(-6);
     const student = await Student.create({
-      studentId: studentIdValue,
-      enrollmentNo: enrollmentNoValue,
+      studentId: studentId?.trim() || `STU${suffix}`,
+      enrollmentNo: enrollmentNo?.trim() || `ENR${suffix}`,
       name: name.trim(),
       gender: gender.trim(),
       email: normalizedEmail,
@@ -70,9 +60,7 @@ exports.addStudent = async (req, res) => {
       initials: initials || null,
     });
 
-    res.status(201).json({ success: true, student });
-  } catch (error) {
-    console.error("Add Student Error:", error);
-    res.status(500).json({ success: false, message: "Failed to add student" });
-  }
-};
+    return ok(res, 201, { student });
+  },
+  { label: "Add Student Error", message: "Failed to add student" }
+);

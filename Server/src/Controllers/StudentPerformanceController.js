@@ -1,6 +1,7 @@
 const Student = require("../Models/Student");
 const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 
 const groupByStudentId = (rows) => {
@@ -13,10 +14,18 @@ const groupByStudentId = (rows) => {
   return map;
 };
 
-exports.getStudentsWithPerformance = async (req, res) => {
-  try {
-    const students = filterByUserCentre(await Student.findAll(), req.user);
+const requireStudent = async (res, studentId) => {
+  const student = await Student.findById(studentId);
+  if (!student) {
+    fail(res, 404, "Student not found");
+    return null;
+  }
+  return student;
+};
 
+exports.getStudentsWithPerformance = wrap(
+  async (req, res) => {
+    const students = filterByUserCentre(await Student.findAll(), req.user);
     const [performances, attendances] = await Promise.all([
       SubjectPerformance.findAll(),
       SubjectAttendance.findAll(),
@@ -25,37 +34,27 @@ exports.getStudentsWithPerformance = async (req, res) => {
     const performancesByStudent = groupByStudentId(performances);
     const attendancesByStudent = groupByStudentId(attendances);
 
-    const studentsWithDetails = students.map((student) => ({
-      ...student,
-      performances: performancesByStudent.get(student.id) || [],
-      attendances: attendancesByStudent.get(student.id) || [],
-    }));
-
-    res.status(200).json({ success: true, students: studentsWithDetails });
-  } catch (error) {
-    console.error("Get Students with Performance Error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to fetch performance details",
+    return ok(res, {
+      students: students.map((student) => ({
+        ...student,
+        performances: performancesByStudent.get(student.id) || [],
+        attendances: attendancesByStudent.get(student.id) || [],
+      })),
     });
-  }
-};
+  },
+  { label: "Get Students with Performance Error", message: "Failed to fetch performance details" }
+);
 
-exports.addSubjectPerformance = async (req, res) => {
-  try {
+exports.addSubjectPerformance = wrap(
+  async (req, res) => {
     const { studentId, subject, marks, maxMarks, grade, remarks } = req.body;
 
     if (!studentId || !subject || marks === undefined) {
-      return res.status(400).json({
-        success: false,
-        message: "Student ID, subject, and marks are required",
-      });
+      return fail(res, 400, "Student ID, subject, and marks are required");
     }
 
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: "Student not found" });
-    }
+    const student = await requireStudent(res, studentId);
+    if (!student) return;
 
     const performance = await SubjectPerformance.create({
       studentId: student.id,
@@ -66,15 +65,13 @@ exports.addSubjectPerformance = async (req, res) => {
       remarks: remarks || null,
     });
 
-    res.status(201).json({ success: true, performance });
-  } catch (error) {
-    console.error("Add Subject Performance Error:", error);
-    res.status(500).json({ success: false, message: "Failed to add performance record" });
-  }
-};
+    return ok(res, 201, { performance });
+  },
+  { label: "Add Subject Performance Error", message: "Failed to add performance record" }
+);
 
-exports.addSubjectAttendance = async (req, res) => {
-  try {
+exports.addSubjectAttendance = wrap(
+  async (req, res) => {
     const {
       studentId,
       subject,
@@ -87,16 +84,11 @@ exports.addSubjectAttendance = async (req, res) => {
     } = req.body;
 
     if (!studentId || !subject) {
-      return res.status(400).json({
-        success: false,
-        message: "Student ID and subject are required",
-      });
+      return fail(res, 400, "Student ID and subject are required");
     }
 
-    const student = await Student.findById(studentId);
-    if (!student) {
-      return res.status(404).json({ success: false, message: "Student not found" });
-    }
+    const student = await requireStudent(res, studentId);
+    if (!student) return;
 
     const daily = dailyAttendancePercentage ?? attendancePercentage ?? 0;
     const weekly = weeklyAttendancePercentage ?? attendancePercentage ?? 0;
@@ -112,9 +104,7 @@ exports.addSubjectAttendance = async (req, res) => {
       classesAttended: classesAttended || 0,
     });
 
-    res.status(201).json({ success: true, attendance });
-  } catch (error) {
-    console.error("Add Subject Attendance Error:", error);
-    res.status(500).json({ success: false, message: "Failed to add attendance record" });
-  }
-};
+    return ok(res, 201, { attendance });
+  },
+  { label: "Add Subject Attendance Error", message: "Failed to add attendance record" }
+);

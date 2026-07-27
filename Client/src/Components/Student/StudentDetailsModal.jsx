@@ -26,29 +26,12 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
     setIsEditing(false);
   };
 
-  const handleInputChange = (field, value, section = null) => {
-    setFormData((prev) => {
-      if (section) {
-        return {
-          ...prev,
-          [section]: {
-            ...prev[section],
-            [field]: value,
-          },
-        };
-      }
-      return { ...prev, [field]: value };
-    });
-  };
-
-  const handleObjectFieldChange = (section, field, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      [section]: {
-        ...prev[section],
-        [field]: value,
-      },
-    }));
+  const updateForm = (field, value, section = null) => {
+    setFormData((prev) =>
+      section
+        ? { ...prev, [section]: { ...prev[section], [field]: value } }
+        : { ...prev, [field]: value }
+    );
   };
 
   return (
@@ -115,16 +98,16 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               Basic Information
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, color: "black" }}>
-              <Field label="Name" value={formData.name} editable={isEditing} onChange={(value) => handleInputChange("name", value)} />
-              <Field label="Student ID" value={formData.id || formData.Student_ID || formData.enrollmentNo} editable={isEditing} onChange={(value) => handleInputChange("id", value)} />
-              <Field label="Gender" value={formData.gender} editable={isEditing} onChange={(value) => handleInputChange("gender", value)} />
-              <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => handleInputChange("course", value)} />
-              <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => handleInputChange("category", value)} />
-              <Field label="Email" value={formData.email} editable={isEditing} onChange={(value) => handleInputChange("email", value)} type="email" />
-              <Field label="Phone" value={formData.phone} editable={isEditing} onChange={(value) => handleInputChange("phone", value)} type="tel" />
-              <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => handleInputChange("centre", value)} />
-              <Field label="Student ID" value={formData.Student_ID} editable={isEditing} onChange={(value) => handleInputChange("Student_ID", value)} />
-              <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => handleInputChange("address", value)} />
+              <Field label="Name" value={formData.name} editable={isEditing} onChange={(value) => updateForm("name", value)} />
+              <Field label="Student ID" value={formData.id || formData.Student_ID || formData.enrollmentNo} editable={isEditing} onChange={(value) => updateForm("id", value)} />
+              <Field label="Gender" value={formData.gender} editable={isEditing} onChange={(value) => updateForm("gender", value)} />
+              <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => updateForm("course", value)} />
+              <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => updateForm("category", value)} />
+              <Field label="Email" value={formData.email} editable={isEditing} onChange={(value) => updateForm("email", value)} type="email" />
+              <Field label="Phone" value={formData.phone} editable={isEditing} onChange={(value) => updateForm("phone", value)} type="tel" />
+              <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => updateForm("centre", value)} />
+              <Field label="Student ID" value={formData.Student_ID} editable={isEditing} onChange={(value) => updateForm("Student_ID", value)} />
+              <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => updateForm("address", value)} />
             </div>
           </div>
 
@@ -136,14 +119,14 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               <div>
                 <strong>Father</strong>
                 {isEditing ? (
-                  <input type="text" value={formData.parents?.father || ""} onChange={(e) => handleInputChange("father", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                  <input type="text" value={formData.parents?.father || ""} onChange={(e) => updateForm("father", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                 ) : (
                   <div style={{ marginTop: 6 }}>{formData.parents?.father || "—"}</div>
                 )}
                 <div style={{ marginTop: 10 }}>
                   <strong>Phone</strong>
                   {isEditing ? (
-                    <input type="tel" value={formData.parents?.fatherPhone || ""} onChange={(e) => handleInputChange("fatherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input type="tel" value={formData.parents?.fatherPhone || ""} onChange={(e) => updateForm("fatherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                   ) : (
                     <div style={{ marginTop: 6 }}>{formData.parents?.fatherPhone || "—"}</div>
                   )}
@@ -152,14 +135,14 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               <div>
                 <strong>Mother</strong>
                 {isEditing ? (
-                  <input type="text" value={formData.parents?.mother || ""} onChange={(e) => handleInputChange("mother", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                  <input type="text" value={formData.parents?.mother || ""} onChange={(e) => updateForm("mother", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                 ) : (
                   <div style={{ marginTop: 6 }}>{formData.parents?.mother || "—"}</div>
                 )}
                 <div style={{ marginTop: 10 }}>
                   <strong>Phone</strong>
                   {isEditing ? (
-                    <input type="tel" value={formData.parents?.motherPhone || ""} onChange={(e) => handleInputChange("motherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input type="tel" value={formData.parents?.motherPhone || ""} onChange={(e) => updateForm("motherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                   ) : (
                     <div style={{ marginTop: 6 }}>{formData.parents?.motherPhone || "—"}</div>
                   )}
@@ -177,7 +160,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
                   <strong>{subject}</strong>
                   {isEditing ? (
-                    <input type="text" value={score} onChange={(e) => handleObjectFieldChange("marks", subject, e.target.value)} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input type="text" value={score} onChange={(e) => updateForm(subject, e.target.value, "marks")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                   ) : (
                     <div style={{ marginTop: 6 }}>{score}</div>
                   )}
@@ -195,7 +178,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
                   <strong>{cls}</strong>
                   {isEditing ? (
-                    <input type="text" value={rate} onChange={(e) => handleObjectFieldChange("attendance", cls, e.target.value)} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input type="text" value={rate} onChange={(e) => updateForm(cls, e.target.value, "attendance")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
                   ) : (
                     <div style={{ marginTop: 6 }}>{rate}</div>
                   )}

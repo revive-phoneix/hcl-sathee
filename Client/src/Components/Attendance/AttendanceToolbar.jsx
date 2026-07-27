@@ -1,6 +1,8 @@
 import { Search, Calendar, RefreshCw } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 
+const DATE_TABS = new Set(["daily", "weekly", "monthly", "sathee-mitra"]);
+
 export default function AttendanceToolbar({
   search,
   setSearch,
@@ -29,10 +31,7 @@ export default function AttendanceToolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        {(activeTab === "daily" ||
-          activeTab === "weekly" ||
-          activeTab === "monthly" ||
-          activeTab === "sathee-mitra") && (
+        {DATE_TABS.has(activeTab) && (
           <label className="relative inline-flex items-center cursor-pointer">
             <Calendar
               size={14}

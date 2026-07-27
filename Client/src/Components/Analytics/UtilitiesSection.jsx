@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import { createEquipment, fetchEquipments } from "../../services/equipment";
 import { matchesPortalCentre } from "../../utils/portalMapping";
+import TableStatusRow from "../common/TableStatusRow";
+import { tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 import AddEquipmentModal from "./AddEquipmentModal";
 
 export default function UtilitiesSection({ portalName, readOnly = false }) {
@@ -77,57 +79,36 @@ export default function UtilitiesSection({ portalName, readOnly = false }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: "#CCD2DD" }}>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Equipment Name
-                </th>
-                <th className="text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Description
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Quantity
-                </th>
-                <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Serial Number
-                </th>
+              <tr style={tableHeadRowClass}>
+                {[
+                  ["Equipment Name", "text-left px-5"],
+                  ["Description", "text-left px-4"],
+                  ["Quantity", "text-center px-4"],
+                  ["Serial Number", "text-left px-5"],
+                ].map(([label, alignPad]) => (
+                  <th
+                    key={label}
+                    className={`${alignPad} py-3.5 text-xs font-semibold text-gray-700 uppercase`}
+                  >
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-5 py-10 text-center text-sm text-gray-400"
-                  >
-                    Loading utilities…
-                  </td>
-                </tr>
+                <TableStatusRow colSpan={4}>Loading utilities…</TableStatusRow>
               ) : error ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-5 py-10 text-center text-sm text-red-500"
-                  >
-                    {error}
-                  </td>
-                </tr>
+                <TableStatusRow colSpan={4} className="px-5 py-10 text-center text-sm text-red-500">
+                  {error}
+                </TableStatusRow>
               ) : rows.length === 0 ? (
-                <tr>
-                  <td
-                    colSpan={4}
-                    className="px-5 py-10 text-center text-sm text-gray-400"
-                  >
-                    No equipment added for this centre yet.
-                  </td>
-                </tr>
+                <TableStatusRow colSpan={4}>
+                  No equipment added for this centre yet.
+                </TableStatusRow>
               ) : (
                 rows.map((item, i) => (
-                  <tr
-                    key={item.id}
-                    className={`hover:bg-blue-50 ${
-                      i % 2 === 0 ? "bg-white" : "bg-gray-50/50"
-                    }`}
-                  >
+                  <tr key={item.id} className={zebraRowClass(i)}>
                     <td className="px-5 py-4 font-semibold text-gray-900">
                       {item.name}
                     </td>

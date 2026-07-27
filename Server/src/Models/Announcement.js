@@ -1,15 +1,11 @@
 const { getDb } = require("../config/firebase");
+const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "announcements";
 
 const announcementsRef = () => getDb().collection(COLLECTION);
-
-const toDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
-  return new Date(value);
-};
+const findDocRefById = (id) => findRef(announcementsRef(), id);
+const getNextId = () => nextId(announcementsRef());
 
 const toApiAnnouncement = (docId, data) => ({
   id: Number(docId) || docId,
@@ -24,20 +20,6 @@ const toApiAnnouncement = (docId, data) => ({
   updated_at: toDate(data.updated_at),
 });
 
-const findDocRefById = async (id) => {
-  const ref = announcementsRef().doc(String(id));
-  const doc = await ref.get();
-  if (doc.exists) return ref;
-
-  const numericId = Number(id);
-  if (!Number.isNaN(numericId)) {
-    const snap = await announcementsRef().where("id", "==", numericId).limit(1).get();
-    if (!snap.empty) return snap.docs[0].ref;
-  }
-
-  return null;
-};
-
 const findAll = async () => {
   const snap = await announcementsRef().orderBy("created_at", "desc").get();
   return snap.docs.map((doc) => toApiAnnouncement(doc.id, doc.data()));
@@ -48,21 +30,6 @@ const findById = async (id) => {
   if (!ref) return null;
   const doc = await ref.get();
   return toApiAnnouncement(doc.id, doc.data());
-};
-
-const getNextId = async () => {
-  const snap = await announcementsRef().get();
-  if (snap.empty) return 1;
-
-  let maxId = 0;
-  for (const doc of snap.docs) {
-    const docId = Number(doc.id);
-    const fieldId = Number(doc.data().id);
-    if (!Number.isNaN(docId)) maxId = Math.max(maxId, docId);
-    if (!Number.isNaN(fieldId)) maxId = Math.max(maxId, fieldId);
-  }
-
-  return maxId + 1;
 };
 
 const create = async (data) => {

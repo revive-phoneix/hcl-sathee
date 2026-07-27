@@ -2,18 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchStudentPerformance } from "../../services/studentPerformance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { average, getStudentProgressRates } from "../../utils/studentMetrics";
+import { performanceBadge, tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 
 const PASS_MARK = 40;
-
-const performanceBadge = (level) => {
-  const map = {
-    Excellent: "bg-green-100 text-green-700 border border-green-200",
-    Good: "bg-blue-100 text-blue-700 border border-blue-200",
-    Average: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-    "Needs Improvement": "bg-red-100 text-red-700 border border-red-200",
-  };
-  return map[level] || "bg-gray-100 text-gray-600";
-};
 
 const getPerformanceLabel = (avg) => {
   if (avg >= 75) return "Excellent";
@@ -23,6 +14,103 @@ const getPerformanceLabel = (avg) => {
 };
 
 const round1 = (value) => Math.round(value * 10) / 10;
+
+const STATUS_PANEL = {
+  loading: {
+    className: "rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500",
+    message: "Loading student analytics…",
+  },
+  empty: {
+    className: "rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500",
+    message: "No students found for this centre.",
+  },
+};
+
+const HIGHLIGHT_THEMES = {
+  high: {
+    card: "bg-blue-50 border-blue-100",
+    iconWrap: "bg-blue-100",
+    label: "text-blue-500",
+    score: "text-blue-700",
+    suffix: "text-blue-500",
+    badge: "bg-blue-200 text-blue-800",
+    name: "text-blue-600",
+    meta: "text-blue-400",
+    courseLabel: "text-blue-500",
+    courseValue: "text-blue-700",
+    empty: "text-blue-500",
+    title: "Highest Student Marks",
+    icon: "🏆",
+  },
+  low: {
+    card: "bg-blue-50 border-blue-100",
+    iconWrap: "bg-red-100",
+    label: "text-red-500",
+    score: "text-red-600",
+    suffix: "text-red-400",
+    badge: "bg-red-100 text-red-700 border border-red-200",
+    name: "text-red-600",
+    meta: "text-red-600",
+    courseLabel: "text-red-500",
+    courseValue: "text-red-600",
+    empty: "text-red-500",
+    title: "Lowest Student Marks",
+    icon: "📉",
+  },
+};
+
+function StatusPanel({ kind, message }) {
+  if (kind === "error") {
+    return (
+      <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center text-sm text-red-600">
+        {message}
+      </div>
+    );
+  }
+
+  const panel = STATUS_PANEL[kind];
+  return <div className={panel.className}>{message ?? panel.message}</div>;
+}
+
+function StudentHighlightCard({ theme, entry }) {
+  const t = HIGHLIGHT_THEMES[theme];
+
+  return (
+    <div className={`${t.card} rounded-2xl p-6 shadow-sm border flex gap-5`}>
+      <div className={`flex-shrink-0 w-14 h-14 rounded-xl ${t.iconWrap} flex items-center justify-center text-2xl`}>
+        {t.icon}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className={`text-xs font-semibold ${t.label} uppercase tracking-wider mb-2`}>
+          {t.title}
+        </p>
+        {entry ? (
+          <>
+            <div className="flex items-end gap-3 mb-3">
+              <span className={`text-4xl font-extrabold ${t.score}`}>{round1(entry.avg)}</span>
+              <span className={`text-lg font-semibold ${t.suffix} mb-1`}>/ 100</span>
+              <span className={`ml-auto text-sm font-semibold ${t.badge} px-2.5 py-0.5 rounded-full`}>
+                {round1(entry.avg)}%
+              </span>
+            </div>
+            <div className="space-y-1.5 text-sm">
+              <div className="flex justify-between">
+                <span className={`${t.name} font-medium`}>{entry.student.name}</span>
+                <span className={`${t.meta} text-xs`}>{entry.student.studentId || "—"}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className={t.courseLabel}>Course</span>
+                <span className={`${t.courseValue} font-semibold`}>{entry.student.course || "—"}</span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <p className={`text-sm ${t.empty}`}>No marks recorded yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function StudentsTab({ portalName }) {
   const [students, setStudents] = useState([]);
@@ -111,116 +199,15 @@ export default function StudentsTab({ portalName }) {
     };
   }, [students, portalName]);
 
-  if (loading) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-        Loading student analytics…
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="rounded-2xl border border-red-200 bg-red-50 px-6 py-12 text-center text-sm text-red-600">
-        {error}
-      </div>
-    );
-  }
-
-  if (!courseRows.length) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white px-6 py-12 text-center text-sm text-gray-500">
-        No students found for this centre.
-      </div>
-    );
-  }
+  if (loading) return <StatusPanel kind="loading" />;
+  if (error) return <StatusPanel kind="error" message={error} />;
+  if (!courseRows.length) return <StatusPanel kind="empty" />;
 
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-2 gap-6">
-        <div className="bg-blue-50 rounded-2xl p-6 shadow-sm border border-blue-100 flex gap-5">
-          <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center text-2xl">
-            🏆
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-2">
-              Highest Student Marks
-            </p>
-            {highestStudent ? (
-              <>
-                <div className="flex items-end gap-3 mb-3">
-                  <span className="text-4xl font-extrabold text-blue-700">
-                    {round1(highestStudent.avg)}
-                  </span>
-                  <span className="text-lg font-semibold text-blue-500 mb-1">/ 100</span>
-                  <span className="ml-auto text-sm font-semibold bg-blue-200 text-blue-800 px-2.5 py-0.5 rounded-full">
-                    {round1(highestStudent.avg)}%
-                  </span>
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-blue-600 font-medium">
-                      {highestStudent.student.name}
-                    </span>
-                    <span className="text-blue-400 text-xs">
-                      {highestStudent.student.studentId || "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-blue-500">Course</span>
-                    <span className="text-blue-700 font-semibold">
-                      {highestStudent.student.course || "—"}
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-blue-500">No marks recorded yet.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="bg-blue-50 rounded-2xl p-6 shadow-sm border border-blue-100 flex gap-5">
-          <div className="flex-shrink-0 w-14 h-14 rounded-xl bg-red-100 flex items-center justify-center text-2xl">
-            📉
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-semibold text-red-500 uppercase tracking-wider mb-2">
-              Lowest Student Marks
-            </p>
-            {lowestStudent ? (
-              <>
-                <div className="flex items-end gap-3 mb-3">
-                  <span className="text-4xl font-extrabold text-red-600">
-                    {round1(lowestStudent.avg)}
-                  </span>
-                  <span className="text-lg font-semibold text-red-400 mb-1">/ 100</span>
-                  <span className="ml-auto text-sm font-semibold bg-red-100 text-red-700 px-2.5 py-0.5 rounded-full border border-red-200">
-                    {round1(lowestStudent.avg)}%
-                  </span>
-                </div>
-                <div className="space-y-1.5 text-sm">
-                  <div className="flex justify-between">
-                    <span className="font-medium text-red-600">
-                      {lowestStudent.student.name}
-                    </span>
-                    <span className="text-red-600 text-xs">
-                      {lowestStudent.student.studentId || "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-red-500">Course</span>
-                    <span className="font-semibold text-red-600">
-                      {lowestStudent.student.course || "—"}
-                    </span>
-                  </div>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-red-500">No marks recorded yet.</p>
-            )}
-          </div>
-        </div>
+        <StudentHighlightCard theme="high" entry={highestStudent} />
+        <StudentHighlightCard theme="low" entry={lowestStudent} />
       </div>
 
       <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
@@ -233,57 +220,39 @@ export default function StudentsTab({ portalName }) {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ backgroundColor: "#CCD2DD" }}>
-                <th className="text-left px-6 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Course
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Students Count
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Avg
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Highest
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Lowest
-                </th>
-                <th className="text-center px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Pass %
-                </th>
-                <th className="text-center px-6 py-3.5 text-xs font-semibold text-gray-700 uppercase">
-                  Performance
-                </th>
+              <tr style={tableHeadRowClass}>
+                {[
+                  ["Course", "text-left px-6"],
+                  ["Students Count", "text-center px-4"],
+                  ["Avg", "text-center px-4"],
+                  ["Highest", "text-center px-4"],
+                  ["Lowest", "text-center px-4"],
+                  ["Pass %", "text-center px-4"],
+                  ["Performance", "text-center px-6"],
+                ].map(([label, alignPad]) => (
+                  <th
+                    key={label}
+                    className={`${alignPad} py-3.5 text-xs font-semibold text-gray-700 uppercase`}
+                  >
+                    {label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
               {courseRows.map((row, i) => (
-                <tr
-                  key={row.Course}
-                  className={`hover:bg-blue-50 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}
-                >
+                <tr key={row.Course} className={zebraRowClass(i)}>
                   <td className="px-6 py-4 font-semibold text-gray-900">{row.Course}</td>
-                  <td className="px-4 py-4 text-center font-semibold text-gray-800">
-                    👤 {row.students}
-                  </td>
+                  <td className="px-4 py-4 text-center font-semibold text-gray-800">👤 {row.students}</td>
                   <td className="px-4 py-4 text-center text-gray-700">{row.avg}</td>
-                  <td className="px-4 py-4 text-center font-medium text-green-700">
-                    {row.highest}
-                  </td>
-                  <td className="px-4 py-4 text-center font-medium text-red-600">
-                    {row.lowest}
-                  </td>
-                  <td className="px-4 py-4 text-center font-semibold text-gray-800">
-                    {row.pass}%
-                  </td>
+                  <td className="px-4 py-4 text-center font-medium text-green-700">{row.highest}</td>
+                  <td className="px-4 py-4 text-center font-medium text-red-600">{row.lowest}</td>
+                  <td className="px-4 py-4 text-center font-semibold text-gray-800">{row.pass}%</td>
                   <td className="px-6 py-4 text-center">
                     {row.performance === "—" ? (
                       <span className="text-gray-400">—</span>
                     ) : (
-                      <span
-                        className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${performanceBadge(row.performance)}`}
-                      >
+                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${performanceBadge(row.performance)}`}>
                         {row.performance}
                       </span>
                     )}

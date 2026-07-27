@@ -1,6 +1,8 @@
 import { Search, RefreshCw, UserPlus, ChevronDown } from "lucide-react";
 
-export default function StudentToolbar({ 
+const COURSE_OPTIONS = ["JEE-Exams", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
+
+export default function StudentToolbar({
   search, 
   onSearch, 
   courseFilter, 
@@ -61,9 +63,9 @@ export default function StudentToolbar({
           }}
         >
           <option>All Courses</option>
-          {["JEE-Exams","NEET","SSC","CLAT","IBPS","ICAR","CUET","RRB"].map(c => 
-            <option key={c}>{c}</option>
-          )}
+          {COURSE_OPTIONS.map((course) => (
+            <option key={course}>{course}</option>
+          ))}
         </select>
         <ChevronDown 
           size={14} 

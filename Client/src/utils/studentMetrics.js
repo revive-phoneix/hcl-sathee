@@ -1,3 +1,17 @@
+export const getInitials = (name = "", fallback = "") => {
+  const initials = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+  return initials || fallback;
+};
+
+export const AVATAR_COLORS = ["#1e40af", "#0f766e", "#7c3aed", "#b45309", "#be123c"];
+
 export const parsePercentValue = (value) => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const parsed = parseFloat(String(value ?? "").replace("%", "").trim());

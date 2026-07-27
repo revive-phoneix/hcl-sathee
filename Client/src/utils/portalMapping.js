@@ -1,3 +1,9 @@
+const CENTRE_RULES = [
+  { patterns: ["RAJASTHAN", "RAJATHAN"], key: "HCLRAJASTHAN", label: "HCL RAJASTHAN" },
+  { patterns: ["JHARKHAND"], key: "HCLJHARKHAND", label: "HCL JHARKHAND" },
+  { patterns: ["MADHYAPRADESH"], key: "HCLMADHYAPRADESH", label: "HCL MADHYA PRADESH" },
+];
+
 const normalizeCentreValue = (value = "") =>
   value
     .toString()
@@ -5,40 +11,27 @@ const normalizeCentreValue = (value = "") =>
     .toUpperCase()
     .replace(/[^A-Z]/g, "");
 
+const matchCentreRule = (normalized) =>
+  CENTRE_RULES.find((rule) => rule.patterns.some((pattern) => normalized.includes(pattern)));
+
 const getCanonicalCentreKey = (value = "") => {
   const normalized = normalizeCentreValue(value);
-
-  if (normalized.includes("RAJASTHAN") || normalized.includes("RAJATHAN")) return "HCLRAJASTHAN";
-  if (normalized.includes("JHARKHAND")) return "HCLJHARKHAND";
-  if (normalized.includes("MADHYAPRADESH")) return "HCLMADHYAPRADESH";
-
-  return normalized;
+  return matchCentreRule(normalized)?.key ?? normalized;
 };
 
-export const getCentreValueFromPortal = (portalName = "") => {
-  const normalizedPortal = normalizeCentreValue(portalName);
-
-  if (normalizedPortal.includes("RAJASTHAN") || normalizedPortal.includes("RAJATHAN")) return "HCL RAJASTHAN";
-  if (normalizedPortal.includes("JHARKHAND")) return "HCL JHARKHAND";
-  if (normalizedPortal.includes("MADHYAPRADESH")) return "HCL MADHYA PRADESH";
-
-  return null;
-};
+export const getCentreValueFromPortal = (portalName = "") =>
+  matchCentreRule(normalizeCentreValue(portalName))?.label ?? null;
 
 export const matchesPortalCentre = (centreValue, portalName = "") => {
   const targetCentre = getCentreValueFromPortal(portalName);
-
   if (!targetCentre) return true;
-
   return getCanonicalCentreKey(centreValue) === getCanonicalCentreKey(targetCentre);
 };
 
 export const canAccessPortal = (userCentre, portalName = "", userRole = "") => {
   const role = String(userRole || "").trim().toUpperCase();
-
   if (role === "ADMIN") return true;
   if (!userCentre) return false;
-
   return matchesPortalCentre(userCentre, portalName);
 };
 
@@ -58,16 +51,7 @@ export const canEnterAdminDashboard = (userRole = "") => isAdminRole(userRole);
 export const canEnterPartnerDashboard = (userRole = "") => isHclPartnerRole(userRole);
 
 export const PORTAL_OPTIONS = [
-  {
-    title: "HCL SATHEE RAJASTHAN",
-    subtitle: "Rajasthan Learning Portal",
-  },
-  {
-    title: "HCL SATHEE JHARKHAND",
-    subtitle: "Jharkhand Learning Portal",
-  },
-  {
-    title: "HCL SATHEE MADHYA PRADESH",
-    subtitle: "Madhya Pradesh Learning Portal",
-  },
+  { title: "HCL SATHEE RAJASTHAN", subtitle: "Rajasthan Learning Portal" },
+  { title: "HCL SATHEE JHARKHAND", subtitle: "Jharkhand Learning Portal" },
+  { title: "HCL SATHEE MADHYA PRADESH", subtitle: "Madhya Pradesh Learning Portal" },
 ];

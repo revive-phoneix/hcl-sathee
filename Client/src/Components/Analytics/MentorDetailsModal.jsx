@@ -1,6 +1,53 @@
 import { useEffect, useState } from "react";
 import { updateUser } from "../../services/users";
 import { WEEKDAYS, formatAvailableDays } from "../../utils/availableDays";
+import { mentorInitial } from "./analyticsUi";
+
+const overlayStyle = {
+  position: "fixed",
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: "rgba(0,0,0,0.6)",
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  zIndex: 1000,
+  fontFamily: "Inter, sans-serif",
+};
+
+const panelStyle = {
+  background: "#fff",
+  borderRadius: 12,
+  width: "90%",
+  maxWidth: "780px",
+  maxHeight: "90vh",
+  overflow: "auto",
+  boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
+};
+
+const sectionTitleStyle = {
+  fontSize: 17,
+  marginBottom: 12,
+  color: "#1a1f2e",
+  borderBottom: "2px solid #e2e8f0",
+  paddingBottom: 8,
+};
+
+const detailLineStyle = { color: "#1f2937", marginBottom: 8 };
+
+function DetailLine({ label, children }) {
+  return (
+    <p style={detailLineStyle}>
+      <strong>{label}:</strong> {children}
+    </p>
+  );
+}
+
+function SectionTitle({ children }) {
+  return <h3 style={sectionTitleStyle}>{children}</h3>;
+}
 
 export default function MentorDetailsModal({
   mentor,
@@ -28,17 +75,13 @@ export default function MentorDetailsModal({
       const has = current.includes(day);
       return {
         ...prev,
-        availableDays: has
-          ? current.filter((d) => d !== day)
-          : [...current, day],
+        availableDays: has ? current.filter((d) => d !== day) : [...current, day],
       };
     });
   };
 
   const handleSave = async () => {
-    const days = Array.isArray(formData.availableDays)
-      ? formData.availableDays
-      : [];
+    const days = Array.isArray(formData.availableDays) ? formData.availableDays : [];
 
     setSaving(true);
     setError("");
@@ -65,45 +108,11 @@ export default function MentorDetailsModal({
     setFormData((prev) => ({ ...prev, [field]: e.target.value }));
   };
 
-  const initial =
-    String(mentor.name || "")
-      .trim()
-      .split(/\s+/)
-      .filter(Boolean)
-      .pop()?.[0]
-      ?.toUpperCase() || "?";
-
-  const displayDays = isEditing
-    ? formData.availableDays
-    : mentor.availableDays;
+  const displayDays = isEditing ? formData.availableDays : mentor.availableDays;
 
   return (
-    <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.6)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        zIndex: 1000,
-        fontFamily: "Inter, sans-serif",
-      }}
-    >
-      <div
-        style={{
-          background: "#fff",
-          borderRadius: 12,
-          width: "90%",
-          maxWidth: "780px",
-          maxHeight: "90vh",
-          overflow: "auto",
-          boxShadow: "0 10px 30px rgba(0,0,0,0.2)",
-        }}
-      >
+    <div style={overlayStyle}>
+      <div style={panelStyle}>
         <div
           style={{
             background: "linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)",
@@ -131,7 +140,7 @@ export default function MentorDetailsModal({
                 fontWeight: 700,
               }}
             >
-              {initial}
+              {mentorInitial(mentor.name)}
             </div>
             <div>
               <h2 style={{ margin: 0, fontSize: 26 }}>{mentor.name}</h2>
@@ -163,23 +172,9 @@ export default function MentorDetailsModal({
             }}
           >
             <div>
-              <h3
-                style={{
-                  fontSize: 17,
-                  marginBottom: 12,
-                  color: "#1a1f2e",
-                  borderBottom: "2px solid #e2e8f0",
-                  paddingBottom: 8,
-                }}
-              >
-                Contact & Location
-              </h3>
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Email:</strong> {mentor.email || "—"}
-              </p>
-
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Phone:</strong>{" "}
+              <SectionTitle>Contact & Location</SectionTitle>
+              <DetailLine label="Email">{mentor.email || "—"}</DetailLine>
+              <DetailLine label="Phone">
                 {isEditing ? (
                   <input
                     value={formData.phone || ""}
@@ -194,37 +189,20 @@ export default function MentorDetailsModal({
                 ) : (
                   mentor.phone || "—"
                 )}
-              </p>
-
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Centre:</strong> {mentor.centre || "—"}
-              </p>
-
-              <p style={{ color: "#1f2937" }}>
+              </DetailLine>
+              <DetailLine label="Centre">{mentor.centre || "—"}</DetailLine>
+              <p style={{ ...detailLineStyle, marginBottom: 0 }}>
                 <strong>Address:</strong> {mentor.address || "—"}
               </p>
             </div>
 
             <div>
-              <h3
-                style={{
-                  fontSize: 17,
-                  marginBottom: 12,
-                  color: "#1a1f2e",
-                  borderBottom: "2px solid #e2e8f0",
-                  paddingBottom: 8,
-                }}
-              >
-                Professional Details
-              </h3>
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Role:</strong> {mentor.qualification || "Sathee Mitra"}
-              </p>
-              <p style={{ color: "#1f2937", marginBottom: 8 }}>
-                <strong>Attendance (7d):</strong>{" "}
+              <SectionTitle>Professional Details</SectionTitle>
+              <DetailLine label="Role">{mentor.qualification || "Sathee Mitra"}</DetailLine>
+              <DetailLine label="Attendance (7d)">
                 {mentor.attendance == null ? "—" : `${mentor.attendance}%`}
-              </p>
-              <div style={{ color: "#1f2937", marginBottom: 8 }}>
+              </DetailLine>
+              <div style={detailLineStyle}>
                 <strong>Days Available:</strong>
                 {isEditing ? (
                   <div
@@ -245,9 +223,7 @@ export default function MentorDetailsModal({
                           style={{
                             padding: "6px 10px",
                             borderRadius: 8,
-                            border: selected
-                              ? "1px solid #059669"
-                              : "1px solid #e5e7eb",
+                            border: selected ? "1px solid #059669" : "1px solid #e5e7eb",
                             background: selected ? "#059669" : "#fff",
                             color: selected ? "#fff" : "#374151",
                             fontSize: 12,
@@ -261,9 +237,7 @@ export default function MentorDetailsModal({
                     })}
                   </div>
                 ) : (
-                  <span style={{ marginLeft: 6 }}>
-                    {formatAvailableDays(displayDays)}
-                  </span>
+                  <span style={{ marginLeft: 6 }}>{formatAvailableDays(displayDays)}</span>
                 )}
               </div>
             </div>

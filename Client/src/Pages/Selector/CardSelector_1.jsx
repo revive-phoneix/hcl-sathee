@@ -2,22 +2,11 @@ import { ArrowUpRight } from "lucide-react";
 import HCLLogo from "../../assets/HCL.svg";
 import SatheeLogo from "../../assets/sathee.svg";
 
-function HCLIcon() {
+function LogoIcon({ src, alt }) {
   return (
     <img
-      src={HCLLogo}
-      alt="HCL"
-      style={{ width: "100%", height: "100%" }}
-      className="h-full w-full rounded-xl object-cover"
-    />
-  );
-}
-
-function SatheeIcon() {
-  return (
-    <img
-      src={SatheeLogo}
-      alt="SATHEE"
+      src={src}
+      alt={alt}
       style={{ width: "100%", height: "100%" }}
       className="h-full w-full rounded-xl object-cover"
     />
@@ -29,7 +18,7 @@ export default function DashboardSelect({ openHCLSathee }) {
     {
       title: "HCL SATHEE",
       subtitle: "Open your internal HCL SATHEE analytics workspace",
-      icon: HCLIcon,
+      icon: () => <LogoIcon src={HCLLogo} alt="HCL" />,
       buttonText: "Open HCL SATHEE",
       onClick: openHCLSathee,
       badge: "Internal",
@@ -37,14 +26,10 @@ export default function DashboardSelect({ openHCLSathee }) {
     {
       title: "SATHEE",
       subtitle: "Go to the official SATHEE learning portal",
-      icon: SatheeIcon,
+      icon: () => <LogoIcon src={SatheeLogo} alt="SATHEE" />,
       buttonText: "Visit SATHEE",
       onClick: () =>
-        window.open(
-          "https://sathee.iitk.ac.in/",
-          "_blank",
-          "noopener,noreferrer"
-        ),
+        window.open("https://sathee.iitk.ac.in/", "_blank", "noopener,noreferrer"),
       badge: "External",
     },
     {

@@ -14,18 +14,15 @@ import {
   downloadAttendanceSvg,
   downloadAttendanceXlsx,
 } from "../../utils/exportAttendance";
+import { WEEKDAYS } from "../../utils/availableDays";
 
 const COLUMN_LABEL = { daily: "Day", weekly: "Week", monthly: "Month" };
-
-const WEEKDAY_LABELS = [
-  "Monday",
-  "Tuesday",
-  "Wednesday",
-  "Thursday",
-  "Friday",
-  "Saturday",
-  "Sunday",
-];
+const PERIOD_TABS = new Set(["daily", "weekly", "monthly"]);
+const PERCENT_HINT = {
+  daily: "Centre % = average of all students that day",
+  weekly: "Week % = average of centre daily %",
+  monthly: "Month % = average of centre daily %",
+};
 
 const MONTH_LABELS = [
   "January",
@@ -192,6 +189,26 @@ const getWeeksInMonth = (dateStr) => {
   return weeks;
 };
 
+const fetchList = async (fetcher, onSuccess, onLoading, errorLabel) => {
+  onLoading(true);
+  try {
+    onSuccess(await fetcher());
+  } catch (err) {
+    console.error(`${errorLabel}:`, err);
+    onSuccess([]);
+  } finally {
+    onLoading(false);
+  }
+};
+
+const FooterMeta = ({ children }) => (
+  <>
+    {" "}
+    ·{" "}
+    <span className="font-medium text-gray-600">{children}</span>
+  </>
+);
+
 export default function AdminAttendance({
   portalName = "HCL SATHEE",
   navItems,
@@ -219,11 +236,7 @@ export default function AdminAttendance({
   const filtersReady =
     !isAdminView ||
     isMitraTab ||
-    (Boolean(activeTab) &&
-      (activeTab === "daily" ||
-        activeTab === "weekly" ||
-        activeTab === "monthly") &&
-      Boolean(selectedCentre));
+    (PERIOD_TABS.has(activeTab) && Boolean(selectedCentre));
 
   const centreScope = isAdminView
     ? selectedCentre
@@ -289,7 +302,7 @@ export default function AdminAttendance({
     if (activeTab === "daily") {
       const { from } = getWeekRange(selectedDate);
       const monday = new Date(`${from}T00:00:00`);
-      return WEEKDAY_LABELS.map((label, index) => {
+      return WEEKDAYS.map((label, index) => {
         const day = new Date(monday);
         day.setDate(monday.getDate() + index);
         const date = toInputDate(day);
@@ -367,36 +380,21 @@ export default function AdminAttendance({
     };
   }, [filtered]);
 
-  const loadMitras = useCallback(async () => {
-    setLoadingMitras(true);
-    try {
-      setMitras(await fetchUsers());
-    } catch (err) {
-      console.error("Fetch Sathee Mitra error:", err);
-      setMitras([]);
-    } finally {
-      setLoadingMitras(false);
-    }
-  }, []);
+  const loadMitras = useCallback(
+    () => fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch Sathee Mitra error"),
+    []
+  );
 
-  const loadStudents = useCallback(async () => {
-    setLoadingStudents(true);
-    try {
-      setStudents(await fetchStudents());
-    } catch (err) {
-      console.error("Fetch students error:", err);
-      setStudents([]);
-    } finally {
-      setLoadingStudents(false);
-    }
-  }, []);
+  const loadStudents = useCallback(
+    () => fetchList(fetchStudents, setStudents, setLoadingStudents, "Fetch students error"),
+    []
+  );
 
   const loadAttendance = useCallback(async () => {
     if (isMitraTab || !selectedDate) return;
     if (
       isAdminView &&
-      (!selectedCentre ||
-        !["daily", "weekly", "monthly"].includes(activeTab))
+      (!selectedCentre || !PERIOD_TABS.has(activeTab))
     ) {
       setAttendanceRecords([]);
       return;
@@ -558,45 +556,17 @@ export default function AdminAttendance({
               ) : (
                 <>
                   Showing {filtered.length} of {tableRows.length} records
-                  {periodMeta.label ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <span className="font-medium text-gray-600">
-                        {periodMeta.label}
-                      </span>
-                    </>
-                  ) : null}
+                  {periodMeta.label ? <FooterMeta>{periodMeta.label}</FooterMeta> : null}
                   {selectedCentre || !isAdminView ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <span className="font-medium text-gray-600">
-                        {isAdminView ? selectedCentre : portalName}
-                      </span>
-                    </>
+                    <FooterMeta>{isAdminView ? selectedCentre : portalName}</FooterMeta>
                   ) : null}
                   {centreStudentIds.length ? (
-                    <>
-                      {" "}
-                      ·{" "}
-                      <span className="font-medium text-gray-600">
-                        {centreStudentIds.length} students
-                      </span>
-                    </>
+                    <FooterMeta>{centreStudentIds.length} students</FooterMeta>
                   ) : null}
                 </>
               )}
             </p>
-            <p className="text-xs text-gray-400">
-              {activeTab === "daily"
-                ? "Centre % = average of all students that day"
-                : activeTab === "weekly"
-                  ? "Week % = average of centre daily %"
-                  : activeTab === "monthly"
-                    ? "Month % = average of centre daily %"
-                    : null}
-            </p>
+            <p className="text-xs text-gray-400">{PERCENT_HINT[activeTab] ?? null}</p>
           </div>
         </div>
 

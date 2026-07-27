@@ -1,29 +1,25 @@
 const Announcement = require("../Models/Announcement");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 
-exports.getAnnouncements = async (req, res) => {
-  try {
+exports.getAnnouncements = wrap(
+  async (req, res) => {
     const announcements = filterByUserCentre(
       await Announcement.findAll(),
       req.user
     );
-    res.status(200).json({ success: true, announcements });
-  } catch (error) {
-    console.error("Get Announcements Error:", error);
-    res.status(500).json({ success: false, message: "Failed to fetch announcements" });
-  }
-};
+    return ok(res, { announcements });
+  },
+  { label: "Get Announcements Error", message: "Failed to fetch announcements" }
+);
 
-exports.addAnnouncement = async (req, res) => {
-  try {
+exports.addAnnouncement = wrap(
+  async (req, res) => {
     const { title, description, category, priority, postedBy, centre, attachmentName } =
       req.body;
 
     if (!title?.trim() || !description?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Title and description are required",
-      });
+      return fail(res, 400, "Title and description are required");
     }
 
     const announcement = await Announcement.create({
@@ -36,28 +32,22 @@ exports.addAnnouncement = async (req, res) => {
       attachmentName: attachmentName?.trim() || null,
     });
 
-    res.status(201).json({ success: true, announcement });
-  } catch (error) {
-    console.error("Add Announcement Error:", error);
-    res.status(500).json({ success: false, message: "Failed to create announcement" });
-  }
-};
+    return ok(res, 201, { announcement });
+  },
+  { label: "Add Announcement Error", message: "Failed to create announcement" }
+);
 
-exports.updateAnnouncement = async (req, res) => {
-  try {
+exports.updateAnnouncement = wrap(
+  async (req, res) => {
     const { id } = req.params;
     const { title, description, category, priority, attachmentName, centre } = req.body;
 
     const existing = await Announcement.findById(id);
     if (!existing) {
-      return res.status(404).json({ success: false, message: "Announcement not found" });
+      return fail(res, 404, "Announcement not found");
     }
-
     if (!title?.trim() || !description?.trim()) {
-      return res.status(400).json({
-        success: false,
-        message: "Title and description are required",
-      });
+      return fail(res, 400, "Title and description are required");
     }
 
     const announcement = await Announcement.update(id, {
@@ -72,24 +62,17 @@ exports.updateAnnouncement = async (req, res) => {
           : attachmentName?.trim() || null,
     });
 
-    res.status(200).json({ success: true, announcement });
-  } catch (error) {
-    console.error("Update Announcement Error:", error);
-    res.status(500).json({ success: false, message: "Failed to update announcement" });
-  }
-};
+    return ok(res, { announcement });
+  },
+  { label: "Update Announcement Error", message: "Failed to update announcement" }
+);
 
-exports.deleteAnnouncement = async (req, res) => {
-  try {
-    const deleted = await Announcement.destroy(req.params.id);
-
-    if (!deleted) {
-      return res.status(404).json({ success: false, message: "Announcement not found" });
+exports.deleteAnnouncement = wrap(
+  async (req, res) => {
+    if (!(await Announcement.destroy(req.params.id))) {
+      return fail(res, 404, "Announcement not found");
     }
-
-    res.status(200).json({ success: true, message: "Announcement deleted successfully" });
-  } catch (error) {
-    console.error("Delete Announcement Error:", error);
-    res.status(500).json({ success: false, message: "Failed to delete announcement" });
-  }
-};
+    return ok(res, { message: "Announcement deleted successfully" });
+  },
+  { label: "Delete Announcement Error", message: "Failed to delete announcement" }
+);

@@ -1,16 +1,10 @@
 const { getDb, getBucket } = require("../config/firebase");
 const path = require("path");
+const { toDate } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "mitraAttendances";
 
 const attendancesRef = () => getDb().collection(COLLECTION);
-
-const toDate = (value) => {
-  if (!value) return null;
-  if (value instanceof Date) return value;
-  if (typeof value.toDate === "function") return value.toDate();
-  return new Date(value);
-};
 
 const toApiRecord = (docId, data) => ({
   id: docId,
