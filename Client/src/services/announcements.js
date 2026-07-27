@@ -53,10 +53,7 @@ export const fetchAnnouncements = async () => {
 export const createAnnouncement = async (payload) => {
   const response = await api.post(
     "/api/announcements",
-    buildAnnouncementFormData(payload),
-    {
-      headers: { "Content-Type": "multipart/form-data" },
-    }
+    buildAnnouncementFormData(payload)
   );
   return normalizeAnnouncement(response.data.announcement);
 };
@@ -64,10 +61,7 @@ export const createAnnouncement = async (payload) => {
 export const updateAnnouncement = async (id, payload) => {
   const response = await api.put(
     `/api/announcements/${id}`,
-    buildAnnouncementFormData(payload),
-    {
-      headers: { "Content-Type": "multipart/form-data" },
-    }
+    buildAnnouncementFormData(payload)
   );
   return normalizeAnnouncement(response.data.announcement);
 };

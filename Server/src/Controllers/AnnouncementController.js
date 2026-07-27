@@ -31,7 +31,7 @@ exports.addAnnouncement = wrap(
     const { title, description, category, priority, postedBy, centre } =
       parseBody(req);
 
-    if (!title?.trim() || !description?.trim()) {
+    if (!String(title || "").trim() || !String(description || "").trim()) {
       return fail(res, 400, "Title and description are required");
     }
 
@@ -54,18 +54,22 @@ exports.addAnnouncement = wrap(
     }
 
     const announcement = await Announcement.create({
-      title: title.trim(),
-      description: description.trim(),
-      category: category?.trim() || "General",
+      title: String(title).trim(),
+      description: String(description).trim(),
+      category: String(category || "").trim() || "General",
       priority: priority || "Medium",
-      postedBy: postedBy?.trim() || "Admin",
-      centre: centre?.trim() || null,
+      postedBy: String(postedBy || "").trim() || "Admin",
+      centre: String(centre || "").trim() || null,
       ...attachment,
     });
 
     return ok(res, 201, { announcement });
   },
-  { label: "Add Announcement Error", message: "Failed to create announcement" }
+  {
+    label: "Add Announcement Error",
+    message: "Failed to create announcement",
+    useErrorMessage: true,
+  }
 );
 
 exports.updateAnnouncement = wrap(
@@ -77,16 +81,19 @@ exports.updateAnnouncement = wrap(
     if (!existing) {
       return fail(res, 404, "Announcement not found");
     }
-    if (!title?.trim() || !description?.trim()) {
+    if (!String(title || "").trim() || !String(description || "").trim()) {
       return fail(res, 400, "Title and description are required");
     }
 
     const patch = {
-      title: title.trim(),
-      description: description.trim(),
-      category: category?.trim() || existing.category,
+      title: String(title).trim(),
+      description: String(description).trim(),
+      category: String(category || "").trim() || existing.category,
       priority: priority || existing.priority,
-      centre: centre === undefined ? existing.centre : centre?.trim() || null,
+      centre:
+        centre === undefined || centre === null
+          ? existing.centre
+          : String(centre).trim() || null,
     };
 
     if (req.file) {
@@ -94,9 +101,16 @@ exports.updateAnnouncement = wrap(
     }
 
     const announcement = await Announcement.update(id, patch);
+    if (!announcement) {
+      return fail(res, 404, "Announcement not found");
+    }
     return ok(res, { announcement });
   },
-  { label: "Update Announcement Error", message: "Failed to update announcement" }
+  {
+    label: "Update Announcement Error",
+    message: "Failed to update announcement",
+    useErrorMessage: true,
+  }
 );
 
 exports.deleteAnnouncement = wrap(

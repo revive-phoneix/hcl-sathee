@@ -41,31 +41,59 @@ const findById = async (id) => {
 };
 
 const uploadAttachment = async (file) => {
-  const ext = path.extname(file.originalname || "").toLowerCase() || "";
+  if (!file?.buffer) {
+    throw new Error("Attachment file is missing or empty");
+  }
+
+  const originalName = String(file.originalname || "attachment").trim();
+  const ext = path.extname(originalName).toLowerCase() || "";
   const safeExt = ALLOWED_EXTS.includes(ext) ? ext : ".bin";
   const storagePath = `announcements/${Date.now()}-${Math.random()
     .toString(36)
     .slice(2)}${safeExt}`;
   const bucket = getBucket();
   const storageFile = bucket.file(storagePath);
+  const contentType = file.mimetype || "application/octet-stream";
 
-  await storageFile.save(file.buffer, {
-    metadata: {
-      contentType: file.mimetype || "application/octet-stream",
-      cacheControl: "public, max-age=31536000",
-    },
-    resumable: false,
-  });
+  try {
+    await storageFile.save(file.buffer, {
+      metadata: {
+        contentType,
+        cacheControl: "public, max-age=31536000",
+        metadata: {
+          originalName,
+        },
+      },
+      resumable: false,
+    });
+  } catch (err) {
+    throw new Error(
+      `Failed to upload attachment to storage: ${err.message || "unknown error"}`
+    );
+  }
 
-  const [url] = await storageFile.getSignedUrl({
-    action: "read",
-    expires: "03-01-2500",
-  });
+  let url;
+  try {
+    const [signedUrl] = await storageFile.getSignedUrl({
+      action: "read",
+      expires: new Date("2500-01-01T00:00:00.000Z"),
+    });
+    url = signedUrl;
+  } catch (err) {
+    try {
+      await storageFile.makePublic();
+      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    } catch (publicErr) {
+      throw new Error(
+        `Failed to create attachment URL: ${err.message || publicErr.message}`
+      );
+    }
+  }
 
   return {
-    attachmentName: file.originalname || `attachment${safeExt}`,
+    attachmentName: originalName || `attachment${safeExt}`,
     attachmentUrl: url,
-    attachmentType: file.mimetype || "application/octet-stream",
+    attachmentType: contentType,
     attachmentPath: storagePath,
   };
 };
@@ -97,8 +125,13 @@ const update = async (id, data) => {
   const ref = await findDocRefById(id);
   if (!ref) return null;
 
-  const updated = { ...data, updated_at: new Date() };
-  await ref.update(updated);
+  const updated = { updated_at: new Date() };
+  Object.entries(data || {}).forEach(([key, value]) => {
+    if (value !== undefined) updated[key] = value;
+  });
+
+  // merge:true safely adds new attachment fields on older announcement docs
+  await ref.set(updated, { merge: true });
   const doc = await ref.get();
   return toApiAnnouncement(doc.id, doc.data());
 };

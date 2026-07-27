@@ -19,6 +19,7 @@ const upload = multer({
   fileFilter: (_req, file, cb) => {
     const allowed = [
       "application/pdf",
+      "application/x-pdf",
       "image/jpeg",
       "image/jpg",
       "image/png",
@@ -26,7 +27,9 @@ const upload = multer({
       "application/msword",
       "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     ];
-    if (allowed.includes(file.mimetype)) return cb(null, true);
+    const name = String(file.originalname || "").toLowerCase();
+    const byExt = /\.(pdf|jpe?g|png|webp|docx?)$/i.test(name);
+    if (allowed.includes(file.mimetype) || byExt) return cb(null, true);
     return cb(new Error("Only PDF, DOC, DOCX, JPG, and PNG uploads are allowed"));
   },
 });
