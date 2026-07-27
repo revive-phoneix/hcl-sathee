@@ -1,53 +1,76 @@
-const { google } = require('googleapis');
-const { createPasswordLink } = require('./createPasswordLink');
+const { google } = require("googleapis");
+const { createPasswordLink } = require("./createPasswordLink");
 
-const oauth2Client = new google.auth.OAuth2(
-  process.env.EMAIL_CLIENT_ID,
-  process.env.EMAIL_CLIENT_SECRET
-);
+const requiredEmailEnv = () => {
+  const missing = [
+    "EMAIL_USER",
+    "EMAIL_CLIENT_ID",
+    "EMAIL_CLIENT_SECRET",
+    "EMAIL_REFRESH_TOKEN",
+  ].filter((key) => !String(process.env[key] || "").trim());
 
-oauth2Client.setCredentials({
-  refresh_token: process.env.EMAIL_REFRESH_TOKEN,
-});
+  if (missing.length) {
+    throw new Error(
+      `Email is not configured. Missing env: ${missing.join(", ")}`
+    );
+  }
+};
 
-const gmail = google.gmail({
-  version: 'v1',
-  auth: oauth2Client,
-});
+const getGmailClient = async () => {
+  requiredEmailEnv();
+
+  const oauth2Client = new google.auth.OAuth2(
+    process.env.EMAIL_CLIENT_ID,
+    process.env.EMAIL_CLIENT_SECRET
+  );
+
+  oauth2Client.setCredentials({
+    refresh_token: process.env.EMAIL_REFRESH_TOKEN,
+  });
+
+  // Force refresh so auth failures surface before send.
+  await oauth2Client.getAccessToken();
+
+  return google.gmail({
+    version: "v1",
+    auth: oauth2Client,
+  });
+};
 
 function createMessage(from, to, subject, text, html) {
-  const boundary = '0000000000000000000000000000000000000000';
+  const boundary = "0000000000000000000000000000000000000000";
   const message = [
     `From: SATHEE Admin <${from}>`,
     `To: ${to}`,
     `Subject: ${subject}`,
-    'Content-Type: multipart/alternative; boundary="' + boundary + '"',
-    'MIME-Version: 1.0',
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "MIME-Version: 1.0",
     `Date: ${new Date().toUTCString()}`,
-    '',
+    "",
     `--${boundary}`,
     'Content-Type: text/plain; charset="UTF-8"',
-    'Content-Transfer-Encoding: 7bit',
-    '',
+    "Content-Transfer-Encoding: 7bit",
+    "",
     text,
-    '',
+    "",
     `--${boundary}`,
     'Content-Type: text/html; charset="UTF-8"',
-    'Content-Transfer-Encoding: 7bit',
-    '',
+    "Content-Transfer-Encoding: 7bit",
+    "",
     html,
-    '',
+    "",
     `--${boundary}--`,
-  ].join('\r\n');
+  ].join("\r\n");
 
   return Buffer.from(message)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
 }
 
 async function sendWelcomeEmail(to, name, role) {
+  const from = String(process.env.EMAIL_USER || "").trim();
   const link = createPasswordLink(name, to);
   const text = `Hello ${name},\n\nYour account has been created as ${role}.\n\nPlease set your password using the link below:\n${link}\n\nIf the button does not work, copy and paste this URL into your browser.\n\nWelcome to HCL SATHEE.`;
   const html = `
@@ -67,10 +90,10 @@ async function sendWelcomeEmail(to, name, role) {
             <a href="${link}" style="display: inline-block; padding: 14px 26px; background: #2563eb; color: white; text-decoration: none; border-radius: 10px; font-weight: 600;">Create Your Password</a>
           </div>
 
-          <p style="margin: 0 0 4px; font-size: 14px; color: #6b7280;">If the button doesn’t work, use this link:</p>
+          <p style="margin: 0 0 4px; font-size: 14px; color: #6b7280;">If the button doesn't work, use this link:</p>
           <p style="margin: 0 0 24px; font-size: 13px; word-break: break-all; color: #2563eb;"><a href="${link}" style="color: #2563eb; text-decoration: none;">${link}</a></p>
 
-          <p style="margin: 0 0 16px;">Thank you for joining HCL SATHEE. We’re excited to have you onboard.</p>
+          <p style="margin: 0 0 16px;">Thank you for joining HCL SATHEE. We're excited to have you onboard.</p>
 
           <div style="padding: 20px; background: #f8fafc; border-radius: 12px;">
             <p style="margin: 0; font-size: 14px; color: #475569;"><strong>Need help?</strong> Reply to this email and our support team will assist you.</p>
@@ -84,22 +107,17 @@ async function sendWelcomeEmail(to, name, role) {
     </div>
   `;
 
-  const raw = createMessage(
-    process.env.EMAIL_USER,
-    to,
-    'Welcome to HCL SATHEE — Create Your Password',
-    text,
-    html
-  );
+  // Keep subject ASCII-safe for MIME headers.
+  const subject = "Welcome to HCL SATHEE - Create Your Password";
+  const gmail = await getGmailClient();
+  const raw = createMessage(from, to, subject, text, html);
 
   const res = await gmail.users.messages.send({
-    userId: 'me',
-    requestBody: {
-      raw,
-    },
+    userId: "me",
+    requestBody: { raw },
   });
 
-  console.log('Email Sent Successfully', res.data.id, res.data.labelIds);
+  console.log("Email Sent Successfully", res.data.id, res.data.labelIds);
   return res.data;
 }
 

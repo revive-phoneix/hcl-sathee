@@ -7,7 +7,12 @@ export const fetchUsers = async () => {
 
 export const createUser = async (payload) => {
   const response = await api.post("/api/users", payload);
-  return response.data.user;
+  return {
+    user: response.data.user,
+    emailSent: Boolean(response.data.emailSent),
+    emailError: response.data.emailError || null,
+    message: response.data.message || null,
+  };
 };
 
 export const updateUser = async (id, payload) => {

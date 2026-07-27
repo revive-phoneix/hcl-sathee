@@ -114,17 +114,32 @@ exports.addUser = async (req, res) => {
       password: null,
     });
 
-    if (!normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
+    let emailSent = false;
+    let emailError = null;
+
+    if (normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
+      emailSent = false;
+      emailError = "Skipped welcome email for @example.com addresses";
+    } else {
       try {
         await sendWelcomeEmail(normalizedEmail, name.trim(), role);
-      } catch (emailError) {
-        console.error("Welcome email failed:", emailError);
+        emailSent = true;
+      } catch (err) {
+        emailError =
+          err?.response?.data?.error?.message ||
+          err?.message ||
+          "Failed to send welcome email";
+        console.error("Welcome email failed:", emailError, err);
       }
     }
 
     res.status(201).json({
       success: true,
-      message: "User created successfully",
+      message: emailSent
+        ? "User created successfully. Welcome email sent."
+        : "User created successfully, but welcome email could not be sent.",
+      emailSent,
+      emailError,
       user: toPublicUser(createdUser),
     });
   } catch (error) {

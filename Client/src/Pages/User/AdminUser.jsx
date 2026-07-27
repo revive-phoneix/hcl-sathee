@@ -103,11 +103,20 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
     setUsersError("");
 
     try {
-      const savedUser = await createUser(newUser);
-      const normalizedUser = normalizeUser(savedUser);
+      const result = await createUser(newUser);
+      const normalizedUser = normalizeUser(result.user);
       setUsers((prev) => [...prev, normalizedUser]);
       setActiveFilter(normalizedUser.role);
       setSearch("");
+
+      if (!result.emailSent) {
+        setUsersError(
+          result.emailError
+            ? `User saved, but email failed: ${result.emailError}`
+            : "User saved, but the welcome email was not sent."
+        );
+      }
+
       return true;
     } catch (error) {
       console.error("Create User Error:", error);
