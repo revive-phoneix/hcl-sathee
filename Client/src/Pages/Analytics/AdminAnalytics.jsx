@@ -3,6 +3,7 @@ import StudentsTab from "../../Components/Analytics/StudentsTab";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import TeachersTab from "../../Components/Analytics/TeachersTab";
 import MentorDetailsModal from "../../Components/Analytics/MentorDetailsModal";
+import UtilitiesSection from "../../Components/Analytics/UtilitiesSection";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchUsers, updateUser } from "../../services/users";
 import { fetchMitraAttendance } from "../../services/mitraAttendance";
@@ -251,6 +252,8 @@ export default function AdminAnalytics({
             }}
           />
         )}
+
+        <UtilitiesSection portalName={portalName} readOnly={readOnly} />
 
         <MentorDetailsModal
           mentor={selectedMentor}

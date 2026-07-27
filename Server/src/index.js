@@ -10,6 +10,7 @@ const studentPerformanceRoutes = require("./Routes/StudentPerformanceRoutes");
 const announcementRoutes = require("./Routes/AnnouncementRoutes");
 const mitraAttendanceRoutes = require("./Routes/MitraAttendanceRoutes");
 const studentAttendanceRoutes = require("./Routes/StudentAttendanceRoutes");
+const equipmentRoutes = require("./Routes/EquipmentRoutes");
 
 const app = express();
 
@@ -37,6 +38,7 @@ app.use("/api/students/performance", studentPerformanceRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/mitra-attendance", mitraAttendanceRoutes);
 app.use("/api/student-attendance", studentAttendanceRoutes);
+app.use("/api/equipments", equipmentRoutes);
 
 try {
   initFirebase();
