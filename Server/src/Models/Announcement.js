@@ -1,7 +1,13 @@
-const { getDb } = require("../config/firebase");
-const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getDb, getBucket } = require("../config/firebase");
+const path = require("path");
+const {
+  toDate,
+  findDocRefById: findRef,
+  getNextId: nextId,
+} = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "announcements";
+const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"];
 
 const announcementsRef = () => getDb().collection(COLLECTION);
 const findDocRefById = (id) => findRef(announcementsRef(), id);
@@ -16,6 +22,8 @@ const toApiAnnouncement = (docId, data) => ({
   postedBy: data.postedBy || "Admin",
   centre: data.centre ?? null,
   attachmentName: data.attachmentName ?? null,
+  attachmentUrl: data.attachmentUrl ?? null,
+  attachmentType: data.attachmentType ?? null,
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
 });
@@ -32,6 +40,36 @@ const findById = async (id) => {
   return toApiAnnouncement(doc.id, doc.data());
 };
 
+const uploadAttachment = async (file) => {
+  const ext = path.extname(file.originalname || "").toLowerCase() || "";
+  const safeExt = ALLOWED_EXTS.includes(ext) ? ext : ".bin";
+  const storagePath = `announcements/${Date.now()}-${Math.random()
+    .toString(36)
+    .slice(2)}${safeExt}`;
+  const bucket = getBucket();
+  const storageFile = bucket.file(storagePath);
+
+  await storageFile.save(file.buffer, {
+    metadata: {
+      contentType: file.mimetype || "application/octet-stream",
+      cacheControl: "public, max-age=31536000",
+    },
+    resumable: false,
+  });
+
+  const [url] = await storageFile.getSignedUrl({
+    action: "read",
+    expires: "03-01-2500",
+  });
+
+  return {
+    attachmentName: file.originalname || `attachment${safeExt}`,
+    attachmentUrl: url,
+    attachmentType: file.mimetype || "application/octet-stream",
+    attachmentPath: storagePath,
+  };
+};
+
 const create = async (data) => {
   const now = new Date();
   const id = await getNextId();
@@ -44,6 +82,9 @@ const create = async (data) => {
     postedBy: data.postedBy || "Admin",
     centre: data.centre ?? null,
     attachmentName: data.attachmentName ?? null,
+    attachmentUrl: data.attachmentUrl ?? null,
+    attachmentType: data.attachmentType ?? null,
+    attachmentPath: data.attachmentPath ?? null,
     created_at: now,
     updated_at: now,
   };
@@ -81,6 +122,9 @@ const importFromMysql = async (row) => {
     postedBy: row.postedBy || "Admin",
     centre: row.centre ?? null,
     attachmentName: row.attachmentName ?? null,
+    attachmentUrl: row.attachmentUrl ?? null,
+    attachmentType: row.attachmentType ?? null,
+    attachmentPath: row.attachmentPath ?? null,
     created_at: toDate(row.created_at) || new Date(),
     updated_at: toDate(row.updated_at) || new Date(),
   };
@@ -95,5 +139,6 @@ module.exports = {
   create,
   update,
   destroy,
+  uploadAttachment,
   importFromMysql,
 };

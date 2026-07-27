@@ -169,19 +169,23 @@ export default function NewAnnouncementModal({
                 </p>
 
                 <p className="text-sm text-slate-400 mt-2">
-                  PDF, JPG, PNG — max 10 MB
+                  PDF, DOC, DOCX, JPG, PNG — max 10 MB
                 </p>
 
-                {form.attachment && (
+                {form.attachment ? (
                   <p className="mt-3 text-sm text-green-600 font-medium">
                     {form.attachment.name}
                   </p>
-                )}
+                ) : editData?.attachmentName ? (
+                  <p className="mt-3 text-sm text-slate-600 font-medium">
+                    Current: {editData.attachmentName}
+                  </p>
+                ) : null}
               </div>
 
               <input
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 className="hidden"
                 onChange={(e) =>
                   setForm({

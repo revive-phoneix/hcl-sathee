@@ -113,7 +113,7 @@ export default function AdminAnnouncements({
         category: data.category,
         priority: data.priority,
         postedBy: userName || "Admin",
-        attachmentName: data.attachment?.name || null,
+        attachment: data.attachment || null,
       };
 
       if (editId !== null) {
@@ -127,9 +127,23 @@ export default function AdminAnnouncements({
         );
 
         if (extraCentres.length) {
+          const sharedAttachment = {
+            attachmentName: updated.attachmentName,
+            attachmentUrl: updated.attachmentUrl,
+            attachmentType: updated.attachmentType,
+            attachmentPath: updated.attachmentPath,
+          };
           const createdList = await Promise.all(
             extraCentres.map((centre) =>
-              createAnnouncement({ ...basePayload, centre })
+              createAnnouncement({
+                title: basePayload.title,
+                description: basePayload.description,
+                category: basePayload.category,
+                priority: basePayload.priority,
+                postedBy: basePayload.postedBy,
+                centre,
+                ...sharedAttachment,
+              })
             )
           );
           setAnnouncements((prev) => [...createdList, ...prev]);
@@ -137,9 +151,36 @@ export default function AdminAnnouncements({
 
         setEditId(null);
       } else {
-        const createdList = await Promise.all(
-          centres.map((centre) => createAnnouncement({ ...basePayload, centre }))
-        );
+        const [primaryCentre, ...extraCentres] = centres;
+        const first = await createAnnouncement({
+          ...basePayload,
+          centre: primaryCentre,
+        });
+        const createdList = [first];
+
+        if (extraCentres.length) {
+          const sharedAttachment = {
+            attachmentName: first.attachmentName,
+            attachmentUrl: first.attachmentUrl,
+            attachmentType: first.attachmentType,
+            attachmentPath: first.attachmentPath,
+          };
+          const rest = await Promise.all(
+            extraCentres.map((centre) =>
+              createAnnouncement({
+                title: basePayload.title,
+                description: basePayload.description,
+                category: basePayload.category,
+                priority: basePayload.priority,
+                postedBy: basePayload.postedBy,
+                centre,
+                ...sharedAttachment,
+              })
+            )
+          );
+          createdList.push(...rest);
+        }
+
         setAnnouncements((prev) => [...createdList, ...prev]);
       }
 

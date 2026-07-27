@@ -39,8 +39,11 @@ export default function AnnouncementCard({
 
         <p className="text-slate-600 text-sm mt-2 line-clamp-2">{announcement.description}</p>
 
-        <div className="flex gap-6 text-xs mt-4 text-slate-500">
+        <div className="flex gap-6 text-xs mt-4 text-slate-500 flex-wrap">
           <div>📅 {announcement.postedOn}</div>
+          {announcement.attachmentName || announcement.attachmentUrl ? (
+            <div>📎 {announcement.attachmentName || "Attachment"}</div>
+          ) : null}
         </div>
       </div>
 
