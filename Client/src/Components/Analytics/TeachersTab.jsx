@@ -50,6 +50,7 @@ function DayToggles({
 
 export default function TeachersTab({
   mentors = [],
+  vishists = [],
   onViewMentor,
   onToggleAvailableDay,
   loading = false,
@@ -153,14 +154,14 @@ export default function TeachersTab({
                     Loading schedule…
                   </td>
                 </tr>
-              ) : mentors.length === 0 ? (
+              ) : vishists.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
-                    No mentors scheduled for this centre.
+                    No Sathee Vishist scheduled for this centre.
                   </td>
                 </tr>
               ) : (
-                mentors.map((mentor, i) => (
+                vishists.map((mentor, i) => (
                   <tr key={mentor.id} className={`hover:bg-blue-50 ${i % 2 === 0 ? "bg-white" : "bg-gray-50/50"}`}>
                     <td className="px-5 py-4">
                       <span

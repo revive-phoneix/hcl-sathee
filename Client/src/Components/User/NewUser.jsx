@@ -12,6 +12,7 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
     role: "ADMIN",
     designation: "",
     centre: defaultCentre,
+    isVishist: false,
   });
 
   const [error, setError] = useState("");
@@ -39,6 +40,7 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
       await onAddUser({
         ...form,
         centre: form.centre || defaultCentre,
+        isVishist: form.role === "SATHEE MITRA" ? Boolean(form.isVishist) : false,
       });
     } catch (submitError) {
       setError(submitError.message || "Unable to add user");
@@ -113,6 +115,8 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                     ...prev,
                     role: e.target.value,
                     centre: prev.centre || defaultCentre,
+                    isVishist:
+                      e.target.value === "SATHEE MITRA" ? prev.isVishist : false,
                   }))
                 }
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -122,6 +126,22 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                 <option value="HCL PARTNER">HCL PARTNER</option>
               </select>
             </div>
+
+            {form.role === "SATHEE MITRA" ? (
+              <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.isVishist)}
+                  onChange={(e) =>
+                    setForm((prev) => ({ ...prev, isVishist: e.target.checked }))
+                  }
+                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Is Vishist?
+                </span>
+              </label>
+            ) : null}
           </div>
 
           {error && (

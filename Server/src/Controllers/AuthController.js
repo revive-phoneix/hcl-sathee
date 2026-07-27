@@ -1,5 +1,6 @@
 const User = require("../Models/User");
 const generateToken = require("../Utils/GenerateToken");
+const { hashPassword, verifyPassword } = require("../Utils/password");
 
 exports.createPassword = async (req, res) => {
   try {
@@ -35,7 +36,8 @@ exports.createPassword = async (req, res) => {
       });
     }
 
-    await User.update(user.id, { password });
+    const hashedPassword = await hashPassword(password);
+    await User.update(user.id, { password: hashedPassword });
 
     res.status(200).json({
       success: true,
@@ -63,11 +65,18 @@ exports.login = async (req, res) => {
       });
     }
 
-    if (String(password) !== String(user.password ?? "")) {
+    const { valid, needsRehash } = await verifyPassword(password, user.password);
+
+    if (!valid) {
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
+    }
+
+    if (needsRehash) {
+      const hashedPassword = await hashPassword(password);
+      await User.update(user.id, { password: hashedPassword });
     }
 
     const token = generateToken(user);

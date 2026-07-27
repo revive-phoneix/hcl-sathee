@@ -46,7 +46,8 @@ exports.getUsers = async (req, res) => {
 
 exports.addUser = async (req, res) => {
   try {
-    const { name, email, phone, role, centre, availableDays } = req.body;
+    const { name, email, phone, role, centre, availableDays, isVishist } =
+      req.body;
 
     if (!name || !email || !phone || !role) {
       return res.status(400).json({
@@ -104,6 +105,8 @@ exports.addUser = async (req, res) => {
       centre: normalizedCentre,
       availableDays:
         String(role).toUpperCase() === "SATHEE MITRA" ? normalizedDays : [],
+      isVishist:
+        String(role).toUpperCase() === "SATHEE MITRA" ? Boolean(isVishist) : false,
       password: null,
     });
 
@@ -146,7 +149,7 @@ exports.addUser = async (req, res) => {
 
 exports.updateUser = async (req, res) => {
   try {
-    const { availableDays, name, phone, centre } = req.body;
+    const { availableDays, name, phone, centre, isVishist } = req.body;
     const existing = await User.findById(req.params.id);
 
     if (!existing) {
@@ -170,6 +173,10 @@ exports.updateUser = async (req, res) => {
 
     if (availableDays != null) {
       patch.availableDays = User.normalizeAvailableDays(availableDays);
+    }
+
+    if (isVishist != null) {
+      patch.isVishist = User.normalizeIsVishist(existing.role, isVishist);
     }
 
     if (!Object.keys(patch).length) {

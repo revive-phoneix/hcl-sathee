@@ -52,6 +52,7 @@ const mapUserToMentor = (user, attendanceRate) => ({
   specialization: "Sathee Mitra",
   joinDate: formatJoinDate(user.created_at),
   availableDays: Array.isArray(user.availableDays) ? user.availableDays : [],
+  isVishist: Boolean(user.isVishist),
   role: user.role,
 });
 
@@ -135,7 +136,15 @@ export default function AdminAnalytics({
     };
   }, [portalName]);
 
-  const filteredMentors = useMemo(() => mentors, [mentors]);
+  const regularMentors = useMemo(
+    () => mentors.filter((m) => !m.isVishist),
+    [mentors]
+  );
+
+  const vishistMentors = useMemo(
+    () => mentors.filter((m) => Boolean(m.isVishist)),
+    [mentors]
+  );
 
   const handleToggleAvailableDay = async (mentor, day) => {
     if (readOnly) return;
@@ -240,7 +249,8 @@ export default function AdminAnalytics({
           <StudentsTab portalName={portalName} />
         ) : (
           <TeachersTab
-            mentors={filteredMentors}
+            mentors={regularMentors}
+            vishists={vishistMentors}
             loading={loadingMentors}
             error={mentorsError}
             readOnly={readOnly}

@@ -40,6 +40,15 @@ const normalizeAvailableDays = (value) => {
   return WEEKDAYS.filter((day) => days.includes(day));
 };
 
+const isMitraRole = (role = "") =>
+  String(role || "").trim().toUpperCase() === "SATHEE MITRA";
+
+/** isVishist only applies to Sathee Mitra; everyone else is false. */
+const normalizeIsVishist = (role, value) => {
+  if (!isMitraRole(role)) return false;
+  return value === true || value === "true" || value === 1 || value === "1";
+};
+
 const toApiUser = (docId, data) => ({
   id: Number(docId) || docId,
   name: data.name,
@@ -49,6 +58,7 @@ const toApiUser = (docId, data) => ({
   role: data.role,
   centre: data.centre ?? null,
   availableDays: normalizeAvailableDays(data.availableDays),
+  isVishist: normalizeIsVishist(data.role, data.isVishist),
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
 });
@@ -67,7 +77,38 @@ const findDocRefById = async (id) => {
   return null;
 };
 
+let isVishistBackfillDone = false;
+
+/** Existing Sathee Mitra without isVishist → write false once. */
+const backfillMissingIsVishist = async () => {
+  if (isVishistBackfillDone) return;
+  isVishistBackfillDone = true;
+
+  try {
+    const snap = await usersRef().get();
+    const batch = getDb().batch();
+    let ops = 0;
+
+    for (const doc of snap.docs) {
+      const data = doc.data() || {};
+      if (!isMitraRole(data.role)) continue;
+      if (Object.prototype.hasOwnProperty.call(data, "isVishist")) continue;
+      batch.update(doc.ref, { isVishist: false, updated_at: new Date() });
+      ops += 1;
+    }
+
+    if (ops > 0) {
+      await batch.commit();
+      console.log(`Backfilled isVishist=false on ${ops} Sathee Mitra user(s)`);
+    }
+  } catch (error) {
+    console.error("isVishist backfill failed:", error);
+    isVishistBackfillDone = false;
+  }
+};
+
 const findAll = async () => {
+  await backfillMissingIsVishist();
   const snap = await usersRef().orderBy("created_at", "desc").get();
   return snap.docs.map((doc) => toApiUser(doc.id, doc.data()));
 };
@@ -112,15 +153,19 @@ const getNextId = async () => {
 const create = async (data) => {
   const now = new Date();
   const id = await getNextId();
+  const role = data.role;
   const payload = {
     id,
     name: data.name,
     email: data.email,
     phone: data.phone ?? null,
     password: data.password == null ? null : String(data.password),
-    role: data.role,
+    role,
     centre: data.centre ?? null,
-    availableDays: normalizeAvailableDays(data.availableDays),
+    availableDays: isMitraRole(role)
+      ? normalizeAvailableDays(data.availableDays)
+      : [],
+    isVishist: normalizeIsVishist(role, data.isVishist),
     created_at: now,
     updated_at: now,
   };
@@ -133,10 +178,25 @@ const update = async (id, data) => {
   const ref = await findDocRefById(id);
   if (!ref) return null;
 
+  const existing = (await ref.get()).data() || {};
+  const nextRole = data.role != null ? data.role : existing.role;
   const updated = { ...data, updated_at: new Date() };
+
   if (Object.prototype.hasOwnProperty.call(data, "availableDays")) {
-    updated.availableDays = normalizeAvailableDays(data.availableDays);
+    updated.availableDays = isMitraRole(nextRole)
+      ? normalizeAvailableDays(data.availableDays)
+      : [];
   }
+
+  if (Object.prototype.hasOwnProperty.call(data, "isVishist") || data.role != null) {
+    updated.isVishist = normalizeIsVishist(
+      nextRole,
+      Object.prototype.hasOwnProperty.call(data, "isVishist")
+        ? data.isVishist
+        : existing.isVishist
+    );
+  }
+
   await ref.update(updated);
   const doc = await ref.get();
   return toApiUser(doc.id, doc.data());
@@ -161,6 +221,7 @@ const importFromMysql = async (row) => {
     role: row.role,
     centre: row.centre ?? null,
     availableDays: normalizeAvailableDays(row.availableDays),
+    isVishist: normalizeIsVishist(row.role, row.isVishist),
     created_at: toDate(row.created_at) || new Date(),
     updated_at: toDate(row.updated_at) || new Date(),
   };
@@ -172,6 +233,7 @@ const importFromMysql = async (row) => {
 module.exports = {
   WEEKDAYS,
   normalizeAvailableDays,
+  normalizeIsVishist,
   findAll,
   findByEmail,
   findById,
@@ -180,4 +242,5 @@ module.exports = {
   update,
   destroy,
   importFromMysql,
+  backfillMissingIsVishist,
 };
