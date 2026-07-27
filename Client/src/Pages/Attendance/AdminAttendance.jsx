@@ -201,7 +201,9 @@ export default function AdminAttendance({
   readOnly = false,
   roleLabel = "Admin Portal",
 }) {
-  const [activeTab, setActiveTab] = useState("daily");
+  const isAdminView = !readOnly;
+  const [activeTab, setActiveTab] = useState(isAdminView ? "" : "daily");
+  const [selectedCentre, setSelectedCentre] = useState("");
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => toInputDate());
   const [mitras, setMitras] = useState([]);
@@ -214,13 +216,25 @@ export default function AdminAttendance({
   const [error, setError] = useState("");
 
   const isMitraTab = activeTab === "sathee-mitra";
+  const filtersReady =
+    !isAdminView ||
+    isMitraTab ||
+    (Boolean(activeTab) &&
+      (activeTab === "daily" ||
+        activeTab === "weekly" ||
+        activeTab === "monthly") &&
+      Boolean(selectedCentre));
+
+  const centreScope = isAdminView
+    ? selectedCentre
+    : portalName;
 
   const centreStudents = useMemo(
     () =>
       students.filter((student) =>
-        matchesPortalCentre(student.centre, portalName)
+        matchesPortalCentre(student.centre, centreScope)
       ),
-    [students, portalName]
+    [students, centreScope]
   );
 
   const centreStudentIds = useMemo(
@@ -270,7 +284,7 @@ export default function AdminAttendance({
   }, [activeTab, selectedDate]);
 
   const tableRows = useMemo(() => {
-    if (isMitraTab) return [];
+    if (isMitraTab || !filtersReady) return [];
 
     if (activeTab === "daily") {
       const { from } = getWeekRange(selectedDate);
@@ -313,6 +327,7 @@ export default function AdminAttendance({
     return [];
   }, [
     isMitraTab,
+    filtersReady,
     activeTab,
     selectedDate,
     centreStudentIds,
@@ -378,6 +393,14 @@ export default function AdminAttendance({
 
   const loadAttendance = useCallback(async () => {
     if (isMitraTab || !selectedDate) return;
+    if (
+      isAdminView &&
+      (!selectedCentre ||
+        !["daily", "weekly", "monthly"].includes(activeTab))
+    ) {
+      setAttendanceRecords([]);
+      return;
+    }
 
     setLoadingAttendance(true);
     setError("");
@@ -398,7 +421,7 @@ export default function AdminAttendance({
     } finally {
       setLoadingAttendance(false);
     }
-  }, [isMitraTab, selectedDate, activeTab]);
+  }, [isMitraTab, selectedDate, activeTab, isAdminView, selectedCentre]);
 
   useEffect(() => {
     loadMitras();
@@ -415,13 +438,18 @@ export default function AdminAttendance({
       return;
     }
 
+    if (!filtersReady) {
+      alert("Please select both Type and Centre before exporting");
+      return;
+    }
+
     try {
       setExporting(true);
       const payload = {
         records: filtered,
         columnLabel: COLUMN_LABEL[activeTab],
         activeTab,
-        portalName,
+        portalName: isAdminView ? selectedCentre || portalName : portalName,
         selectedDate,
         periodLabel: periodMeta.label,
       };
@@ -456,13 +484,23 @@ export default function AdminAttendance({
           </p>
         </div>
 
-        <TabSelector activeTab={activeTab} setActiveTab={setActiveTab} />
+        <TabSelector
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          selectedCentre={selectedCentre}
+          setSelectedCentre={setSelectedCentre}
+          adminFilters={isAdminView}
+        />
 
         <div className="bg-white rounded-2xl shadow-sm border border-[rgba(0,0,0,0.06)] overflow-hidden">
           <AttendanceToolbar
             search={search}
             setSearch={setSearch}
-            activeTab={activeTab}
+            activeTab={
+              filtersReady || isMitraTab
+                ? activeTab || "daily"
+                : "daily"
+            }
             selectedDate={selectedDate}
             onDateChange={setSelectedDate}
             onExportXlsx={() => runAttendanceExport("xlsx")}
@@ -483,7 +521,16 @@ export default function AdminAttendance({
             </div>
           ) : null}
 
-          {isMitraTab ? (
+          {!isMitraTab && !filtersReady ? (
+            <div className="px-6 py-16 text-center">
+              <p className="text-sm font-medium text-gray-700">
+                Select Type and Centre to view attendance
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                Both dropdowns are required before records are shown.
+              </p>
+            </div>
+          ) : isMitraTab ? (
             <SatheeMitraAttendance
               mitras={centreMitras}
               loading={loadingMitras}
@@ -493,7 +540,7 @@ export default function AdminAttendance({
           ) : (
             <AttendanceTable
               filtered={filtered}
-              columnLabel={COLUMN_LABEL[activeTab]}
+              columnLabel={COLUMN_LABEL[activeTab] || "Day"}
               loading={busy}
             />
           )}
@@ -506,6 +553,8 @@ export default function AdminAttendance({
                   <span className="font-medium text-gray-600">{centreMitras.length}</span>{" "}
                   Sathee Mitra
                 </>
+              ) : !filtersReady ? (
+                <>Select Type and Centre to continue</>
               ) : (
                 <>
                   Showing {filtered.length} of {tableRows.length} records
@@ -515,6 +564,15 @@ export default function AdminAttendance({
                       ·{" "}
                       <span className="font-medium text-gray-600">
                         {periodMeta.label}
+                      </span>
+                    </>
+                  ) : null}
+                  {selectedCentre || !isAdminView ? (
+                    <>
+                      {" "}
+                      ·{" "}
+                      <span className="font-medium text-gray-600">
+                        {isAdminView ? selectedCentre : portalName}
                       </span>
                     </>
                   ) : null}
@@ -542,7 +600,7 @@ export default function AdminAttendance({
           </div>
         </div>
 
-        {!isMitraTab ? (
+        {!isMitraTab && filtersReady ? (
           <SummaryCards activeTab={activeTab} summary={summary} />
         ) : null}
       </div>

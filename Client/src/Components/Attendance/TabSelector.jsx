@@ -1,26 +1,100 @@
-export default function TabSelector({ activeTab, setActiveTab }) {
-  const tabs = [
-    { key: "daily", label: "Daily" },
-    { key: "weekly", label: "Weekly" },
-    { key: "monthly", label: "Monthly" },
-    { key: "sathee-mitra", label: "Sathee Mitra" },
-  ];
+const CENTRE_OPTIONS = [
+  "HCL RAJASTHAN",
+  "HCL JHARKHAND",
+  "HCL MADHYA PRADESH",
+];
+
+const TYPE_OPTIONS = [
+  { value: "daily", label: "Daily" },
+  { value: "weekly", label: "Weekly" },
+  { value: "monthly", label: "Monthly" },
+];
+
+const selectClass =
+  "min-w-[160px] px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors";
+
+/** Admin: type + centre dropdowns + Sathee Mitra. Partner: original tab pills. */
+export default function TabSelector({
+  activeTab,
+  setActiveTab,
+  selectedCentre = "",
+  setSelectedCentre,
+  adminFilters = false,
+}) {
+  if (!adminFilters) {
+    const tabs = [
+      { key: "daily", label: "Daily" },
+      { key: "weekly", label: "Weekly" },
+      { key: "monthly", label: "Monthly" },
+      { key: "sathee-mitra", label: "Sathee Mitra" },
+    ];
+
+    return (
+      <div className="flex flex-wrap items-center gap-2 mb-5">
+        {tabs.map((tab) => (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => setActiveTab(tab.key)}
+            className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+              activeTab === tab.key
+                ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+                : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  const typeValue =
+    activeTab === "daily" || activeTab === "weekly" || activeTab === "monthly"
+      ? activeTab
+      : "";
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5">
-      {tabs.map((tab) => (
-        <button
-          key={tab.key}
-          onClick={() => setActiveTab(tab.key)}
-          className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-            activeTab === tab.key
-              ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-              : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
+      <select
+        value={typeValue}
+        onChange={(e) => setActiveTab(e.target.value || "")}
+        className={selectClass}
+        aria-label="Select attendance type"
+      >
+        <option value="">Select Type</option>
+        {TYPE_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
+        ))}
+      </select>
+
+      <select
+        value={selectedCentre}
+        onChange={(e) => setSelectedCentre?.(e.target.value)}
+        className={selectClass}
+        aria-label="Select centre"
+      >
+        <option value="">Select Centre</option>
+        {CENTRE_OPTIONS.map((centre) => (
+          <option key={centre} value={centre}>
+            {centre}
+          </option>
+        ))}
+      </select>
+
+      <button
+        type="button"
+        onClick={() => setActiveTab("sathee-mitra")}
+        className={`px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
+          activeTab === "sathee-mitra"
+            ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+            : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
+        }`}
+      >
+        Sathee Mitra
+      </button>
     </div>
   );
 }
