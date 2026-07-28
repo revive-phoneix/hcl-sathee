@@ -72,6 +72,7 @@ export function QuickActions({
           isOpen={isScheduleOpen}
           onClose={() => setIsScheduleOpen(false)}
           readOnly={readOnly}
+          portalName={portalName}
         />
       )}
 
