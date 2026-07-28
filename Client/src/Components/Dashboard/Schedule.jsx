@@ -7,12 +7,6 @@ const DEFAULT_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Biology", "Eng
 const DEFAULT_MONTHS = ["August 2026", "July 2026", "September 2026", "October 2026"];
 const DEFAULT_MONTH = "August 2026";
 
-const pickPreferredMonth = (months = []) => {
-  if (months.includes(DEFAULT_MONTH)) return DEFAULT_MONTH;
-  const august = months.find((m) => String(m).toLowerCase().startsWith("august"));
-  return august || months[0] || DEFAULT_MONTH;
-};
-
 const ACCEPT =
   ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
@@ -307,10 +301,7 @@ export default function Schedule({
       });
       const first = stored.rows[0];
       if (first?.subject) setSubject(first.subject);
-      const availableMonths = [
-        ...new Set(stored.rows.map((r) => r.month).filter(Boolean)),
-      ];
-      setMonth(pickPreferredMonth(availableMonths));
+      setMonth(DEFAULT_MONTH);
     } else {
       setAllRows([]);
       setScheduleMeta(null);
@@ -325,7 +316,7 @@ export default function Schedule({
 
   const months = useMemo(() => {
     const fromData = [...new Set(allRows.map((r) => r.month).filter(Boolean))];
-    return fromData.length ? fromData : DEFAULT_MONTHS;
+    return [...new Set([DEFAULT_MONTH, ...DEFAULT_MONTHS, ...fromData])];
   }, [allRows]);
 
   useEffect(() => {
@@ -333,7 +324,7 @@ export default function Schedule({
   }, [subjects, subject]);
 
   useEffect(() => {
-    if (!months.includes(month)) setMonth(pickPreferredMonth(months));
+    if (!months.includes(month)) setMonth(DEFAULT_MONTH);
   }, [months, month]);
 
   if (!isOpen) return null;
@@ -395,11 +386,7 @@ export default function Schedule({
       setAllRows(parsedRows);
       setScheduleMeta({ name: file.name, updatedAt: payload.updatedAt });
       setSubject(parsedRows[0].subject);
-      setMonth(
-        pickPreferredMonth([
-          ...new Set(parsedRows.map((r) => r.month).filter(Boolean)),
-        ])
-      );
+      setMonth(DEFAULT_MONTH);
       setSearch("");
     } catch (err) {
       console.error(err);
