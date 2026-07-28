@@ -518,10 +518,26 @@ export default function Schedule({
   const [scheduleMeta, setScheduleMeta] = useState(null);
   const [allRows, setAllRows] = useState([]);
   const [isDirty, setIsDirty] = useState(false);
+  const [bannerVisible, setBannerVisible] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteMonth, setDeleteMonth] = useState("");
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
+  const bannerTimerRef = useRef(null);
+
+  const flashStatusBanner = () => {
+    setBannerVisible(true);
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    bannerTimerRef.current = setTimeout(() => setBannerVisible(false), 2000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
+    };
+  }, []);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -542,6 +558,8 @@ export default function Schedule({
     if (!isOpen) return;
     setError("");
     setIsDirty(false);
+    setBannerVisible(false);
+    setDeleteOpen(false);
     const stored = readStored(portalName);
     if (stored) {
       const repaired = repairScheduleRows(stored.rows);
@@ -654,6 +672,7 @@ export default function Schedule({
         updatedAt: new Date().toISOString(),
         pendingMonths: uploadedMonths,
       });
+      flashStatusBanner();
       setSubject(parsedRows[0].subject);
       setMonth(firstMonth(uploadedMonths));
       setSearch("");
@@ -684,20 +703,60 @@ export default function Schedule({
       });
       setIsDirty(false);
       setError("");
+      flashStatusBanner();
     } catch (err) {
       console.error(err);
       setError("Unable to save schedule. Storage may be full.");
     }
   };
 
-  const handleRemove = () => {
-    writeStored(portalName, null);
-    setAllRows([]);
-    setScheduleMeta(null);
-    setIsDirty(false);
-    setError("");
-    setMonth(DEFAULT_MONTHS[0]);
+  const openDeleteMonth = () => {
+    const available = monthsFromRows(allRows);
+    if (!available.length) {
+      setError("No month schedule available to delete.");
+      return;
+    }
+    setDeleteMonth(available.includes(month) ? month : available[0]);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteMonth = () => {
+    if (!deleteMonth) return;
+    const remaining = allRows.filter((row) => row.month !== deleteMonth);
+    const monthLabels = monthsFromRows(remaining);
+
+    if (!remaining.length) {
+      writeStored(portalName, null);
+      setAllRows([]);
+      setScheduleMeta(null);
+      setIsDirty(false);
+      setMonth(DEFAULT_MONTHS[0]);
+      setSubject("Mathematics");
+    } else {
+      const payload = {
+        name: `Centre schedule · ${monthLabels.join(", ")}`,
+        lastFile: scheduleMeta?.lastFile || null,
+        updatedAt: new Date().toISOString(),
+        rows: remaining,
+      };
+      writeStored(portalName, payload);
+      setAllRows(remaining);
+      setScheduleMeta({
+        name: payload.name,
+        lastFile: payload.lastFile,
+        updatedAt: payload.updatedAt,
+      });
+      setIsDirty(false);
+      setMonth(firstMonth(monthLabels));
+      if (!remaining.some((row) => row.subject === subject)) {
+        setSubject(remaining[0].subject);
+      }
+      flashStatusBanner();
+    }
+
+    setDeleteOpen(false);
     setSearch("");
+    setError("");
   };
 
   const runScheduleExport = (format) => {
@@ -856,7 +915,7 @@ export default function Schedule({
             />
           ) : (
             <>
-              {scheduleMeta ? (
+              {bannerVisible && scheduleMeta ? (
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="font-semibold text-blue-800 truncate">
@@ -868,15 +927,49 @@ export default function Schedule({
                       {isDirty ? " · Unsaved changes — click Save" : " · Saved"}
                     </p>
                   </div>
-                  {!readOnly ? (
+                </div>
+              ) : null}
+
+              {deleteOpen ? (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 space-y-3">
+                  <p className="text-sm font-semibold text-red-800">
+                    Delete month schedule
+                  </p>
+                  <p className="text-xs text-red-700">
+                    Choose which month to remove. Other months will stay saved.
+                  </p>
+                  <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs font-bold text-red-700 uppercase tracking-wider">
+                        Month
+                      </label>
+                      <select
+                        value={deleteMonth}
+                        onChange={(e) => setDeleteMonth(e.target.value)}
+                        className="appearance-none bg-white border border-red-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-300 min-w-[160px]"
+                      >
+                        {monthsFromRows(allRows).map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <button
                       type="button"
-                      onClick={handleRemove}
-                      className="shrink-0 text-blue-600 hover:text-blue-800 text-xs font-semibold"
+                      onClick={handleDeleteMonth}
+                      className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700"
                     >
-                      Clear All
+                      Delete Month
                     </button>
-                  ) : null}
+                    <button
+                      type="button"
+                      onClick={() => setDeleteOpen(false)}
+                      className="px-4 py-2.5 rounded-xl border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-100"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 </div>
               ) : null}
 
@@ -1081,6 +1174,14 @@ export default function Schedule({
                 className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
               >
                 Save
+              </button>
+              <button
+                type="button"
+                onClick={openDeleteMonth}
+                disabled={!hasUpload}
+                className="px-5 py-2.5 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+              >
+                Delete
               </button>
             </>
           ) : null}
