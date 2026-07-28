@@ -4,7 +4,12 @@ import { SectionHeader } from "./SectionHeader";
 import Schedule from "./Schedule";
 import TimeTable from "./TimeTable";
 
-export function QuickActions({ onViewStudents, onViewAttendance, readOnly = false }) {
+export function QuickActions({
+  onViewStudents,
+  onViewAttendance,
+  readOnly = false,
+  portalName = "",
+}) {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isTimetableOpen, setIsTimetableOpen] = useState(false);
 
@@ -75,6 +80,7 @@ export function QuickActions({ onViewStudents, onViewAttendance, readOnly = fals
           isOpen={isTimetableOpen}
           onClose={() => setIsTimetableOpen(false)}
           readOnly={readOnly}
+          portalName={portalName}
         />
       )}
     </>

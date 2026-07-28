@@ -103,6 +103,7 @@ export default function AdminDashboard({
 
         <QuickActions
           readOnly={readOnly}
+          portalName={portalName}
           onViewStudents={() => onNavChange(studentsNavIndex)}
           onViewAttendance={() => onNavChange(attendanceNavIndex)}
         />
