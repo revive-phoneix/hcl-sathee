@@ -4,8 +4,63 @@ import ExportDropdown from "../common/ExportDropdown";
 import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
 
 const DEFAULT_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Biology", "English"];
-const DEFAULT_MONTHS = ["August 2026", "July 2026", "September 2026", "October 2026"];
-const DEFAULT_MONTH = "August 2026";
+const DEFAULT_MONTHS = [
+  "July 2026",
+  "August 2026",
+  "September 2026",
+  "October 2026",
+];
+
+const MONTH_INDEX = {
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11,
+};
+
+const parseMonthLabel = (value) => {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+  const match = text.match(/^([a-zA-Z]+)\s+(\d{4})$/);
+  if (!match) return null;
+  const monthIdx = MONTH_INDEX[match[1].toLowerCase()];
+  const year = Number(match[2]);
+  if (monthIdx == null || !Number.isFinite(year)) return null;
+  return { year, monthIdx, label: `${match[1][0].toUpperCase()}${match[1].slice(1).toLowerCase()} ${year}` };
+};
+
+const sortMonthsAscending = (months = []) =>
+  [...new Set(months.filter(Boolean))].sort((a, b) => {
+    const pa = parseMonthLabel(a);
+    const pb = parseMonthLabel(b);
+    if (pa && pb) {
+      if (pa.year !== pb.year) return pa.year - pb.year;
+      return pa.monthIdx - pb.monthIdx;
+    }
+    if (pa) return -1;
+    if (pb) return 1;
+    return String(a).localeCompare(String(b));
+  });
+
+const monthsFromRows = (rows = []) =>
+  sortMonthsAscending(rows.map((r) => r.month).filter(Boolean));
+
+const firstMonth = (months = []) => months[0] || DEFAULT_MONTHS[0];
+
+const normalizeMonthLabel = (value, fallback = DEFAULT_MONTHS[0]) => {
+  const parsed = parseMonthLabel(value);
+  if (parsed) return parsed.label;
+  const text = String(value ?? "").trim();
+  return text || fallback;
+};
 
 const ACCEPT =
   ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
@@ -126,11 +181,10 @@ const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => 
         sheetSubjectGuess ||
         fallbackSubject ||
         "Mathematics";
-      const month =
-        String(monthIdx >= 0 ? row[monthIdx] : "").trim() ||
-        fallbackMonth ||
-        DEFAULT_MONTHS[0];
-
+      const month = normalizeMonthLabel(
+        monthIdx >= 0 ? row[monthIdx] : "",
+        fallbackMonth || DEFAULT_MONTHS[0]
+      );
       rows.push({
         subject,
         month,
@@ -265,7 +319,7 @@ export default function Schedule({
   portalName = "",
 }) {
   const [subject, setSubject] = useState("Mathematics");
-  const [month, setMonth] = useState(DEFAULT_MONTH);
+  const [month, setMonth] = useState(DEFAULT_MONTHS[0]);
   const [search, setSearch] = useState("");
   const [scheduleMeta, setScheduleMeta] = useState(null);
   const [allRows, setAllRows] = useState([]);
@@ -301,11 +355,11 @@ export default function Schedule({
       });
       const first = stored.rows[0];
       if (first?.subject) setSubject(first.subject);
-      setMonth(DEFAULT_MONTH);
+      setMonth(firstMonth(monthsFromRows(stored.rows)));
     } else {
       setAllRows([]);
       setScheduleMeta(null);
-      setMonth(DEFAULT_MONTH);
+      setMonth(DEFAULT_MONTHS[0]);
     }
   }, [isOpen, portalName]);
 
@@ -315,8 +369,8 @@ export default function Schedule({
   }, [allRows]);
 
   const months = useMemo(() => {
-    const fromData = [...new Set(allRows.map((r) => r.month).filter(Boolean))];
-    return [...new Set([DEFAULT_MONTH, ...DEFAULT_MONTHS, ...fromData])];
+    const fromData = monthsFromRows(allRows);
+    return fromData.length ? fromData : DEFAULT_MONTHS;
   }, [allRows]);
 
   useEffect(() => {
@@ -324,7 +378,7 @@ export default function Schedule({
   }, [subjects, subject]);
 
   useEffect(() => {
-    if (!months.includes(month)) setMonth(DEFAULT_MONTH);
+    if (!months.includes(month)) setMonth(firstMonth(months));
   }, [months, month]);
 
   if (!isOpen) return null;
@@ -386,7 +440,7 @@ export default function Schedule({
       setAllRows(parsedRows);
       setScheduleMeta({ name: file.name, updatedAt: payload.updatedAt });
       setSubject(parsedRows[0].subject);
-      setMonth(DEFAULT_MONTH);
+      setMonth(firstMonth(monthsFromRows(parsedRows)));
       setSearch("");
     } catch (err) {
       console.error(err);
@@ -399,7 +453,7 @@ export default function Schedule({
     setAllRows([]);
     setScheduleMeta(null);
     setError("");
-    setMonth(DEFAULT_MONTH);
+    setMonth(DEFAULT_MONTHS[0]);
     setSearch("");
   };
 
