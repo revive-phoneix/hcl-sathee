@@ -12,6 +12,51 @@ const fieldClass =
 
 const isValidEmail = (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value || "").trim());
 
+const encodeSecret = (value) => {
+  try {
+    return btoa(unescape(encodeURIComponent(String(value || ""))));
+  } catch {
+    return String(value || "");
+  }
+};
+
+const decodeSecret = (value) => {
+  if (!value) return "";
+  try {
+    return decodeURIComponent(escape(atob(String(value))));
+  } catch {
+    // Backward compatible with older plain-text saves
+    return String(value);
+  }
+};
+
+const readRemembered = () => {
+  try {
+    const raw = localStorage.getItem(REMEMBER_ME_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return null;
+    return {
+      name: parsed.name || "",
+      email: parsed.email || "",
+      password: decodeSecret(parsed.passwordEnc ?? parsed.password ?? ""),
+    };
+  } catch {
+    return null;
+  }
+};
+
+const writeRemembered = ({ name, email, password }) => {
+  localStorage.setItem(
+    REMEMBER_ME_KEY,
+    JSON.stringify({
+      name: name || "",
+      email: email || "",
+      passwordEnc: encodeSecret(password || ""),
+    })
+  );
+};
+
 export default function AdminLoginCard({ onLoginSuccess }) {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
@@ -19,18 +64,24 @@ export default function AdminLoginCard({ onLoginSuccess }) {
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [error, setError] = useState("");
+  const [hydrated, setHydrated] = useState(false);
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(REMEMBER_ME_KEY);
-      if (!saved) return;
-      setFormData((prev) => ({ ...prev, ...JSON.parse(saved) }));
+    const saved = readRemembered();
+    if (saved) {
+      setFormData(saved);
       setRememberMe(true);
-    } catch (err) {
-      console.error("Unable to load saved login details", err);
     }
+    setHydrated(true);
   }, []);
+
+  // Keep storage in sync whenever Remember me is on and fields change.
+  useEffect(() => {
+    if (!hydrated) return;
+    if (!rememberMe) return;
+    writeRemembered(formData);
+  }, [formData, rememberMe, hydrated]);
 
   const setField = (key) => (e) =>
     setFormData((prev) => ({ ...prev, [key]: e.target.value }));
@@ -86,9 +137,8 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         }
       );
 
-      if (rememberMe) {
-        localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ name, email, password }));
-      } else localStorage.removeItem(REMEMBER_ME_KEY);
+      if (rememberMe) writeRemembered({ name, email, password });
+      else localStorage.removeItem(REMEMBER_ME_KEY);
 
       const user = response.data?.user || {};
       if (response.data?.token) setAuthToken(response.data.token);
@@ -143,6 +193,15 @@ export default function AdminLoginCard({ onLoginSuccess }) {
     }
   };
 
+  if (!hydrated) {
+    return (
+      <div className="max-w-md rounded-3xl bg-[#1e40af] p-8 shadow-2xl lg:max-w-lg lg:p-10 text-white">
+        <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
+        <p className="text-sm opacity-90">Loading saved login…</p>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-md rounded-3xl bg-[#1e40af] p-8 shadow-2xl lg:max-w-lg lg:p-10 text-white">
       <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
@@ -150,7 +209,13 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         Sign in to access the HCL SATHEE Admin Dashboard.
       </p>
 
-      <form className="space-y-6" onSubmit={handleLogin}>
+      <form
+        className="space-y-6"
+        onSubmit={handleLogin}
+        autoComplete="off"
+        data-lpignore="true"
+        data-1p-ignore="true"
+      >
         {[
           ["FULL NAME", "name", "text", "Enter your full name", "login-name"],
           ["EMAIL ADDRESS", "email", "email", "Enter your email address", "login-email"],
@@ -161,6 +226,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
             </label>
             <input
               id={id}
+              name={key}
               type={type}
               value={formData[key]}
               onChange={setField(key)}
@@ -168,7 +234,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               placeholder={placeholder}
               className={fieldClass}
               required
-              autoComplete={key === "email" ? "email" : "name"}
+              autoComplete="off"
             />
           </div>
         ))}
@@ -180,6 +246,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
           <div className="relative">
             <input
               id="login-password"
+              name="login-password"
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={setField("password")}
@@ -187,7 +254,9 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               placeholder="Enter your password"
               className={`${fieldClass} pr-12`}
               required
-              autoComplete="current-password"
+              autoComplete="off"
+              data-lpignore="true"
+              data-1p-ignore="true"
             />
             <button
               type="button"
@@ -207,16 +276,8 @@ export default function AdminLoginCard({ onLoginSuccess }) {
               onChange={(e) => {
                 const checked = e.target.checked;
                 setRememberMe(checked);
-                if (checked) {
-                  localStorage.setItem(
-                    REMEMBER_ME_KEY,
-                    JSON.stringify({
-                      name: formData.name,
-                      email: formData.email,
-                      password: formData.password,
-                    })
-                  );
-                } else localStorage.removeItem(REMEMBER_ME_KEY);
+                if (checked) writeRemembered(formData);
+                else localStorage.removeItem(REMEMBER_ME_KEY);
               }}
               className="h-4 w-4 rounded border-white/40 bg-white/10 accent-[#fbbf24]"
             />
