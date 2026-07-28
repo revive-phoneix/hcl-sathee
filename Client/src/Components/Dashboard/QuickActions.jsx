@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Plus, Eye } from "lucide-react";
 import { SectionHeader } from "./SectionHeader";
-import Schedule from "./Schedule";
+import Schedule from "../../Pages/Schedule/Schedule";
 import TimeTable from "./TimeTable";
 
 export function QuickActions({
