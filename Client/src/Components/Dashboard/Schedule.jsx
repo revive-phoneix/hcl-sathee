@@ -1,510 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import * as XLSX from "xlsx";
 import ExportDropdown from "../common/ExportDropdown";
 import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
-
-const DEFAULT_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Biology", "English"];
-const DEFAULT_MONTHS = [
-  "July 2026",
-  "August 2026",
-  "September 2026",
-  "October 2026",
-];
-
-const MONTH_INDEX = {
-  january: 0,
-  jan: 0,
-  february: 1,
-  feb: 1,
-  march: 2,
-  mar: 2,
-  april: 3,
-  apr: 3,
-  may: 4,
-  june: 5,
-  jun: 5,
-  july: 6,
-  jul: 6,
-  august: 7,
-  aug: 7,
-  september: 8,
-  sep: 8,
-  sept: 8,
-  october: 9,
-  oct: 9,
-  november: 10,
-  nov: 10,
-  december: 11,
-  dec: 11,
-};
-
-const MONTH_NAMES = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
-
-const parseMonthLabel = (value) => {
-  const text = String(value ?? "").trim();
-  if (!text) return null;
-  const match = text.match(/^([a-zA-Z]+)\s+(\d{4})$/);
-  if (!match) return null;
-  const monthIdx = MONTH_INDEX[match[1].toLowerCase()];
-  const year = Number(match[2]);
-  if (monthIdx == null || !Number.isFinite(year)) return null;
-  return {
-    year,
-    monthIdx,
-    label: `${MONTH_NAMES[monthIdx]} ${year}`,
-  };
-};
-
-const sortMonthsAscending = (months = []) =>
-  [...new Set(months.filter(Boolean))].sort((a, b) => {
-    const pa = parseMonthLabel(a);
-    const pb = parseMonthLabel(b);
-    if (pa && pb) {
-      if (pa.year !== pb.year) return pa.year - pb.year;
-      return pa.monthIdx - pb.monthIdx;
-    }
-    if (pa) return -1;
-    if (pb) return 1;
-    return String(a).localeCompare(String(b));
-  });
-
-const monthsFromRows = (rows = []) =>
-  sortMonthsAscending(rows.map((r) => r.month).filter(Boolean));
-
-const firstMonth = (months = []) => months[0] || DEFAULT_MONTHS[0];
-
-/** Keep other months; replace any month present in the new upload. */
-const mergeScheduleRows = (existing = [], incoming = []) => {
-  const incomingMonths = new Set(
-    incoming.map((row) => row.month).filter(Boolean)
-  );
-  const kept = existing.filter((row) => !incomingMonths.has(row.month));
-  return [...kept, ...incoming];
-};
-
-const normalizeMonthLabel = (value, fallback = DEFAULT_MONTHS[0]) => {
-  const parsed = parseMonthLabel(value);
-  if (parsed) return parsed.label;
-  // Allow bare month names like "August" with a year fallback later via parseMonthLabel helpers
-  const text = String(value ?? "").trim();
-  if (!text) return fallback;
-  const bare = text.match(/^([a-zA-Z]{3,9})$/);
-  if (bare && MONTH_INDEX[bare[1].toLowerCase()] != null) {
-    return `${MONTH_NAMES[MONTH_INDEX[bare[1].toLowerCase()]]} 2026`;
-  }
-  return text;
-};
-
-const inferMonthFromText = (value, fallbackYear = 2026) => {
-  const text = String(value ?? "").trim();
-  if (!text) return null;
-
-  // Filename / free text: "...August...2026..." or "August_Centre..."
-  const withYear = text.match(
-    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b[\s_-]*(\d{4})/i
-  );
-  if (withYear) {
-    return normalizeMonthLabel(`${withYear[1]} ${withYear[2]}`);
-  }
-
-  const monthOnly = text.match(
-    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i
-  );
-  if (monthOnly) {
-    return normalizeMonthLabel(`${monthOnly[1]} ${fallbackYear}`);
-  }
-
-  return parseMonthLabel(text)?.label || null;
-};
-
-const ACCEPT =
-  ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
-
-const storageKey = (portalName = "") =>
-  `hcl_sathee_schedule_data_${String(portalName || "default")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")}`;
-
-const readStored = (portalName) => {
-  try {
-    const raw = localStorage.getItem(storageKey(portalName));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed?.rows)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-};
-
-const writeStored = (portalName, payload) => {
-  try {
-    if (!payload) localStorage.removeItem(storageKey(portalName));
-    else localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
-  } catch (err) {
-    console.error("Unable to save schedule data", err);
-    throw err;
-  }
-};
-
-const normalizeHeader = (value) =>
-  String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/[%()]/g, " ")
-    .replace(/\s+/g, " ");
-
-const pickColumn = (headers, aliases) => {
-  const normalized = headers.map(normalizeHeader);
-  for (const alias of aliases) {
-    const idx = normalized.indexOf(alias);
-    if (idx >= 0) return idx;
-  }
-  return -1;
-};
-
-const normalizeStatus = (value) => {
-  const raw = String(value ?? "").trim().toLowerCase();
-  if (!raw) return "Pending";
-  if (raw.includes("complete") || raw === "done") return "Completed";
-  if (raw.includes("progress") || raw.includes("ongoing")) return "In Progress";
-  if (raw.includes("pending") || raw.includes("todo") || raw.includes("not started")) return "Pending";
-  if (raw === "completed") return "Completed";
-  if (raw === "in progress") return "In Progress";
-  return "Pending";
-};
-
-const normalizeCompletion = (value, status) => {
-  const num = Number(String(value ?? "").replace("%", "").trim());
-  if (Number.isFinite(num)) return Math.max(0, Math.min(100, Math.round(num)));
-  if (status === "Completed") return 100;
-  if (status === "In Progress") return 50;
-  return 0;
-};
-
-const formatScheduleDate = (value) => {
-  if (value == null || value === "") return "";
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const day = String(value.getDate()).padStart(2, "0");
-    const mon = value.toLocaleString("en-US", { month: "short" });
-    return `${day} ${mon}`;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    // Excel serial date support via Date offset is handled by sheet_to_json usually as Date;
-    // keep numeric as string fallback.
-    return String(value);
-  }
-  return String(value).trim();
-};
-
-const inferMonthFromDateValue = (value, fallbackYear = 2026) => {
-  if (value instanceof Date && !Number.isNaN(value.getTime())) {
-    const monthName = value.toLocaleString("en-US", { month: "long" });
-    return normalizeMonthLabel(`${monthName} ${value.getFullYear()}`);
-  }
-
-  const text = String(value ?? "").trim();
-  if (!text) return null;
-
-  const withYear = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
-  if (withYear) {
-    return normalizeMonthLabel(`${withYear[2]} ${withYear[3]}`);
-  }
-
-  const short = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/);
-  if (short) {
-    return normalizeMonthLabel(`${short[2]} ${fallbackYear}`);
-  }
-
-  return inferMonthFromText(text, fallbackYear);
-};
-
-/** Fix rows saved under the wrong month (e.g. Aug dates labeled July). */
-const repairScheduleRows = (rows = []) =>
-  rows.map((row) => {
-    const inferred =
-      inferMonthFromDateValue(row.start) || inferMonthFromDateValue(row.end);
-    if (inferred && inferred !== row.month) {
-      return { ...row, month: inferred };
-    }
-    return row;
-  });
-
-const inferMetaFromSheetPrefix = (matrix, headerRowIndex) => {
-  let month = null;
-  let subject = null;
-  let faculty = null;
-  let yearHint = 2026;
-
-  for (let i = 0; i < headerRowIndex; i += 1) {
-    const row = matrix[i] || [];
-    const joined = row
-      .map((cell) => String(cell ?? "").trim())
-      .filter(Boolean)
-      .join(" ");
-    if (!joined) continue;
-
-    const titleMatch = joined.match(
-      /^([A-Za-z]+)\s+(\d{4})\s*[-–—:]\s*(.+)$/
-    );
-    if (titleMatch) {
-      month = normalizeMonthLabel(`${titleMatch[1]} ${titleMatch[2]}`);
-      yearHint = Number(titleMatch[2]) || yearHint;
-      const maybeSubject = titleMatch[3].trim();
-      if (maybeSubject && !/^faculty$/i.test(maybeSubject)) {
-        subject = maybeSubject;
-      }
-    }
-
-    const monthOnly = parseMonthLabel(joined);
-    if (!month && monthOnly) {
-      month = monthOnly.label;
-      yearHint = monthOnly.year;
-    }
-
-    const facultyIdx = row.findIndex(
-      (cell) => normalizeHeader(cell) === "faculty"
-    );
-    if (facultyIdx >= 0) {
-      const next = String(row[facultyIdx + 1] ?? "").trim();
-      if (next) faculty = next;
-    }
-  }
-
-  return { month, subject, faculty, yearHint };
-};
-
-const parseScheduleWorkbook = (
-  workbook,
-  { fallbackSubject, fallbackMonth, fileName = "" } = {}
-) => {
-  const rows = [];
-  const fileMonth = inferMonthFromText(fileName);
-
-  workbook.SheetNames.forEach((sheetName) => {
-    const sheet = workbook.Sheets[sheetName];
-    const matrix = XLSX.utils.sheet_to_json(sheet, {
-      header: 1,
-      defval: "",
-      raw: true,
-    });
-    if (!matrix.length) return;
-
-    const headerRowIndex = matrix.findIndex((row) =>
-      row.some((cell) => {
-        const h = normalizeHeader(cell);
-        return h.includes("topic") || h === "subject" || h.includes("planned");
-      })
-    );
-    if (headerRowIndex < 0) return;
-
-    const headers = matrix[headerRowIndex];
-    const subjectIdx = pickColumn(headers, ["subject"]);
-    const monthIdx = pickColumn(headers, ["month", "period"]);
-    const topicIdx = pickColumn(headers, ["topic", "chapter", "unit"]);
-    const daysIdx = pickColumn(headers, [
-      "planned days",
-      "days",
-      "planned day",
-      "duration",
-    ]);
-    const startIdx = pickColumn(headers, ["start date", "start", "from"]);
-    const endIdx = pickColumn(headers, ["end date", "end", "to"]);
-    const facultyIdx = pickColumn(headers, ["faculty", "teacher", "instructor"]);
-    const completionIdx = pickColumn(headers, [
-      "completion",
-      "completion %",
-      "progress",
-      "progress %",
-    ]);
-    const statusIdx = pickColumn(headers, ["status"]);
-
-    if (topicIdx < 0) return;
-
-    const prefixMeta = inferMetaFromSheetPrefix(matrix, headerRowIndex);
-    const sheetSubjectGuess = DEFAULT_SUBJECTS.find(
-      (s) => normalizeHeader(s) === normalizeHeader(sheetName)
-    );
-
-    for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
-      const row = matrix[i] || [];
-      const topic = String(row[topicIdx] ?? "").trim();
-      if (!topic) continue;
-
-      const status = normalizeStatus(statusIdx >= 0 ? row[statusIdx] : "");
-      const startRaw = startIdx >= 0 ? row[startIdx] : "";
-      const endRaw = endIdx >= 0 ? row[endIdx] : "";
-      const start = formatScheduleDate(startRaw) || "—";
-      const end = formatScheduleDate(endRaw) || "—";
-
-      const monthFromColumn =
-        monthIdx >= 0 ? normalizeMonthLabel(row[monthIdx], "") : "";
-      const monthFromDates =
-        inferMonthFromDateValue(startRaw, prefixMeta.yearHint) ||
-        inferMonthFromDateValue(endRaw, prefixMeta.yearHint) ||
-        inferMonthFromDateValue(start, prefixMeta.yearHint) ||
-        inferMonthFromDateValue(end, prefixMeta.yearHint);
-
-      // Prefer real signals over the currently selected month filter.
-      const month =
-        prefixMeta.month ||
-        fileMonth ||
-        monthFromDates ||
-        monthFromColumn ||
-        normalizeMonthLabel(fallbackMonth, DEFAULT_MONTHS[0]);
-
-      const subject =
-        String(subjectIdx >= 0 ? row[subjectIdx] : "").trim() ||
-        prefixMeta.subject ||
-        sheetSubjectGuess ||
-        (sheetName && sheetName !== "Sheet1" ? sheetName : "") ||
-        fallbackSubject ||
-        "Mathematics";
-
-      const faculty =
-        String(facultyIdx >= 0 ? row[facultyIdx] : "").trim() ||
-        prefixMeta.faculty ||
-        "—";
-
-      rows.push({
-        subject,
-        month,
-        topic,
-        days: Number(daysIdx >= 0 ? row[daysIdx] : 0) || 0,
-        start,
-        end,
-        faculty,
-        completion: normalizeCompletion(
-          completionIdx >= 0 ? row[completionIdx] : "",
-          status
-        ),
-        status,
-      });
-    }
-  });
-
-  return repairScheduleRows(rows);
-};
-
-function StatusBadge({ status }) {
-  const config = {
-    Completed: "bg-emerald-100 text-emerald-700 border border-emerald-200",
-    "In Progress": "bg-blue-100 text-blue-700 border border-blue-200",
-    Pending: "bg-gray-100 text-gray-500 border border-gray-200",
-  };
-  const dot = {
-    Completed: "text-emerald-500",
-    "In Progress": "text-blue-500",
-    Pending: "text-gray-400",
-  };
-  return (
-    <span
-      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${config[status] || config.Pending}`}
-    >
-      <span className={dot[status] || dot.Pending}>
-        {status === "Pending" ? "○" : "●"}
-      </span>
-      {status}
-    </span>
-  );
-}
-
-function ProgressBar({ value, status }) {
-  const barColor =
-    status === "Completed"
-      ? "bg-emerald-500"
-      : status === "In Progress"
-        ? "bg-blue-500"
-        : "bg-gray-300";
-  const trackColor =
-    status === "Completed"
-      ? "bg-emerald-100"
-      : status === "In Progress"
-        ? "bg-blue-100"
-        : "bg-gray-200";
-
-  return (
-    <div className="flex items-center gap-2 min-w-[120px]">
-      <div className={`flex-1 h-1.5 rounded-full ${trackColor} overflow-hidden`}>
-        <div
-          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
-          style={{ width: `${value}%` }}
-        />
-      </div>
-      <span className="text-xs font-semibold text-gray-600 w-8 text-right">
-        {value}%
-      </span>
-    </div>
-  );
-}
-
-function EmptyState({ readOnly, onUploadClick }) {
-  return (
-    <div className="flex flex-col items-center justify-center flex-1 py-16 gap-5">
-      <div
-        className="w-24 h-24 rounded-3xl flex items-center justify-center"
-        style={{ background: "#ccd2dd" }}
-      >
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-          <rect x="6" y="10" width="36" height="32" rx="4" fill="#94a3b8" />
-          <rect x="6" y="10" width="36" height="9" rx="4" fill="#3B82F6" />
-          <rect x="14" y="25" width="20" height="2" rx="1" fill="#cbd5e1" />
-          <rect x="14" y="31" width="14" height="2" rx="1" fill="#cbd5e1" />
-          <rect
-            x="12"
-            y="6"
-            width="4"
-            height="7"
-            rx="2"
-            fill="#e2e8f0"
-            stroke="#94a3b8"
-            strokeWidth="1.5"
-          />
-          <rect
-            x="32"
-            y="6"
-            width="4"
-            height="7"
-            rx="2"
-            fill="#e2e8f0"
-            stroke="#94a3b8"
-            strokeWidth="1.5"
-          />
-        </svg>
-      </div>
-      <div className="text-center">
-        <p className="text-lg font-bold text-gray-800">No Schedule Available</p>
-        <p className="text-sm text-gray-500 mt-1 max-w-xs leading-relaxed">
-          {readOnly
-            ? "No teaching schedule has been uploaded for this centre yet."
-            : "Upload an Excel or CSV schedule, then Save. You can add more months later."}
-        </p>
-      </div>
-      {!readOnly ? (
-        <button
-          type="button"
-          onClick={onUploadClick}
-          className="mt-1 px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 active:scale-95 transition-all shadow-sm"
-        >
-          Upload Schedule
-        </button>
-      ) : null}
-    </div>
-  );
-}
+import {
+  DEFAULT_MONTHS,
+  DEFAULT_SUBJECTS,
+  SCHEDULE_ACCEPT,
+  firstMonth,
+  mergeScheduleRows,
+  monthsFromRows,
+  parseScheduleFile,
+  readStoredSchedule,
+  repairScheduleRows,
+  scheduleMetaLabel,
+  writeStoredSchedule,
+} from "../../utils/scheduleData";
+import {
+  DeleteMonthPanel,
+  EmptySchedule,
+  FilterSelect,
+  ScheduleTable,
+  StatusBanner,
+} from "./scheduleUi";
 
 export default function Schedule({
   isOpen,
@@ -533,10 +49,8 @@ export default function Schedule({
     bannerTimerRef.current = setTimeout(() => setBannerVisible(false), 2000);
   };
 
-  useEffect(() => {
-    return () => {
-      if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
-    };
+  useEffect(() => () => {
+    if (bannerTimerRef.current) clearTimeout(bannerTimerRef.current);
   }, []);
 
   useEffect(() => {
@@ -560,37 +74,35 @@ export default function Schedule({
     setIsDirty(false);
     setBannerVisible(false);
     setDeleteOpen(false);
-    const stored = readStored(portalName);
-    if (stored) {
-      const repaired = repairScheduleRows(stored.rows);
-      const changed = JSON.stringify(repaired) !== JSON.stringify(stored.rows);
-      setAllRows(repaired);
-      const monthLabels = monthsFromRows(repaired);
-      setScheduleMeta({
-        name: `Centre schedule · ${monthLabels.join(", ")}`,
-        updatedAt: stored.updatedAt || null,
-        lastFile: stored.lastFile || stored.name || null,
-      });
-      if (changed) {
-        try {
-          writeStored(portalName, {
-            ...stored,
-            name: `Centre schedule · ${monthLabels.join(", ")}`,
-            rows: repaired,
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.error(err);
-        }
-      }
-      const first = repaired[0];
-      if (first?.subject) setSubject(first.subject);
-      setMonth(firstMonth(monthLabels));
-    } else {
+
+    const stored = readStoredSchedule(portalName);
+    if (!stored) {
       setAllRows([]);
       setScheduleMeta(null);
       setMonth(DEFAULT_MONTHS[0]);
+      return;
     }
+
+    const repaired = repairScheduleRows(stored.rows);
+    const monthLabels = monthsFromRows(repaired);
+    setAllRows(repaired);
+    setScheduleMeta({
+      ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
+      updatedAt: stored.updatedAt || null,
+    });
+    if (JSON.stringify(repaired) !== JSON.stringify(stored.rows)) {
+      try {
+        writeStoredSchedule(portalName, {
+          ...stored,
+          ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
+          rows: repaired,
+        });
+      } catch (err) {
+        console.error(err);
+      }
+    }
+    if (repaired[0]?.subject) setSubject(repaired[0].subject);
+    setMonth(firstMonth(monthLabels));
   }, [isOpen, portalName]);
 
   const subjects = useMemo(() => {
@@ -614,17 +126,12 @@ export default function Schedule({
   if (!isOpen) return null;
 
   const hasUpload = allRows.length > 0;
-
-  const rows = allRows.filter((r) => {
-    const matchesSubject = r.subject === subject;
-    const matchesMonth = r.month === month;
-    const matchesSearch = r.topic.toLowerCase().includes(search.toLowerCase());
-    return matchesSubject && matchesMonth && matchesSearch;
-  });
-
-  const handleBackdropClick = (e) => {
-    if (e.target === backdropRef.current) onClose();
-  };
+  const rows = allRows.filter(
+    (r) =>
+      r.subject === subject &&
+      r.month === month &&
+      r.topic.toLowerCase().includes(search.toLowerCase())
+  );
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0] || null;
@@ -647,14 +154,10 @@ export default function Schedule({
 
     try {
       setError("");
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
-      const parsedRows = parseScheduleWorkbook(workbook, {
+      const parsedRows = await parseScheduleFile(file, {
         fallbackSubject: subject,
         fallbackMonth: month,
-        fileName: file.name,
       });
-
       if (!parsedRows.length) {
         setError(
           "No schedule rows found. Include columns like Subject, Month, Topic, Days, Start, End, Faculty, Completion, Status."
@@ -666,12 +169,7 @@ export default function Schedule({
       const uploadedMonths = monthsFromRows(parsedRows);
       setAllRows(merged);
       setIsDirty(true);
-      setScheduleMeta({
-        name: `Centre schedule · ${monthsFromRows(merged).join(", ")}`,
-        lastFile: file.name,
-        updatedAt: new Date().toISOString(),
-        pendingMonths: uploadedMonths,
-      });
+      setScheduleMeta(scheduleMetaLabel(merged, file.name));
       flashStatusBanner();
       setSubject(parsedRows[0].subject);
       setMonth(firstMonth(uploadedMonths));
@@ -688,19 +186,9 @@ export default function Schedule({
       return;
     }
     try {
-      const monthLabels = monthsFromRows(allRows);
-      const payload = {
-        name: `Centre schedule · ${monthLabels.join(", ")}`,
-        lastFile: scheduleMeta?.lastFile || null,
-        updatedAt: new Date().toISOString(),
-        rows: allRows,
-      };
-      writeStored(portalName, payload);
-      setScheduleMeta({
-        name: payload.name,
-        lastFile: payload.lastFile,
-        updatedAt: payload.updatedAt,
-      });
+      const meta = scheduleMetaLabel(allRows, scheduleMeta?.lastFile);
+      writeStoredSchedule(portalName, { ...meta, rows: allRows });
+      setScheduleMeta(meta);
       setIsDirty(false);
       setError("");
       flashStatusBanner();
@@ -726,26 +214,17 @@ export default function Schedule({
     const monthLabels = monthsFromRows(remaining);
 
     if (!remaining.length) {
-      writeStored(portalName, null);
+      writeStoredSchedule(portalName, null);
       setAllRows([]);
       setScheduleMeta(null);
       setIsDirty(false);
       setMonth(DEFAULT_MONTHS[0]);
       setSubject("Mathematics");
     } else {
-      const payload = {
-        name: `Centre schedule · ${monthLabels.join(", ")}`,
-        lastFile: scheduleMeta?.lastFile || null,
-        updatedAt: new Date().toISOString(),
-        rows: remaining,
-      };
-      writeStored(portalName, payload);
+      const meta = scheduleMetaLabel(remaining, scheduleMeta?.lastFile);
+      writeStoredSchedule(portalName, { ...meta, rows: remaining });
       setAllRows(remaining);
-      setScheduleMeta({
-        name: payload.name,
-        lastFile: payload.lastFile,
-        updatedAt: payload.updatedAt,
-      });
+      setScheduleMeta(meta);
       setIsDirty(false);
       setMonth(firstMonth(monthLabels));
       if (!remaining.some((row) => row.subject === subject)) {
@@ -762,31 +241,10 @@ export default function Schedule({
   const runScheduleExport = (format) => {
     try {
       setExporting(true);
-      const headers = [
-        "Topic",
-        "Days",
-        "Start",
-        "End",
-        "Faculty",
-        "Completion (%)",
-        "Status",
-      ];
-      const exportRows = rows.map((r) => [
-        r.topic,
-        r.days,
-        r.start,
-        r.end,
-        r.faculty,
-        r.completion,
-        r.status,
-      ]);
-      const filename = `schedule-${subject}-${month}`
-        .toLowerCase()
-        .replace(/\s+/g, "-");
       const payload = {
-        headers,
-        rows: exportRows,
-        filename,
+        headers: ["Topic", "Days", "Start", "End", "Faculty", "Completion (%)", "Status"],
+        rows: rows.map((r) => [r.topic, r.days, r.start, r.end, r.faculty, r.completion, r.status]),
+        filename: `schedule-${subject}-${month}`.toLowerCase().replace(/\s+/g, "-"),
         title: `Teaching Schedule · ${subject} · ${month}`,
         sheetName: "Schedule",
       };
@@ -803,21 +261,13 @@ export default function Schedule({
   return (
     <div
       ref={backdropRef}
-      onClick={handleBackdropClick}
+      onClick={(e) => e.target === backdropRef.current && onClose()}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        background: "rgba(10, 18, 35, 0.62)",
-        backdropFilter: "blur(6px)",
-      }}
+      style={{ background: "rgba(10, 18, 35, 0.62)", backdropFilter: "blur(6px)" }}
     >
       <div
         className="relative flex flex-col bg-white shadow-2xl overflow-hidden"
-        style={{
-          width: "90%",
-          maxWidth: "1200px",
-          height: "90vh",
-          borderRadius: "24px",
-        }}
+        style={{ width: "90%", maxWidth: "1200px", height: "90vh", borderRadius: "24px" }}
         role="dialog"
         aria-modal="true"
         aria-label="Teaching Schedule"
@@ -825,75 +275,25 @@ export default function Schedule({
         <button
           type="button"
           onClick={onClose}
-          className="absolute top-5 right-5 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-all"
+          className="absolute top-5 right-5 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500"
           aria-label="Close modal"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-            <path
-              d="M1 1l12 12M13 1L1 13"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-            />
-          </svg>
+          ✕
         </button>
 
         <div className="flex items-center justify-between px-8 pt-7 pb-5 border-b border-gray-100 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "#EFF6FF" }}
-            >
-              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-                <rect
-                  x="2"
-                  y="4"
-                  width="18"
-                  height="16"
-                  rx="2.5"
-                  fill="none"
-                  stroke="#3B82F6"
-                  strokeWidth="1.6"
-                />
-                <path d="M2 9h18" stroke="#3B82F6" strokeWidth="1.6" />
-                <rect x="7" y="1.5" width="2" height="5" rx="1" fill="#3B82F6" />
-                <rect x="13" y="1.5" width="2" height="5" rx="1" fill="#3B82F6" />
-                <path
-                  d="M6 13h2M10 13h2M14 13h2M6 16.5h2M10 16.5h2"
-                  stroke="#3B82F6"
-                  strokeWidth="1.3"
-                  strokeLinecap="round"
-                />
-              </svg>
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-gray-900 leading-tight">
-                Centre Teaching Schedule
-              </h2>
-              <p className="text-xs text-gray-500 mt-0.5 font-medium">
-                {portalName
-                  ? `${portalName} · Monthly Subject Planning & Coverage`
-                  : "Monthly Subject Planning & Coverage"}
-              </p>
-            </div>
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">Centre Teaching Schedule</h2>
+            <p className="text-xs text-gray-500 mt-0.5 font-medium">
+              {portalName
+                ? `${portalName} · Monthly Subject Planning & Coverage`
+                : "Monthly Subject Planning & Coverage"}
+            </p>
           </div>
           <div
-            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-blue-100 flex-shrink-0"
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-blue-100"
             style={{ background: "#EFF6FF" }}
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <rect
-                x="1"
-                y="2"
-                width="12"
-                height="11"
-                rx="1.5"
-                fill="none"
-                stroke="#3B82F6"
-                strokeWidth="1.3"
-              />
-              <path d="M1 5.5h12" stroke="#3B82F6" strokeWidth="1.3" />
-            </svg>
             <span className="text-sm font-bold text-blue-600">{month}</span>
           </div>
         </div>
@@ -909,228 +309,59 @@ export default function Schedule({
           ) : null}
 
           {!hasUpload ? (
-            <EmptyState
+            <EmptySchedule
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
             />
           ) : (
             <>
-              {bannerVisible && scheduleMeta ? (
-                <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-blue-800 truncate">
-                      {scheduleMeta.lastFile || scheduleMeta.name}
-                    </p>
-                    <p className="text-xs text-blue-600 mt-0.5">
-                      {allRows.length} topic{allRows.length === 1 ? "" : "s"} ·{" "}
-                      {monthsFromRows(allRows).join(", ") || "No months"}
-                      {isDirty ? " · Unsaved changes — click Save" : " · Saved"}
-                    </p>
-                  </div>
-                </div>
+              {bannerVisible ? (
+                <StatusBanner
+                  meta={scheduleMeta}
+                  topicCount={allRows.length}
+                  months={monthsFromRows(allRows)}
+                  isDirty={isDirty}
+                />
               ) : null}
 
               {deleteOpen ? (
-                <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-4 space-y-3">
-                  <p className="text-sm font-semibold text-red-800">
-                    Delete month schedule
-                  </p>
-                  <p className="text-xs text-red-700">
-                    Choose which month to remove. Other months will stay saved.
-                  </p>
-                  <div className="flex flex-wrap items-end gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs font-bold text-red-700 uppercase tracking-wider">
-                        Month
-                      </label>
-                      <select
-                        value={deleteMonth}
-                        onChange={(e) => setDeleteMonth(e.target.value)}
-                        className="appearance-none bg-white border border-red-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-red-300 min-w-[160px]"
-                      >
-                        {monthsFromRows(allRows).map((m) => (
-                          <option key={m} value={m}>
-                            {m}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleDeleteMonth}
-                      className="px-4 py-2.5 rounded-xl bg-red-600 text-white text-sm font-semibold hover:bg-red-700"
-                    >
-                      Delete Month
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setDeleteOpen(false)}
-                      className="px-4 py-2.5 rounded-xl border border-red-200 text-red-700 text-sm font-semibold hover:bg-red-100"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
+                <DeleteMonthPanel
+                  months={monthsFromRows(allRows)}
+                  value={deleteMonth}
+                  onChange={setDeleteMonth}
+                  onConfirm={handleDeleteMonth}
+                  onCancel={() => setDeleteOpen(false)}
+                />
               ) : null}
 
               <div className="flex flex-wrap gap-3 items-end">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Subject
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={subject}
-                      onChange={(e) => setSubject(e.target.value)}
-                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[150px]"
-                    >
-                      {subjects.map((s) => (
-                        <option key={s}>{s}</option>
-                      ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                      ▾
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Month
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={month}
-                      onChange={(e) => setMonth(e.target.value)}
-                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[140px]"
-                    >
-                      {months.map((m) => (
-                        <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                      ▾
-                    </span>
-                  </div>
-                </div>
-
+                <FilterSelect
+                  label="Subject"
+                  value={subject}
+                  onChange={setSubject}
+                  options={subjects}
+                />
+                <FilterSelect
+                  label="Month"
+                  value={month}
+                  onChange={setMonth}
+                  options={months}
+                />
                 <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                     Search
                   </label>
-                  <div className="relative">
-                    <svg
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 14 14"
-                      fill="none"
-                    >
-                      <circle
-                        cx="6"
-                        cy="6"
-                        r="4.5"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                      />
-                      <path
-                        d="M9.5 9.5l3 3"
-                        stroke="currentColor"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <input
-                      type="text"
-                      placeholder="Search Topic..."
-                      value={search}
-                      onChange={(e) => setSearch(e.target.value)}
-                      className="w-full bg-white border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
-                    />
-                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search Topic..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                  />
                 </div>
               </div>
 
-              {rows.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
-                  <p className="text-base font-bold text-gray-800">
-                    No topics for this filter
-                  </p>
-                  <p className="text-sm text-gray-500">
-                    Try another subject or month.
-                  </p>
-                </div>
-              ) : (
-                <div
-                  className="overflow-x-auto rounded-2xl border border-gray-100 flex-1"
-                  style={{ minHeight: 0 }}
-                >
-                  <table
-                    className="w-full text-sm border-collapse"
-                    style={{ minWidth: "720px" }}
-                  >
-                    <thead>
-                      <tr style={{ background: "#ccd2dd" }}>
-                        {[
-                          "Topic",
-                          "Planned Days",
-                          "Start Date",
-                          "End Date",
-                          "Faculty",
-                          "Completion",
-                          "Status",
-                        ].map((col, i, arr) => (
-                          <th
-                            key={col}
-                            className={`px-4 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap ${i === 0 ? "rounded-tl-2xl" : ""} ${i === arr.length - 1 ? "rounded-tr-2xl" : ""}`}
-                          >
-                            {col}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {rows.map((row, i) => (
-                        <tr
-                          key={`${row.topic}-${i}`}
-                          className="border-t border-gray-100 hover:bg-blue-50/50 transition-colors cursor-default"
-                          style={{
-                            background: i % 2 === 0 ? "#ffffff" : "#f9fafb",
-                          }}
-                        >
-                          <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
-                            {row.topic}
-                          </td>
-                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
-                              {row.days} Days
-                            </span>
-                          </td>
-                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                            {row.start}
-                          </td>
-                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
-                            {row.end}
-                          </td>
-                          <td className="px-4 py-3.5 font-medium text-gray-700 whitespace-nowrap">
-                            {row.faculty}
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <ProgressBar
-                              value={row.completion}
-                              status={row.status}
-                            />
-                          </td>
-                          <td className="px-4 py-3.5 whitespace-nowrap">
-                            <StatusBadge status={row.status} />
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <ScheduleTable rows={rows} />
             </>
           )}
         </div>
@@ -1141,37 +372,22 @@ export default function Schedule({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={ACCEPT}
+                accept={SCHEDULE_ACCEPT}
                 className="hidden"
                 onChange={handleFileChange}
               />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-5 py-2.5 rounded-xl border border-blue-200 text-sm font-semibold text-blue-600 hover:bg-blue-50 active:scale-95 transition-all flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl border border-blue-200 text-sm font-semibold text-blue-600 hover:bg-blue-50"
               >
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                  <path
-                    d="M7 9V3M4.5 5.5L7 3l2.5 2.5"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M2 10v1.5A1.5 1.5 0 003.5 13h7A1.5 1.5 0 0012 11.5V10"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
                 {hasUpload ? "Add Month" : "Upload"}
               </button>
               <button
                 type="button"
                 onClick={handleSave}
                 disabled={!hasUpload || !isDirty}
-                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Save
               </button>
@@ -1179,7 +395,7 @@ export default function Schedule({
                 type="button"
                 onClick={openDeleteMonth}
                 disabled={!hasUpload}
-                className="px-5 py-2.5 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+                className="px-5 py-2.5 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete
               </button>
@@ -1188,7 +404,7 @@ export default function Schedule({
           <button
             type="button"
             onClick={onClose}
-            className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
+            className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
           >
             Close
           </button>
