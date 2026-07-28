@@ -1,11 +1,22 @@
-import { useEffect, useRef, useState } from "react";
-import { Calendar, Upload, X, FileText } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import { Calendar, Upload, X } from "lucide-react";
 
 const ACCEPT =
-  ".pdf,.xls,.xlsx,.csv,.svg,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/svg+xml";
+  ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
+
+const DAY_ORDER = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
 
 const storageKey = (portalName = "") =>
-  `hcl_sathee_timetable_${String(portalName || "default")
+  `hcl_sathee_timetable_data_${String(portalName || "default")
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")}`;
 
@@ -14,7 +25,7 @@ const readStored = (portalName) => {
     const raw = localStorage.getItem(storageKey(portalName));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.dataUrl || !parsed?.name) return null;
+    if (!Array.isArray(parsed?.rows)) return null;
     return parsed;
   } catch {
     return null;
@@ -26,37 +37,114 @@ const writeStored = (portalName, payload) => {
     if (!payload) localStorage.removeItem(storageKey(portalName));
     else localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
   } catch (err) {
-    console.error("Unable to save timetable file", err);
+    console.error("Unable to save timetable data", err);
+    throw err;
   }
 };
 
-const fileToDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
+const normalizeHeader = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[%()]/g, " ")
+    .replace(/\s+/g, " ");
+
+const pickColumn = (headers, aliases) => {
+  const normalized = headers.map(normalizeHeader);
+  for (const alias of aliases) {
+    const idx = normalized.indexOf(alias);
+    if (idx >= 0) return idx;
+  }
+  return -1;
+};
+
+const normalizeDay = (value) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const match = DAY_ORDER.find(
+    (day) => day.toLowerCase() === raw.toLowerCase() || day.toLowerCase().startsWith(raw.toLowerCase().slice(0, 3))
+  );
+  return match || raw;
+};
+
+const parseTimetableWorkbook = (workbook) => {
+  const rows = [];
+
+  workbook.SheetNames.forEach((sheetName) => {
+    const sheet = workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    if (!matrix.length) return;
+
+    const headerRowIndex = matrix.findIndex((row) =>
+      row.some((cell) => {
+        const h = normalizeHeader(cell);
+        return (
+          h === "day" ||
+          h === "time" ||
+          h.includes("subject") ||
+          h.includes("period")
+        );
+      })
+    );
+    if (headerRowIndex < 0) return;
+
+    const headers = matrix[headerRowIndex];
+    const dayIdx = pickColumn(headers, ["day", "weekday"]);
+    const dateIdx = pickColumn(headers, ["date", "day date", "daydate"]);
+    const timeIdx = pickColumn(headers, ["time", "slot", "timing", "period time"]);
+    const subjectIdx = pickColumn(headers, ["subject", "class", "course"]);
+    const monthIdx = pickColumn(headers, ["month", "period", "label"]);
+
+    if (dayIdx < 0 || timeIdx < 0 || subjectIdx < 0) return;
+
+    for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
+      const row = matrix[i] || [];
+      const day = normalizeDay(row[dayIdx]);
+      const time = String(row[timeIdx] ?? "").trim();
+      const subject = String(row[subjectIdx] ?? "").trim();
+      if (!day || !time || !subject) continue;
+
+      rows.push({
+        day,
+        date: String(dateIdx >= 0 ? row[dateIdx] : "").trim(),
+        time,
+        subject,
+        month: String(monthIdx >= 0 ? row[monthIdx] : "").trim(),
+      });
+    }
   });
 
-const isPdf = (file) =>
-  String(file?.type || "").includes("pdf") ||
-  String(file?.name || "").toLowerCase().endsWith(".pdf");
+  return rows;
+};
 
-const isSvg = (file) =>
-  String(file?.type || "").includes("svg") ||
-  String(file?.name || "").toLowerCase().endsWith(".svg");
+const groupByDay = (rows) => {
+  const map = new Map();
 
-const isSpreadsheet = (file) => {
-  const name = String(file?.name || "").toLowerCase();
-  const type = String(file?.type || "").toLowerCase();
-  return (
-    name.endsWith(".xls") ||
-    name.endsWith(".xlsx") ||
-    name.endsWith(".csv") ||
-    type.includes("sheet") ||
-    type.includes("excel") ||
-    type.includes("csv")
-  );
+  rows.forEach((row) => {
+    const key = `${row.day}__${row.date || ""}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        day: row.day,
+        date: row.date,
+        month: row.month,
+        classes: [],
+      });
+    }
+    map.get(key).classes.push({
+      time: row.time,
+      subject: row.subject,
+    });
+  });
+
+  return [...map.values()].sort((a, b) => {
+    const dayDiff =
+      (DAY_ORDER.indexOf(a.day) === -1 ? 99 : DAY_ORDER.indexOf(a.day)) -
+      (DAY_ORDER.indexOf(b.day) === -1 ? 99 : DAY_ORDER.indexOf(b.day));
+    if (dayDiff !== 0) return dayDiff;
+    return String(a.date).localeCompare(String(b.date), undefined, {
+      numeric: true,
+    });
+  });
 };
 
 function EmptyTimetable({ readOnly, onUploadClick }) {
@@ -70,7 +158,7 @@ function EmptyTimetable({ readOnly, onUploadClick }) {
         <p className="text-sm text-gray-500 mt-1 max-w-sm leading-relaxed">
           {readOnly
             ? "No timetable has been uploaded for this centre yet."
-            : "Upload a PDF, Excel, or SVG file to display the centre timetable here."}
+            : "Upload an Excel or CSV timetable to display centre classes here."}
         </p>
       </div>
       {!readOnly ? (
@@ -87,51 +175,6 @@ function EmptyTimetable({ readOnly, onUploadClick }) {
   );
 }
 
-function TimetablePreview({ file }) {
-  if (!file?.dataUrl) return null;
-
-  if (isPdf(file)) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-violet-200 bg-slate-50">
-        <iframe
-          title={file.name || "Timetable PDF"}
-          src={file.dataUrl}
-          className="h-[55vh] w-full"
-        />
-      </div>
-    );
-  }
-
-  if (isSvg(file) || String(file.type || "").startsWith("image/")) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-violet-200 bg-white p-3">
-        <img
-          src={file.dataUrl}
-          alt={file.name || "Timetable"}
-          className="max-h-[55vh] w-full object-contain"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border border-violet-200 bg-violet-50 px-5 py-8 text-center">
-      <FileText className="mx-auto text-violet-600" size={36} />
-      <p className="mt-3 font-semibold text-violet-900">{file.name}</p>
-      <p className="mt-1 text-sm text-violet-700">
-        Spreadsheet preview is not available in-browser. Open or download the file to view it.
-      </p>
-      <a
-        href={file.dataUrl}
-        download={file.name || "timetable.xlsx"}
-        className="mt-4 inline-flex rounded-xl bg-violet-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-violet-700"
-      >
-        Download / Open
-      </a>
-    </div>
-  );
-}
-
 export default function TimeTable({
   isOpen,
   onClose,
@@ -140,7 +183,8 @@ export default function TimeTable({
 }) {
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [file, setFile] = useState(null);
+  const [allRows, setAllRows] = useState([]);
+  const [meta, setMeta] = useState(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -161,48 +205,86 @@ export default function TimeTable({
   useEffect(() => {
     if (!isOpen) return;
     setError("");
-    setFile(readStored(portalName));
+    const stored = readStored(portalName);
+    if (stored) {
+      setAllRows(stored.rows);
+      setMeta({
+        name: stored.name || "Uploaded timetable",
+        updatedAt: stored.updatedAt || null,
+      });
+    } else {
+      setAllRows([]);
+      setMeta(null);
+    }
   }, [isOpen, portalName]);
 
+  const days = useMemo(() => groupByDay(allRows), [allRows]);
+
+  const periodLabel = useMemo(() => {
+    const month = allRows.find((r) => r.month)?.month;
+    if (month) return `${month} - Centre Classes`;
+    if (portalName) return `${portalName} · Centre Classes`;
+    return "Centre Classes";
+  }, [allRows, portalName]);
+
   if (!isOpen) return null;
+
+  const hasUpload = allRows.length > 0;
 
   const handleBackdropClick = (event) => {
     if (event.target === backdropRef.current) onClose();
   };
 
   const handleFileChange = async (event) => {
-    const next = event.target.files?.[0] || null;
+    const file = event.target.files?.[0] || null;
     event.target.value = "";
-    if (!next) return;
+    if (!file) return;
 
+    const name = file.name.toLowerCase();
     const allowed =
-      isPdf(next) || isSvg(next) || isSpreadsheet(next) || next.type.startsWith("image/");
+      name.endsWith(".xls") ||
+      name.endsWith(".xlsx") ||
+      name.endsWith(".csv") ||
+      String(file.type || "").includes("sheet") ||
+      String(file.type || "").includes("excel") ||
+      String(file.type || "").includes("csv");
+
     if (!allowed) {
-      setError("Please upload a PDF, Excel, CSV, or SVG file.");
+      setError("Please upload an Excel (.xlsx / .xls) or CSV file.");
       return;
     }
 
     try {
       setError("");
-      const dataUrl = await fileToDataUrl(next);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const parsedRows = parseTimetableWorkbook(workbook);
+
+      if (!parsedRows.length) {
+        setError(
+          "No timetable rows found. Include columns like Day, Date, Time, Subject (optional Month)."
+        );
+        return;
+      }
+
       const payload = {
-        name: next.name,
-        type: next.type || "",
-        size: next.size,
-        dataUrl,
+        name: file.name,
         updatedAt: new Date().toISOString(),
+        rows: parsedRows,
       };
       writeStored(portalName, payload);
-      setFile(payload);
+      setAllRows(parsedRows);
+      setMeta({ name: file.name, updatedAt: payload.updatedAt });
     } catch (err) {
       console.error(err);
-      setError("Unable to read that file. Try a smaller file.");
+      setError("Unable to read that file. Check the format and try again.");
     }
   };
 
   const handleRemove = () => {
     writeStored(portalName, null);
-    setFile(null);
+    setAllRows([]);
+    setMeta(null);
     setError("");
   };
 
@@ -220,9 +302,7 @@ export default function TimeTable({
             </div>
             <div>
               <h2 className="text-2xl font-semibold text-black">Timetable</h2>
-              <p className="text-sm text-gray-600">
-                {portalName ? `${portalName} · Centre Classes` : "Centre Classes"}
-              </p>
+              <p className="text-sm text-gray-600">{periodLabel}</p>
             </div>
           </div>
           <button
@@ -241,32 +321,83 @@ export default function TimeTable({
             </div>
           ) : null}
 
-          {file ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium text-violet-800 truncate">{file.name}</p>
-                  <p className="text-xs text-violet-600 mt-0.5">
-                    {file.size ? `${(file.size / 1024).toFixed(1)} KB` : "Uploaded timetable"}
-                  </p>
-                </div>
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    onClick={handleRemove}
-                    className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-              <TimetablePreview file={file} />
-            </div>
-          ) : (
+          {!hasUpload ? (
             <EmptyTimetable
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
             />
+          ) : (
+            <>
+              {meta ? (
+                <div className="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-violet-200 bg-violet-50 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-violet-800 truncate">{meta.name}</p>
+                    <p className="text-xs text-violet-600 mt-0.5">
+                      {allRows.length} class
+                      {allRows.length === 1 ? "" : "es"} · {days.length} day
+                      {days.length === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={handleRemove}
+                      className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {days.map((day) => (
+                  <div
+                    key={`${day.day}-${day.date}`}
+                    className="bg-[#f8fafc] border border-gray-200 rounded-2xl p-5"
+                  >
+                    <div className="flex items-center justify-between mb-4">
+                      <div>
+                        <div className="font-semibold text-lg text-black">
+                          {day.day}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {day.month
+                            ? `${day.month.split(" ")[0]} ${day.date || ""}`.trim()
+                            : day.date
+                              ? `Date ${day.date}`
+                              : "Centre day"}
+                        </div>
+                      </div>
+                      <div className="text-xs px-3 py-1 bg-violet-100 text-violet-700 rounded-full font-medium">
+                        {day.classes.length} classes
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      {day.classes.map((item) => (
+                        <div
+                          key={`${day.day}-${item.time}-${item.subject}`}
+                          className="bg-white border border-gray-100 rounded-xl p-3 text-sm"
+                        >
+                          <div className="font-mono text-violet-600 font-medium mb-1">
+                            {item.time}
+                          </div>
+                          <div className="font-medium text-black">
+                            {item.subject}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-8 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-sm text-amber-700">
+                <strong>Note:</strong> Timetable is subject to change. Please
+                check with the centre administrator for updates.
+              </div>
+            </>
           )}
         </div>
 
@@ -286,7 +417,7 @@ export default function TimeTable({
                 className="px-6 py-3 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2"
               >
                 <Upload size={18} />
-                {file ? "Replace Upload" : "Upload"}
+                {hasUpload ? "Replace Upload" : "Upload"}
               </button>
             </>
           ) : null}
