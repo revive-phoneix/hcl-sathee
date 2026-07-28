@@ -28,6 +28,9 @@ export default function NewAnnouncementModal({
     centres: initialCentres,
   });
   const [centreError, setCentreError] = useState("");
+  const [attachmentError, setAttachmentError] = useState("");
+  const needsReupload =
+    Boolean(editData?.attachmentName) && !editData?.attachmentUrl;
 
   const toggleCentre = (centre) => {
     setCentreError("");
@@ -48,6 +51,12 @@ export default function NewAnnouncementModal({
       return;
     }
 
+    if (needsReupload && !form.attachment) {
+      setAttachmentError("Please re-attach the PDF/document file before updating.");
+      return;
+    }
+
+    setAttachmentError("");
     onSubmit(form);
   };
 
@@ -155,8 +164,18 @@ export default function NewAnnouncementModal({
           </div>
           <div>
             <label className="block text-sm font-semibold text-slate-700 mb-2">
-              Attachment <span className="text-slate-400">(Optional)</span>
+              Attachment{" "}
+              <span className="text-slate-400">
+                {needsReupload ? "(Required — previous file was not saved)" : "(Optional)"}
+              </span>
             </label>
+
+            {needsReupload ? (
+              <p className="mb-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                Only the filename was saved earlier. Choose the file again so it can be stored and
+                previewed.
+              </p>
+            ) : null}
 
             <label className="flex flex-col items-center justify-center w-full h-44 border-2 border-dashed border-sky-200 rounded-3xl cursor-pointer hover:bg-sky-50 transition">
               <div className="flex flex-col items-center">
@@ -179,6 +198,7 @@ export default function NewAnnouncementModal({
                 ) : editData?.attachmentName ? (
                   <p className="mt-3 text-sm text-slate-600 font-medium">
                     Current: {editData.attachmentName}
+                    {!editData.attachmentUrl ? " (missing file)" : ""}
                   </p>
                 ) : null}
               </div>
@@ -187,14 +207,18 @@ export default function NewAnnouncementModal({
                 type="file"
                 accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
                 className="hidden"
-                onChange={(e) =>
+                onChange={(e) => {
+                  setAttachmentError("");
                   setForm({
                     ...form,
                     attachment: e.target.files[0],
-                  })
-                }
+                  });
+                }}
               />
             </label>
+            {attachmentError ? (
+              <p className="mt-2 text-sm text-red-600">{attachmentError}</p>
+            ) : null}
           </div>
 
           <div className="flex justify-end gap-4 pt-6 border-t">

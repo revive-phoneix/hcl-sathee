@@ -87,7 +87,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
       );
 
       if (rememberMe) {
-        localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ name, email, password: "" }));
+        localStorage.setItem(REMEMBER_ME_KEY, JSON.stringify({ name, email, password }));
       } else localStorage.removeItem(REMEMBER_ME_KEY);
 
       const user = response.data?.user || {};
@@ -213,7 +213,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
                     JSON.stringify({
                       name: formData.name,
                       email: formData.email,
-                      password: "",
+                      password: formData.password,
                     })
                   );
                 } else localStorage.removeItem(REMEMBER_ME_KEY);

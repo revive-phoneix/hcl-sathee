@@ -40,6 +40,27 @@ const findById = async (id) => {
   return toApiAnnouncement(doc.id, doc.data());
 };
 
+const MAX_INLINE_BYTES = 600 * 1024;
+
+const toInlineDataUrl = (file) => {
+  if (!file?.buffer) {
+    throw new Error("Attachment file is missing or empty");
+  }
+  if (file.buffer.length > MAX_INLINE_BYTES) {
+    throw new Error(
+      "Attachment is too large for inline storage (max 600 KB). Enable Firebase Storage or use a smaller file."
+    );
+  }
+  const contentType = file.mimetype || "application/octet-stream";
+  const originalName = String(file.originalname || "attachment").trim();
+  return {
+    attachmentName: originalName,
+    attachmentUrl: `data:${contentType};base64,${file.buffer.toString("base64")}`,
+    attachmentType: contentType,
+    attachmentPath: null,
+  };
+};
+
 const uploadAttachment = async (file) => {
   if (!file?.buffer) {
     throw new Error("Attachment file is missing or empty");
@@ -48,54 +69,52 @@ const uploadAttachment = async (file) => {
   const originalName = String(file.originalname || "attachment").trim();
   const ext = path.extname(originalName).toLowerCase() || "";
   const safeExt = ALLOWED_EXTS.includes(ext) ? ext : ".bin";
-  const storagePath = `announcements/${Date.now()}-${Math.random()
-    .toString(36)
-    .slice(2)}${safeExt}`;
-  const bucket = getBucket();
-  const storageFile = bucket.file(storagePath);
   const contentType = file.mimetype || "application/octet-stream";
 
   try {
+    const storagePath = `announcements/${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2)}${safeExt}`;
+    const bucket = getBucket();
+    const storageFile = bucket.file(storagePath);
+
     await storageFile.save(file.buffer, {
       metadata: {
         contentType,
         cacheControl: "public, max-age=31536000",
-        metadata: {
-          originalName,
-        },
+        metadata: { originalName },
       },
       resumable: false,
     });
-  } catch (err) {
-    throw new Error(
-      `Failed to upload attachment to storage: ${err.message || "unknown error"}`
-    );
-  }
 
-  let url;
-  try {
-    const [signedUrl] = await storageFile.getSignedUrl({
-      action: "read",
-      expires: new Date("2500-01-01T00:00:00.000Z"),
-    });
-    url = signedUrl;
-  } catch (err) {
+    let url;
     try {
+      const [signedUrl] = await storageFile.getSignedUrl({
+        action: "read",
+        expires: new Date("2500-01-01T00:00:00.000Z"),
+      });
+      url = signedUrl;
+    } catch {
       await storageFile.makePublic();
       url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-    } catch (publicErr) {
+    }
+
+    return {
+      attachmentName: originalName || `attachment${safeExt}`,
+      attachmentUrl: url,
+      attachmentType: contentType,
+      attachmentPath: storagePath,
+    };
+  } catch (storageErr) {
+    console.error("Firebase Storage upload failed, using inline fallback:", storageErr);
+    try {
+      return toInlineDataUrl(file);
+    } catch (inlineErr) {
       throw new Error(
-        `Failed to create attachment URL: ${err.message || publicErr.message}`
+        `Attachment upload failed: ${storageErr.message || "storage error"}. ${inlineErr.message}`
       );
     }
   }
-
-  return {
-    attachmentName: originalName || `attachment${safeExt}`,
-    attachmentUrl: url,
-    attachmentType: contentType,
-    attachmentPath: storagePath,
-  };
 };
 
 const create = async (data) => {

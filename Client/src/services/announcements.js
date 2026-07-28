@@ -59,7 +59,8 @@ export const createAnnouncement = async (payload) => {
 };
 
 export const updateAnnouncement = async (id, payload) => {
-  const response = await api.put(
+  // Use POST for multipart body reliability on hosted backends
+  const response = await api.post(
     `/api/announcements/${id}`,
     buildAnnouncementFormData(payload)
   );
