@@ -62,9 +62,120 @@ const normalizeDay = (value) => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   const match = DAY_ORDER.find(
-    (day) => day.toLowerCase() === raw.toLowerCase() || day.toLowerCase().startsWith(raw.toLowerCase().slice(0, 3))
+    (day) =>
+      day.toLowerCase() === raw.toLowerCase() ||
+      day.toLowerCase().startsWith(raw.toLowerCase().slice(0, 3))
   );
   return match || raw;
+};
+
+const normalizeTime = (value) =>
+  String(value ?? "")
+    .trim()
+    .replace(/[\u2013\u2014\u2212\-]+/g, " - ")
+    .replace(/\s+/g, " ");
+
+const isDayName = (value) => {
+  const h = normalizeHeader(value);
+  return DAY_ORDER.some((day) => normalizeHeader(day) === h);
+};
+
+/** Weekly grid: Time | Monday | Tuesday | ... */
+const parseWeeklyGridMatrix = (matrix) => {
+  const headerRowIndex = matrix.findIndex((row) => {
+    const cells = row.map(normalizeHeader);
+    const hasTime = cells.some(
+      (c) => c === "time" || c === "timing" || c === "period" || c === "slot"
+    );
+    const dayCount = row.filter(isDayName).length;
+    return hasTime && dayCount >= 3;
+  });
+  if (headerRowIndex < 0) return [];
+
+  const headers = matrix[headerRowIndex];
+  const timeIdx = pickColumn(headers, ["time", "timing", "period", "slot"]);
+  if (timeIdx < 0) return [];
+
+  const dayColumns = headers
+    .map((header, index) => ({ index, day: normalizeDay(header) }))
+    .filter(
+      (col) =>
+        col.index !== timeIdx &&
+        col.day &&
+        DAY_ORDER.includes(col.day)
+    );
+
+  if (!dayColumns.length) return [];
+
+  const rows = [];
+  for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
+    const row = matrix[i] || [];
+    const time = normalizeTime(row[timeIdx]);
+    if (!time) continue;
+
+    dayColumns.forEach(({ index, day }) => {
+      const subject = String(row[index] ?? "").trim();
+      if (!subject) return;
+      rows.push({
+        day,
+        date: "",
+        time,
+        subject,
+        month: "Weekly",
+      });
+    });
+  }
+
+  return rows;
+};
+
+/** Long format: Day | Date | Time | Subject | Month */
+const parseLongFormatMatrix = (matrix) => {
+  const headerRowIndex = matrix.findIndex((row) =>
+    row.some((cell) => {
+      const h = normalizeHeader(cell);
+      return (
+        h === "day" ||
+        h === "time" ||
+        h.includes("subject") ||
+        h.includes("period")
+      );
+    })
+  );
+  if (headerRowIndex < 0) return [];
+
+  const headers = matrix[headerRowIndex];
+  const dayIdx = pickColumn(headers, ["day", "weekday"]);
+  const dateIdx = pickColumn(headers, ["date", "day date", "daydate"]);
+  const timeIdx = pickColumn(headers, [
+    "time",
+    "slot",
+    "timing",
+    "period time",
+  ]);
+  const subjectIdx = pickColumn(headers, ["subject", "class", "course"]);
+  const monthIdx = pickColumn(headers, ["month", "period", "label"]);
+
+  if (dayIdx < 0 || timeIdx < 0 || subjectIdx < 0) return [];
+
+  const rows = [];
+  for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
+    const row = matrix[i] || [];
+    const day = normalizeDay(row[dayIdx]);
+    const time = normalizeTime(row[timeIdx]);
+    const subject = String(row[subjectIdx] ?? "").trim();
+    if (!day || !time || !subject) continue;
+
+    rows.push({
+      day,
+      date: String(dateIdx >= 0 ? row[dateIdx] : "").trim(),
+      time,
+      subject,
+      month: String(monthIdx >= 0 ? row[monthIdx] : "").trim(),
+    });
+  }
+
+  return rows;
 };
 
 const parseTimetableWorkbook = (workbook) => {
@@ -75,43 +186,13 @@ const parseTimetableWorkbook = (workbook) => {
     const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
     if (!matrix.length) return;
 
-    const headerRowIndex = matrix.findIndex((row) =>
-      row.some((cell) => {
-        const h = normalizeHeader(cell);
-        return (
-          h === "day" ||
-          h === "time" ||
-          h.includes("subject") ||
-          h.includes("period")
-        );
-      })
-    );
-    if (headerRowIndex < 0) return;
-
-    const headers = matrix[headerRowIndex];
-    const dayIdx = pickColumn(headers, ["day", "weekday"]);
-    const dateIdx = pickColumn(headers, ["date", "day date", "daydate"]);
-    const timeIdx = pickColumn(headers, ["time", "slot", "timing", "period time"]);
-    const subjectIdx = pickColumn(headers, ["subject", "class", "course"]);
-    const monthIdx = pickColumn(headers, ["month", "period", "label"]);
-
-    if (dayIdx < 0 || timeIdx < 0 || subjectIdx < 0) return;
-
-    for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
-      const row = matrix[i] || [];
-      const day = normalizeDay(row[dayIdx]);
-      const time = String(row[timeIdx] ?? "").trim();
-      const subject = String(row[subjectIdx] ?? "").trim();
-      if (!day || !time || !subject) continue;
-
-      rows.push({
-        day,
-        date: String(dateIdx >= 0 ? row[dateIdx] : "").trim(),
-        time,
-        subject,
-        month: String(monthIdx >= 0 ? row[monthIdx] : "").trim(),
-      });
+    const weeklyRows = parseWeeklyGridMatrix(matrix);
+    if (weeklyRows.length) {
+      rows.push(...weeklyRows);
+      return;
     }
+
+    rows.push(...parseLongFormatMatrix(matrix));
   });
 
   return rows;
@@ -222,6 +303,7 @@ export default function TimeTable({
 
   const periodLabel = useMemo(() => {
     const month = allRows.find((r) => r.month)?.month;
+    if (month === "Weekly") return "Weekly Centre Classes";
     if (month) return `${month} - Centre Classes`;
     if (portalName) return `${portalName} · Centre Classes`;
     return "Centre Classes";
@@ -262,7 +344,7 @@ export default function TimeTable({
 
       if (!parsedRows.length) {
         setError(
-          "No timetable rows found. Include columns like Day, Date, Time, Subject (optional Month)."
+          "No timetable rows found. Use a weekly grid (Time | Monday | Tuesday | …) or columns Day, Time, Subject."
         );
         return;
       }
@@ -362,11 +444,13 @@ export default function TimeTable({
                           {day.day}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {day.month
-                            ? `${day.month.split(" ")[0]} ${day.date || ""}`.trim()
-                            : day.date
-                              ? `Date ${day.date}`
-                              : "Centre day"}
+                          {day.month === "Weekly"
+                            ? "Weekly slot"
+                            : day.month
+                              ? `${day.month.split(" ")[0]} ${day.date || ""}`.trim()
+                              : day.date
+                                ? `Date ${day.date}`
+                                : "Centre day"}
                         </div>
                       </div>
                       <div className="text-xs px-3 py-1 bg-violet-100 text-violet-700 rounded-full font-medium">
@@ -375,19 +459,35 @@ export default function TimeTable({
                     </div>
 
                     <div className="space-y-3">
-                      {day.classes.map((item) => (
-                        <div
-                          key={`${day.day}-${item.time}-${item.subject}`}
-                          className="bg-white border border-gray-100 rounded-xl p-3 text-sm"
-                        >
-                          <div className="font-mono text-violet-600 font-medium mb-1">
-                            {item.time}
+                      {day.classes.map((item) => {
+                        const isBreak =
+                          /lunch|break|recess/i.test(item.subject);
+                        return (
+                          <div
+                            key={`${day.day}-${item.time}-${item.subject}`}
+                            className={`rounded-xl p-3 text-sm border ${
+                              isBreak
+                                ? "bg-amber-50 border-amber-100"
+                                : "bg-white border-gray-100"
+                            }`}
+                          >
+                            <div
+                              className={`font-mono font-medium mb-1 ${
+                                isBreak ? "text-amber-700" : "text-violet-600"
+                              }`}
+                            >
+                              {item.time}
+                            </div>
+                            <div
+                              className={`font-medium ${
+                                isBreak ? "text-amber-800" : "text-black"
+                              }`}
+                            >
+                              {item.subject}
+                            </div>
                           </div>
-                          <div className="font-medium text-black">
-                            {item.subject}
-                          </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
