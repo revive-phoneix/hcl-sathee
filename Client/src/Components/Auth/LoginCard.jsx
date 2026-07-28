@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import { getAuthErrorMessage, postWithColdStartRetry } from "../../utils/apiRequest";
 import { setAuthToken } from "../../utils/authToken";
+import { setSession } from "../../utils/authSession";
 
 const REMEMBER_ME_KEY = "hcl_sathee_remember_me";
 const fieldClass =
@@ -34,7 +35,13 @@ export default function AdminLoginCard({ onLoginSuccess }) {
   const setField = (key) => (e) =>
     setFormData((prev) => ({ ...prev, [key]: e.target.value }));
 
-  const handleLogin = async () => {
+  const focusField = (id) => {
+    const el = document.getElementById(id);
+    if (el) el.focus();
+  };
+
+  const handleLogin = async (e) => {
+    e?.preventDefault?.();
     setError("");
     setStatusText("");
 
@@ -42,10 +49,26 @@ export default function AdminLoginCard({ onLoginSuccess }) {
     const email = formData.email.trim().toLowerCase();
     const password = formData.password;
 
-    if (!name) return setError("Full name is required.");
-    if (!email) return setError("Email address is required.");
-    if (!isValidEmail(email)) return setError("Enter a valid email address.");
-    if (!password) return setError("Password is required.");
+    if (!name) {
+      setError("Full name is required.");
+      focusField("login-name");
+      return;
+    }
+    if (!email) {
+      setError("Email address is required.");
+      focusField("login-email");
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setError("Enter a valid email address.");
+      focusField("login-email");
+      return;
+    }
+    if (!password) {
+      setError("Password is required.");
+      focusField("login-password");
+      return;
+    }
 
     setLoading(true);
 
@@ -69,11 +92,14 @@ export default function AdminLoginCard({ onLoginSuccess }) {
 
       const user = response.data?.user || {};
       if (response.data?.token) setAuthToken(response.data.token);
-      onLoginSuccess?.({
+
+      const sessionUser = {
         name: user.name || name,
         role: user.role || "",
         centre: user.centre || null,
-      });
+      };
+      setSession({ ...sessionUser, portal: "" });
+      onLoginSuccess?.(sessionUser);
       navigate("/");
     } catch (err) {
       console.error(err.response?.data || err);
@@ -84,6 +110,39 @@ export default function AdminLoginCard({ onLoginSuccess }) {
     }
   };
 
+  const handleFieldEnter = (currentKey) => (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+
+    const name = formData.name.trim();
+    const email = formData.email.trim();
+    const password = formData.password;
+
+    if (currentKey === "name") {
+      if (!name) return setError("Full name is required.");
+      setError("");
+      focusField("login-email");
+      return;
+    }
+
+    if (currentKey === "email") {
+      if (!email) return setError("Email address is required.");
+      if (!isValidEmail(email)) return setError("Enter a valid email address.");
+      setError("");
+      focusField("login-password");
+      return;
+    }
+
+    if (currentKey === "password") {
+      if (!name || !email || !password) {
+        if (!name) return focusField("login-name");
+        if (!email) return focusField("login-email");
+        return setError("Password is required.");
+      }
+      handleLogin(e);
+    }
+  };
+
   return (
     <div className="max-w-md rounded-3xl bg-[#1e40af] p-8 shadow-2xl lg:max-w-lg lg:p-10 text-white">
       <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
@@ -91,22 +150,25 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         Sign in to access the HCL SATHEE Admin Dashboard.
       </p>
 
-      <div className="space-y-6">
+      <form className="space-y-6" onSubmit={handleLogin}>
         {[
-          ["FULL NAME", "name", "text", "Enter your full name"],
-          ["EMAIL ADDRESS", "email", "email", "Enter your email address"],
-        ].map(([label, key, type, placeholder]) => (
+          ["FULL NAME", "name", "text", "Enter your full name", "login-name"],
+          ["EMAIL ADDRESS", "email", "email", "Enter your email address", "login-email"],
+        ].map(([label, key, type, placeholder, id]) => (
           <div key={key}>
             <label className="text-xs font-semibold tracking-widest opacity-75 block mb-2">
               {label}
             </label>
             <input
+              id={id}
               type={type}
               value={formData[key]}
               onChange={setField(key)}
+              onKeyDown={handleFieldEnter(key)}
               placeholder={placeholder}
               className={fieldClass}
               required
+              autoComplete={key === "email" ? "email" : "name"}
             />
           </div>
         ))}
@@ -117,12 +179,15 @@ export default function AdminLoginCard({ onLoginSuccess }) {
           </label>
           <div className="relative">
             <input
+              id="login-password"
               type={showPassword ? "text" : "password"}
               value={formData.password}
               onChange={setField("password")}
+              onKeyDown={handleFieldEnter("password")}
               placeholder="Enter your password"
               className={`${fieldClass} pr-12`}
               required
+              autoComplete="current-password"
             />
             <button
               type="button"
@@ -174,14 +239,14 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         ) : null}
 
         <button
-          onClick={handleLogin}
+          type="submit"
           disabled={loading}
           className="h-12 w-full rounded-2xl bg-white text-[#1e40af] font-semibold text-lg flex items-center justify-center gap-2 hover:bg-white/90 transition disabled:cursor-not-allowed disabled:opacity-70"
         >
           {loading ? statusText || "Signing In…" : "Sign In"}
           {!loading ? <ArrowRight size={22} /> : null}
         </button>
-      </div>
+      </form>
 
       <p className="mt-8 text-center text-sm opacity-75">
         Having trouble? <span className="underline cursor-pointer">Contact IT Support</span>

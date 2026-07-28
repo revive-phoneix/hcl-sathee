@@ -1,12 +1,10 @@
 import { useState } from "react";
-import { Search, RefreshCw, Plus } from "lucide-react";
+import { Search, Plus } from "lucide-react";
 import NewUser from "./NewUser";
 
 export default function UserToolbar({
   search,
   setSearch,
-  refreshing,
-  handleRefresh,
   onAddUser,
   submittingUser,
   portalName,
@@ -20,7 +18,6 @@ export default function UserToolbar({
   return (
     <>
       <div className="flex flex-col sm:flex-row gap-3">
-        {/* Search */}
         <div className="relative flex-1 max-w-sm">
           <Search
             size={15}
@@ -37,19 +34,6 @@ export default function UserToolbar({
         </div>
 
         <div className="flex gap-2 ml-auto">
-          {/* Refresh */}
-          <button
-            onClick={handleRefresh}
-            className="w-10 h-10 rounded-xl bg-white border border-slate-200 flex items-center justify-center text-slate-500
-              hover:border-slate-300 hover:text-slate-700 shadow-sm transition-all"
-          >
-            <RefreshCw
-              size={15}
-              className={`transition-transform duration-700 ${refreshing ? "rotate-[360deg]" : ""}`}
-            />
-          </button>
-
-          {/* Add User */}
           <button
             onClick={() => setShowNewUser(true)}
             className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold
@@ -61,7 +45,6 @@ export default function UserToolbar({
         </div>
       </div>
 
-      {/* Add User Modal */}
       {showNewUser && (
         <NewUser
           onClose={() => setShowNewUser(false)}

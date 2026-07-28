@@ -33,7 +33,6 @@ const normalizeUser = (user) => ({
 export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout }) {
   const [activeFilter, setActiveFilter] = useState("All Users");
   const [search, setSearch] = useState("");
-  const [refreshing, setRefreshing] = useState(false);
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submittingUser, setSubmittingUser] = useState(false);
@@ -42,12 +41,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletingUser, setDeletingUser] = useState(false);
 
-  const loadUsers = useCallback(async ({ showRefreshSpinner = false } = {}) => {
-    if (showRefreshSpinner) {
-      setRefreshing(true);
-      setUsersError("");
-    }
-
+  const loadUsers = useCallback(async () => {
     try {
       const data = await fetchUsers();
       setUsers(data.map(normalizeUser));
@@ -57,7 +51,6 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       setUsersError(getApiErrorMessage(error, "Unable to load users from the database"));
     } finally {
       setLoadingUsers(false);
-      setRefreshing(false);
     }
   }, []);
 
@@ -177,8 +170,6 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
         <UserToolbar
           search={search}
           setSearch={setSearch}
-          refreshing={refreshing}
-          handleRefresh={() => loadUsers({ showRefreshSpinner: true })}
           onAddUser={handleAddUser}
           submittingUser={submittingUser}
           portalName={portalName}

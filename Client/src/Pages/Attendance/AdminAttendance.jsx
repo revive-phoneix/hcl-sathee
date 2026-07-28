@@ -503,13 +503,6 @@ export default function AdminAttendance({
             onDateChange={setSelectedDate}
             onExportXlsx={() => runAttendanceExport("xlsx")}
             onExportSvg={() => runAttendanceExport("svg")}
-            onRefresh={() => {
-              setSearch("");
-              setSelectedDate(toInputDate());
-              loadMitras();
-              loadStudents();
-              loadAttendance();
-            }}
             exporting={exporting}
           />
 

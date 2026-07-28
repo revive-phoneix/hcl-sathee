@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_URL } from "../config/api";
-import { authHeaders, clearAuthToken } from "../utils/authToken";
+import { authHeaders } from "../utils/authToken";
+import { clearSession } from "../utils/authSession";
 
 /** Shared axios instance — attaches JWT and clears it on 401. */
 const api = axios.create({
@@ -20,7 +21,7 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      clearAuthToken();
+      clearSession();
     }
     return Promise.reject(error);
   }

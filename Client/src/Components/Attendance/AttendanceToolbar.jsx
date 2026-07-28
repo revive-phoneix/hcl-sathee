@@ -1,4 +1,4 @@
-import { Search, Calendar, RefreshCw } from "lucide-react";
+import { Search, Calendar } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 
 const DATE_TABS = new Set(["daily", "weekly", "monthly", "sathee-mitra"]);
@@ -11,7 +11,6 @@ export default function AttendanceToolbar({
   onDateChange,
   onExportXlsx,
   onExportSvg,
-  onRefresh,
   exporting = false,
 }) {
   return (
@@ -52,15 +51,6 @@ export default function AttendanceToolbar({
           onExportXlsx={onExportXlsx}
           onExportSvg={onExportSvg}
         />
-
-        <button
-          type="button"
-          onClick={onRefresh}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-[#f5f6f8] text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-200 transition-colors border border-gray-200"
-        >
-          <RefreshCw size={14} />
-          Refresh
-        </button>
       </div>
     </div>
   );

@@ -142,12 +142,6 @@ export default function Student({
               setCourseFilter(val);
               setPage(1);
             }}
-            onRefresh={() => {
-              setSearch("");
-              setCourseFilter("All Courses");
-              setPage(1);
-              loadStudents();
-            }}
             onAddStudent={() => setShowNewStudent(true)}
             readOnly={readOnly}
           />

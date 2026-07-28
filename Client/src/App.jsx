@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation,
 } from "react-router-dom";
@@ -27,7 +27,8 @@ import {
   canEnterAdminDashboard,
   canEnterPartnerDashboard,
 } from "./utils/portalMapping";
-import { clearAuthToken } from "./utils/authToken";
+import { clearSession, getSession, setSession, updateSession } from "./utils/authSession";
+import { getAuthToken } from "./utils/authToken";
 
 const ADMIN_PATH_TO_NAV = {
   "/dashboard": 0,
@@ -66,15 +67,28 @@ const PARTNER_NAV_PATHS = [
 const ADMIN_PATHS = new Set(ADMIN_NAV_PATHS);
 const PARTNER_PATHS = new Set(PARTNER_NAV_PATHS);
 
+const readInitialSession = () => {
+  if (!getAuthToken()) return null;
+  return getSession();
+};
+
 const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const initialSession = readInitialSession();
 
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [userName, setUserName] = useState("");
-  const [userCentre, setUserCentre] = useState(null);
-  const [userRole, setUserRole] = useState("");
-  const [selectedPortal, setSelectedPortal] = useState("");
+  const [isLoggedIn, setIsLoggedIn] = useState(Boolean(initialSession));
+  const [userName, setUserName] = useState(initialSession?.name || "");
+  const [userCentre, setUserCentre] = useState(initialSession?.centre ?? null);
+  const [userRole, setUserRole] = useState(initialSession?.role || "");
+  const [selectedPortal, setSelectedPortal] = useState(initialSession?.portal || "");
+
+  useEffect(() => {
+    if (!getAuthToken()) {
+      clearSession();
+      setIsLoggedIn(false);
+    }
+  }, []);
 
   const isAdmin = canEnterAdminDashboard(userRole);
   const isPartner = canEnterPartnerDashboard(userRole);
@@ -101,7 +115,7 @@ const AppContent = () => {
     : ADMIN_PATH_TO_NAV[location.pathname] ?? 0;
 
   const handleLogout = () => {
-    clearAuthToken();
+    clearSession();
     setIsLoggedIn(false);
     setUserName("");
     setUserCentre(null);
@@ -118,6 +132,11 @@ const AppContent = () => {
   const handlePartnerNavChange = (index) => {
     const path = PARTNER_NAV_PATHS[index];
     if (path) navigate(path);
+  };
+
+  const selectPortal = (name) => {
+    setSelectedPortal(name);
+    updateSession({ portal: name });
   };
 
   const adminLayout = {
@@ -149,9 +168,18 @@ const AppContent = () => {
       <Authentication
         onLoginSuccess={(user) => {
           const name = typeof user === "string" ? user : user?.name;
+          const role = typeof user === "object" ? user?.role || "" : "";
+          const centre = typeof user === "object" ? user?.centre ?? null : null;
           setUserName(name || "Administrator");
-          setUserCentre(typeof user === "object" ? user?.centre ?? null : null);
-          setUserRole(typeof user === "object" ? user?.role || "" : "");
+          setUserCentre(centre);
+          setUserRole(role);
+          setSelectedPortal("");
+          setSession({
+            name: name || "Administrator",
+            role,
+            centre,
+            portal: "",
+          });
           setIsLoggedIn(true);
         }}
       />
@@ -186,13 +214,13 @@ const AppContent = () => {
               if (!canAccessPortal(userCentre, name, userRole)) return;
 
               if (canEnterAdminDashboard(userRole)) {
-                setSelectedPortal(name);
+                selectPortal(name);
                 navigate("/dashboard");
                 return;
               }
 
               if (canEnterPartnerDashboard(userRole)) {
-                setSelectedPortal(name);
+                selectPortal(name);
                 navigate("/partner/dashboard");
               }
             }}

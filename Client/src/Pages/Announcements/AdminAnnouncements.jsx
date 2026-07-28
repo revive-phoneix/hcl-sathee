@@ -207,8 +207,6 @@ export default function AdminAnnouncements({
     }
   };
 
-  const lastUpdated = centreAnnouncements[0]?.postedOn || "—";
-
   return (
     <MainLayout
       portalName={portalName}
@@ -271,9 +269,6 @@ export default function AdminAnnouncements({
               Showing{" "}
               <span className="font-semibold text-sky-600">{filtered.length}</span> of{" "}
               {centreAnnouncements.length} announcements
-            </div>
-            <div className="text-xs text-slate-400">
-              Last updated: {lastUpdated}
             </div>
           </div>
 
