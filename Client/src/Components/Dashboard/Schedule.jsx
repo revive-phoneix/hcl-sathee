@@ -55,6 +55,15 @@ const monthsFromRows = (rows = []) =>
 
 const firstMonth = (months = []) => months[0] || DEFAULT_MONTHS[0];
 
+/** Keep other months; replace any month present in the new upload. */
+const mergeScheduleRows = (existing = [], incoming = []) => {
+  const incomingMonths = new Set(
+    incoming.map((row) => row.month).filter(Boolean)
+  );
+  const kept = existing.filter((row) => !incomingMonths.has(row.month));
+  return [...kept, ...incoming];
+};
+
 const normalizeMonthLabel = (value, fallback = DEFAULT_MONTHS[0]) => {
   const parsed = parseMonthLabel(value);
   if (parsed) return parsed.label;
@@ -296,7 +305,7 @@ function EmptyState({ readOnly, onUploadClick }) {
         <p className="text-sm text-gray-500 mt-1 max-w-xs leading-relaxed">
           {readOnly
             ? "No teaching schedule has been uploaded for this centre yet."
-            : "Upload an Excel or CSV schedule to view topics, progress, and status here."}
+            : "Upload an Excel or CSV schedule, then Save. You can add more months later."}
         </p>
       </div>
       {!readOnly ? (
@@ -323,6 +332,7 @@ export default function Schedule({
   const [search, setSearch] = useState("");
   const [scheduleMeta, setScheduleMeta] = useState(null);
   const [allRows, setAllRows] = useState([]);
+  const [isDirty, setIsDirty] = useState(false);
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const backdropRef = useRef(null);
@@ -346,12 +356,14 @@ export default function Schedule({
   useEffect(() => {
     if (!isOpen) return;
     setError("");
+    setIsDirty(false);
     const stored = readStored(portalName);
     if (stored) {
       setAllRows(stored.rows);
       setScheduleMeta({
-        name: stored.name || "Uploaded schedule",
+        name: stored.name || "Saved schedule",
         updatedAt: stored.updatedAt || null,
+        lastFile: stored.lastFile || stored.name || null,
       });
       const first = stored.rows[0];
       if (first?.subject) setSubject(first.subject);
@@ -431,16 +443,18 @@ export default function Schedule({
         return;
       }
 
-      const payload = {
-        name: file.name,
+      const merged = mergeScheduleRows(allRows, parsedRows);
+      const uploadedMonths = monthsFromRows(parsedRows);
+      setAllRows(merged);
+      setIsDirty(true);
+      setScheduleMeta({
+        name: `Centre schedule · ${monthsFromRows(merged).join(", ")}`,
+        lastFile: file.name,
         updatedAt: new Date().toISOString(),
-        rows: parsedRows,
-      };
-      writeStored(portalName, payload);
-      setAllRows(parsedRows);
-      setScheduleMeta({ name: file.name, updatedAt: payload.updatedAt });
+        pendingMonths: uploadedMonths,
+      });
       setSubject(parsedRows[0].subject);
-      setMonth(firstMonth(monthsFromRows(parsedRows)));
+      setMonth(firstMonth(uploadedMonths));
       setSearch("");
     } catch (err) {
       console.error(err);
@@ -448,10 +462,38 @@ export default function Schedule({
     }
   };
 
+  const handleSave = () => {
+    if (!allRows.length) {
+      setError("Nothing to save. Upload a schedule first.");
+      return;
+    }
+    try {
+      const monthLabels = monthsFromRows(allRows);
+      const payload = {
+        name: `Centre schedule · ${monthLabels.join(", ")}`,
+        lastFile: scheduleMeta?.lastFile || null,
+        updatedAt: new Date().toISOString(),
+        rows: allRows,
+      };
+      writeStored(portalName, payload);
+      setScheduleMeta({
+        name: payload.name,
+        lastFile: payload.lastFile,
+        updatedAt: payload.updatedAt,
+      });
+      setIsDirty(false);
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError("Unable to save schedule. Storage may be full.");
+    }
+  };
+
   const handleRemove = () => {
     writeStored(portalName, null);
     setAllRows([]);
     setScheduleMeta(null);
+    setIsDirty(false);
     setError("");
     setMonth(DEFAULT_MONTHS[0]);
     setSearch("");
@@ -617,11 +659,12 @@ export default function Schedule({
                 <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
                   <div className="min-w-0">
                     <p className="font-semibold text-blue-800 truncate">
-                      {scheduleMeta.name}
+                      {scheduleMeta.lastFile || scheduleMeta.name}
                     </p>
                     <p className="text-xs text-blue-600 mt-0.5">
-                      {allRows.length} topic
-                      {allRows.length === 1 ? "" : "s"} loaded
+                      {allRows.length} topic{allRows.length === 1 ? "" : "s"} ·{" "}
+                      {monthsFromRows(allRows).join(", ") || "No months"}
+                      {isDirty ? " · Unsaved changes — click Save" : " · Saved"}
                     </p>
                   </div>
                   {!readOnly ? (
@@ -630,7 +673,7 @@ export default function Schedule({
                       onClick={handleRemove}
                       className="shrink-0 text-blue-600 hover:text-blue-800 text-xs font-semibold"
                     >
-                      Remove
+                      Clear All
                     </button>
                   ) : null}
                 </div>
@@ -828,7 +871,15 @@ export default function Schedule({
                     strokeLinecap="round"
                   />
                 </svg>
-                {hasUpload ? "Replace Upload" : "Upload"}
+                {hasUpload ? "Add Month" : "Upload"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                disabled={!hasUpload || !isDirty}
+                className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+              >
+                Save
               </button>
             </>
           ) : null}
