@@ -98,8 +98,36 @@ const mergeScheduleRows = (existing = [], incoming = []) => {
 const normalizeMonthLabel = (value, fallback = DEFAULT_MONTHS[0]) => {
   const parsed = parseMonthLabel(value);
   if (parsed) return parsed.label;
+  // Allow bare month names like "August" with a year fallback later via parseMonthLabel helpers
   const text = String(value ?? "").trim();
-  return text || fallback;
+  if (!text) return fallback;
+  const bare = text.match(/^([a-zA-Z]{3,9})$/);
+  if (bare && MONTH_INDEX[bare[1].toLowerCase()] != null) {
+    return `${MONTH_NAMES[MONTH_INDEX[bare[1].toLowerCase()]]} 2026`;
+  }
+  return text;
+};
+
+const inferMonthFromText = (value, fallbackYear = 2026) => {
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+
+  // Filename / free text: "...August...2026..." or "August_Centre..."
+  const withYear = text.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b[\s_-]*(\d{4})/i
+  );
+  if (withYear) {
+    return normalizeMonthLabel(`${withYear[1]} ${withYear[2]}`);
+  }
+
+  const monthOnly = text.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i
+  );
+  if (monthOnly) {
+    return normalizeMonthLabel(`${monthOnly[1]} ${fallbackYear}`);
+  }
+
+  return parseMonthLabel(text)?.label || null;
 };
 
 const ACCEPT =
@@ -191,9 +219,7 @@ const inferMonthFromDateValue = (value, fallbackYear = 2026) => {
   const text = String(value ?? "").trim();
   if (!text) return null;
 
-  const withYear = text.match(
-    /^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/
-  );
+  const withYear = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/);
   if (withYear) {
     return normalizeMonthLabel(`${withYear[2]} ${withYear[3]}`);
   }
@@ -203,9 +229,19 @@ const inferMonthFromDateValue = (value, fallbackYear = 2026) => {
     return normalizeMonthLabel(`${short[2]} ${fallbackYear}`);
   }
 
-  const parsed = parseMonthLabel(text);
-  return parsed ? parsed.label : null;
+  return inferMonthFromText(text, fallbackYear);
 };
+
+/** Fix rows saved under the wrong month (e.g. Aug dates labeled July). */
+const repairScheduleRows = (rows = []) =>
+  rows.map((row) => {
+    const inferred =
+      inferMonthFromDateValue(row.start) || inferMonthFromDateValue(row.end);
+    if (inferred && inferred !== row.month) {
+      return { ...row, month: inferred };
+    }
+    return row;
+  });
 
 const inferMetaFromSheetPrefix = (matrix, headerRowIndex) => {
   let month = null;
@@ -251,8 +287,12 @@ const inferMetaFromSheetPrefix = (matrix, headerRowIndex) => {
   return { month, subject, faculty, yearHint };
 };
 
-const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => {
+const parseScheduleWorkbook = (
+  workbook,
+  { fallbackSubject, fallbackMonth, fileName = "" } = {}
+) => {
   const rows = [];
+  const fileMonth = inferMonthFromText(fileName);
 
   workbook.SheetNames.forEach((sheetName) => {
     const sheet = workbook.Sheets[sheetName];
@@ -311,25 +351,26 @@ const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => 
       const end = formatScheduleDate(endRaw) || "—";
 
       const monthFromColumn =
-        monthIdx >= 0
-          ? normalizeMonthLabel(row[monthIdx], "")
-          : "";
+        monthIdx >= 0 ? normalizeMonthLabel(row[monthIdx], "") : "";
       const monthFromDates =
         inferMonthFromDateValue(startRaw, prefixMeta.yearHint) ||
         inferMonthFromDateValue(endRaw, prefixMeta.yearHint) ||
         inferMonthFromDateValue(start, prefixMeta.yearHint) ||
         inferMonthFromDateValue(end, prefixMeta.yearHint);
 
+      // Prefer real signals over the currently selected month filter.
       const month =
-        monthFromColumn ||
         prefixMeta.month ||
+        fileMonth ||
         monthFromDates ||
+        monthFromColumn ||
         normalizeMonthLabel(fallbackMonth, DEFAULT_MONTHS[0]);
 
       const subject =
         String(subjectIdx >= 0 ? row[subjectIdx] : "").trim() ||
         prefixMeta.subject ||
         sheetSubjectGuess ||
+        (sheetName && sheetName !== "Sheet1" ? sheetName : "") ||
         fallbackSubject ||
         "Mathematics";
 
@@ -355,7 +396,7 @@ const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => 
     }
   });
 
-  return rows;
+  return repairScheduleRows(rows);
 };
 
 function StatusBadge({ status }) {
@@ -503,15 +544,30 @@ export default function Schedule({
     setIsDirty(false);
     const stored = readStored(portalName);
     if (stored) {
-      setAllRows(stored.rows);
+      const repaired = repairScheduleRows(stored.rows);
+      const changed = JSON.stringify(repaired) !== JSON.stringify(stored.rows);
+      setAllRows(repaired);
+      const monthLabels = monthsFromRows(repaired);
       setScheduleMeta({
-        name: stored.name || "Saved schedule",
+        name: `Centre schedule · ${monthLabels.join(", ")}`,
         updatedAt: stored.updatedAt || null,
         lastFile: stored.lastFile || stored.name || null,
       });
-      const first = stored.rows[0];
+      if (changed) {
+        try {
+          writeStored(portalName, {
+            ...stored,
+            name: `Centre schedule · ${monthLabels.join(", ")}`,
+            rows: repaired,
+            updatedAt: new Date().toISOString(),
+          });
+        } catch (err) {
+          console.error(err);
+        }
+      }
+      const first = repaired[0];
       if (first?.subject) setSubject(first.subject);
-      setMonth(firstMonth(monthsFromRows(stored.rows)));
+      setMonth(firstMonth(monthLabels));
     } else {
       setAllRows([]);
       setScheduleMeta(null);
@@ -578,6 +634,7 @@ export default function Schedule({
       const parsedRows = parseScheduleWorkbook(workbook, {
         fallbackSubject: subject,
         fallbackMonth: month,
+        fileName: file.name,
       });
 
       if (!parsedRows.length) {
