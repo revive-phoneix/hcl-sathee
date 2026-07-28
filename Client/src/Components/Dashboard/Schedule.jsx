@@ -1,11 +1,16 @@
-import { useEffect, useRef, useState } from "react";
-import { ClipboardList, Upload, X, FileText } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import * as XLSX from "xlsx";
+import ExportDropdown from "../common/ExportDropdown";
+import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
+
+const DEFAULT_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Biology", "English"];
+const DEFAULT_MONTHS = ["July 2026", "August 2026", "September 2026", "October 2026"];
 
 const ACCEPT =
-  ".pdf,.xls,.xlsx,.csv,.svg,application/pdf,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,image/svg+xml";
+  ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
 
 const storageKey = (portalName = "") =>
-  `hcl_sathee_schedule_${String(portalName || "default")
+  `hcl_sathee_schedule_data_${String(portalName || "default")
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")}`;
 
@@ -14,7 +19,7 @@ const readStored = (portalName) => {
     const raw = localStorage.getItem(storageKey(portalName));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (!parsed?.dataUrl || !parsed?.name) return null;
+    if (!Array.isArray(parsed?.rows)) return null;
     return parsed;
   } catch {
     return null;
@@ -26,108 +31,245 @@ const writeStored = (portalName, payload) => {
     if (!payload) localStorage.removeItem(storageKey(portalName));
     else localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
   } catch (err) {
-    console.error("Unable to save schedule file", err);
+    console.error("Unable to save schedule data", err);
+    throw err;
   }
 };
 
-const fileToDataUrl = (file) =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result || ""));
-    reader.onerror = () => reject(new Error("Failed to read file"));
-    reader.readAsDataURL(file);
-  });
+const normalizeHeader = (value) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[%()]/g, " ")
+    .replace(/\s+/g, " ");
 
-const isPdf = (file) =>
-  String(file?.type || "").includes("pdf") ||
-  String(file?.name || "").toLowerCase().endsWith(".pdf");
-
-const isSvg = (file) =>
-  String(file?.type || "").includes("svg") ||
-  String(file?.name || "").toLowerCase().endsWith(".svg");
-
-const isSpreadsheet = (file) => {
-  const name = String(file?.name || "").toLowerCase();
-  const type = String(file?.type || "").toLowerCase();
-  return (
-    name.endsWith(".xls") ||
-    name.endsWith(".xlsx") ||
-    name.endsWith(".csv") ||
-    type.includes("sheet") ||
-    type.includes("excel") ||
-    type.includes("csv")
-  );
+const pickColumn = (headers, aliases) => {
+  const normalized = headers.map(normalizeHeader);
+  for (const alias of aliases) {
+    const idx = normalized.indexOf(alias);
+    if (idx >= 0) return idx;
+  }
+  return -1;
 };
 
-function EmptySchedule({ readOnly, onUploadClick }) {
+const normalizeStatus = (value) => {
+  const raw = String(value ?? "").trim().toLowerCase();
+  if (!raw) return "Pending";
+  if (raw.includes("complete") || raw === "done") return "Completed";
+  if (raw.includes("progress") || raw.includes("ongoing")) return "In Progress";
+  if (raw.includes("pending") || raw.includes("todo") || raw.includes("not started")) return "Pending";
+  if (raw === "completed") return "Completed";
+  if (raw === "in progress") return "In Progress";
+  return "Pending";
+};
+
+const normalizeCompletion = (value, status) => {
+  const num = Number(String(value ?? "").replace("%", "").trim());
+  if (Number.isFinite(num)) return Math.max(0, Math.min(100, Math.round(num)));
+  if (status === "Completed") return 100;
+  if (status === "In Progress") return 50;
+  return 0;
+};
+
+const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => {
+  const rows = [];
+
+  workbook.SheetNames.forEach((sheetName) => {
+    const sheet = workbook.Sheets[sheetName];
+    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    if (!matrix.length) return;
+
+    const headerRowIndex = matrix.findIndex((row) =>
+      row.some((cell) => {
+        const h = normalizeHeader(cell);
+        return h.includes("topic") || h === "subject" || h.includes("planned");
+      })
+    );
+    if (headerRowIndex < 0) return;
+
+    const headers = matrix[headerRowIndex];
+    const subjectIdx = pickColumn(headers, ["subject"]);
+    const monthIdx = pickColumn(headers, ["month", "period"]);
+    const topicIdx = pickColumn(headers, ["topic", "chapter", "unit"]);
+    const daysIdx = pickColumn(headers, [
+      "planned days",
+      "days",
+      "planned day",
+      "duration",
+    ]);
+    const startIdx = pickColumn(headers, ["start date", "start", "from"]);
+    const endIdx = pickColumn(headers, ["end date", "end", "to"]);
+    const facultyIdx = pickColumn(headers, ["faculty", "teacher", "instructor"]);
+    const completionIdx = pickColumn(headers, [
+      "completion",
+      "completion %",
+      "progress",
+      "progress %",
+    ]);
+    const statusIdx = pickColumn(headers, ["status"]);
+
+    if (topicIdx < 0) return;
+
+    const sheetSubjectGuess = DEFAULT_SUBJECTS.find(
+      (s) => normalizeHeader(s) === normalizeHeader(sheetName)
+    );
+
+    for (let i = headerRowIndex + 1; i < matrix.length; i += 1) {
+      const row = matrix[i] || [];
+      const topic = String(row[topicIdx] ?? "").trim();
+      if (!topic) continue;
+
+      const status = normalizeStatus(statusIdx >= 0 ? row[statusIdx] : "");
+      const subject =
+        String(subjectIdx >= 0 ? row[subjectIdx] : "").trim() ||
+        sheetSubjectGuess ||
+        fallbackSubject ||
+        "Mathematics";
+      const month =
+        String(monthIdx >= 0 ? row[monthIdx] : "").trim() ||
+        fallbackMonth ||
+        DEFAULT_MONTHS[0];
+
+      rows.push({
+        subject,
+        month,
+        topic,
+        days: Number(daysIdx >= 0 ? row[daysIdx] : 0) || 0,
+        start: String(startIdx >= 0 ? row[startIdx] : "").trim() || "—",
+        end: String(endIdx >= 0 ? row[endIdx] : "").trim() || "—",
+        faculty: String(facultyIdx >= 0 ? row[facultyIdx] : "").trim() || "—",
+        completion: normalizeCompletion(
+          completionIdx >= 0 ? row[completionIdx] : "",
+          status
+        ),
+        status,
+      });
+    }
+  });
+
+  return rows;
+};
+
+function StatusBadge({ status }) {
+  const config = {
+    Completed: "bg-emerald-100 text-emerald-700 border border-emerald-200",
+    "In Progress": "bg-blue-100 text-blue-700 border border-blue-200",
+    Pending: "bg-gray-100 text-gray-500 border border-gray-200",
+  };
+  const dot = {
+    Completed: "text-emerald-500",
+    "In Progress": "text-blue-500",
+    Pending: "text-gray-400",
+  };
   return (
-    <div className="flex flex-col items-center justify-center gap-4 py-16 px-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-pink-50 border border-pink-100 flex items-center justify-center">
-        <ClipboardList size={28} className="text-pink-500" />
+    <span
+      className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${config[status] || config.Pending}`}
+    >
+      <span className={dot[status] || dot.Pending}>
+        {status === "Pending" ? "○" : "●"}
+      </span>
+      {status}
+    </span>
+  );
+}
+
+function ProgressBar({ value, status }) {
+  const barColor =
+    status === "Completed"
+      ? "bg-emerald-500"
+      : status === "In Progress"
+        ? "bg-blue-500"
+        : "bg-gray-300";
+  const trackColor =
+    status === "Completed"
+      ? "bg-emerald-100"
+      : status === "In Progress"
+        ? "bg-blue-100"
+        : "bg-gray-200";
+
+  return (
+    <div className="flex items-center gap-2 min-w-[120px]">
+      <div className={`flex-1 h-1.5 rounded-full ${trackColor} overflow-hidden`}>
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${value}%` }}
+        />
       </div>
-      <div>
+      <span className="text-xs font-semibold text-gray-600 w-8 text-right">
+        {value}%
+      </span>
+    </div>
+  );
+}
+
+function SummaryCard({ label, value, accent, icon }) {
+  return (
+    <div
+      className="flex-1 min-w-[130px] rounded-2xl p-4 flex flex-col gap-1"
+      style={{ background: "#ccd2dd" }}
+    >
+      <div className="flex items-center gap-2 mb-0.5">
+        <span className="text-base">{icon}</span>
+        <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
+          {label}
+        </span>
+      </div>
+      <span className={`text-3xl font-bold leading-none ${accent}`}>{value}</span>
+    </div>
+  );
+}
+
+function EmptyState({ readOnly, onUploadClick }) {
+  return (
+    <div className="flex flex-col items-center justify-center flex-1 py-16 gap-5">
+      <div
+        className="w-24 h-24 rounded-3xl flex items-center justify-center"
+        style={{ background: "#ccd2dd" }}
+      >
+        <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+          <rect x="6" y="10" width="36" height="32" rx="4" fill="#94a3b8" />
+          <rect x="6" y="10" width="36" height="9" rx="4" fill="#3B82F6" />
+          <rect x="14" y="25" width="20" height="2" rx="1" fill="#cbd5e1" />
+          <rect x="14" y="31" width="14" height="2" rx="1" fill="#cbd5e1" />
+          <rect
+            x="12"
+            y="6"
+            width="4"
+            height="7"
+            rx="2"
+            fill="#e2e8f0"
+            stroke="#94a3b8"
+            strokeWidth="1.5"
+          />
+          <rect
+            x="32"
+            y="6"
+            width="4"
+            height="7"
+            rx="2"
+            fill="#e2e8f0"
+            stroke="#94a3b8"
+            strokeWidth="1.5"
+          />
+        </svg>
+      </div>
+      <div className="text-center">
         <p className="text-lg font-bold text-gray-800">No Schedule Available</p>
-        <p className="text-sm text-gray-500 mt-1 max-w-sm leading-relaxed">
+        <p className="text-sm text-gray-500 mt-1 max-w-xs leading-relaxed">
           {readOnly
             ? "No teaching schedule has been uploaded for this centre yet."
-            : "Upload a PDF, Excel, or SVG file to display the centre teaching schedule here."}
+            : "Upload an Excel or CSV schedule to view topics, progress, and status here."}
         </p>
       </div>
       {!readOnly ? (
         <button
           type="button"
           onClick={onUploadClick}
-          className="mt-1 px-6 py-2.5 rounded-xl bg-pink-600 text-white text-sm font-semibold hover:bg-pink-700 transition-all inline-flex items-center gap-2"
+          className="mt-1 px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600 active:scale-95 transition-all shadow-sm"
         >
-          <Upload size={16} />
           Upload Schedule
         </button>
       ) : null}
-    </div>
-  );
-}
-
-function SchedulePreview({ file }) {
-  if (!file?.dataUrl) return null;
-
-  if (isPdf(file)) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-pink-200 bg-slate-50">
-        <iframe
-          title={file.name || "Schedule PDF"}
-          src={file.dataUrl}
-          className="h-[55vh] w-full"
-        />
-      </div>
-    );
-  }
-
-  if (isSvg(file) || String(file.type || "").startsWith("image/")) {
-    return (
-      <div className="overflow-hidden rounded-2xl border border-pink-200 bg-white p-3">
-        <img
-          src={file.dataUrl}
-          alt={file.name || "Schedule"}
-          className="max-h-[55vh] w-full object-contain"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div className="rounded-2xl border border-pink-200 bg-pink-50 px-5 py-8 text-center">
-      <FileText className="mx-auto text-pink-600" size={36} />
-      <p className="mt-3 font-semibold text-pink-900">{file.name}</p>
-      <p className="mt-1 text-sm text-pink-700">
-        Spreadsheet preview is not available in-browser. Open or download the file to view it.
-      </p>
-      <a
-        href={file.dataUrl}
-        download={file.name || "schedule.xlsx"}
-        className="mt-4 inline-flex rounded-xl bg-pink-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-pink-700"
-      >
-        Download / Open
-      </a>
     </div>
   );
 }
@@ -138,17 +280,23 @@ export default function Schedule({
   readOnly = false,
   portalName = "",
 }) {
+  const [subject, setSubject] = useState("Mathematics");
+  const [month, setMonth] = useState("July 2026");
+  const [faculty, setFaculty] = useState("All Faculty");
+  const [search, setSearch] = useState("");
+  const [scheduleMeta, setScheduleMeta] = useState(null);
+  const [allRows, setAllRows] = useState([]);
+  const [error, setError] = useState("");
+  const [exporting, setExporting] = useState(false);
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
-  const [file, setFile] = useState(null);
-  const [error, setError] = useState("");
 
   useEffect(() => {
-    const onKeyDown = (event) => {
-      if (event.key === "Escape") onClose();
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
     };
-    if (isOpen) window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    if (isOpen) window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
   }, [isOpen, onClose]);
 
   useEffect(() => {
@@ -161,116 +309,512 @@ export default function Schedule({
   useEffect(() => {
     if (!isOpen) return;
     setError("");
-    setFile(readStored(portalName));
+    const stored = readStored(portalName);
+    if (stored) {
+      setAllRows(stored.rows);
+      setScheduleMeta({
+        name: stored.name || "Uploaded schedule",
+        updatedAt: stored.updatedAt || null,
+      });
+      const first = stored.rows[0];
+      if (first?.subject) setSubject(first.subject);
+      if (first?.month) setMonth(first.month);
+    } else {
+      setAllRows([]);
+      setScheduleMeta(null);
+    }
   }, [isOpen, portalName]);
+
+  const subjects = useMemo(() => {
+    const fromData = [...new Set(allRows.map((r) => r.subject).filter(Boolean))];
+    return fromData.length ? fromData : DEFAULT_SUBJECTS;
+  }, [allRows]);
+
+  const months = useMemo(() => {
+    const fromData = [...new Set(allRows.map((r) => r.month).filter(Boolean))];
+    return fromData.length ? fromData : DEFAULT_MONTHS;
+  }, [allRows]);
+
+  const facultyOptions = useMemo(() => {
+    const fromData = [
+      ...new Set(allRows.map((r) => r.faculty).filter((f) => f && f !== "—")),
+    ];
+    return ["All Faculty", ...(fromData.length ? fromData : [])];
+  }, [allRows]);
+
+  useEffect(() => {
+    if (!subjects.includes(subject) && subjects[0]) setSubject(subjects[0]);
+  }, [subjects, subject]);
+
+  useEffect(() => {
+    if (!months.includes(month) && months[0]) setMonth(months[0]);
+  }, [months, month]);
 
   if (!isOpen) return null;
 
-  const handleBackdropClick = (event) => {
-    if (event.target === backdropRef.current) onClose();
+  const hasUpload = allRows.length > 0;
+
+  const rows = allRows.filter((r) => {
+    const matchesSubject = r.subject === subject;
+    const matchesMonth = r.month === month;
+    const matchesFaculty = faculty === "All Faculty" || r.faculty === faculty;
+    const matchesSearch = r.topic.toLowerCase().includes(search.toLowerCase());
+    return matchesSubject && matchesMonth && matchesFaculty && matchesSearch;
+  });
+
+  const total = rows.length;
+  const completed = rows.filter((r) => r.status === "Completed").length;
+  const pending = rows.filter((r) => r.status === "Pending").length;
+
+  const handleBackdropClick = (e) => {
+    if (e.target === backdropRef.current) onClose();
   };
 
-  const handleFileChange = async (event) => {
-    const next = event.target.files?.[0] || null;
-    event.target.value = "";
-    if (!next) return;
+  const handleFileChange = async (e) => {
+    const file = e.target.files?.[0] || null;
+    e.target.value = "";
+    if (!file) return;
 
+    const name = file.name.toLowerCase();
     const allowed =
-      isPdf(next) || isSvg(next) || isSpreadsheet(next) || next.type.startsWith("image/");
+      name.endsWith(".xls") ||
+      name.endsWith(".xlsx") ||
+      name.endsWith(".csv") ||
+      String(file.type || "").includes("sheet") ||
+      String(file.type || "").includes("excel") ||
+      String(file.type || "").includes("csv");
+
     if (!allowed) {
-      setError("Please upload a PDF, Excel, CSV, or SVG file.");
+      setError("Please upload an Excel (.xlsx / .xls) or CSV file.");
       return;
     }
 
     try {
       setError("");
-      const dataUrl = await fileToDataUrl(next);
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const parsedRows = parseScheduleWorkbook(workbook, {
+        fallbackSubject: subject,
+        fallbackMonth: month,
+      });
+
+      if (!parsedRows.length) {
+        setError(
+          "No schedule rows found. Include columns like Subject, Month, Topic, Days, Start, End, Faculty, Completion, Status."
+        );
+        return;
+      }
+
       const payload = {
-        name: next.name,
-        type: next.type || "",
-        size: next.size,
-        dataUrl,
+        name: file.name,
         updatedAt: new Date().toISOString(),
+        rows: parsedRows,
       };
       writeStored(portalName, payload);
-      setFile(payload);
+      setAllRows(parsedRows);
+      setScheduleMeta({ name: file.name, updatedAt: payload.updatedAt });
+      setSubject(parsedRows[0].subject);
+      setMonth(parsedRows[0].month);
+      setFaculty("All Faculty");
+      setSearch("");
     } catch (err) {
       console.error(err);
-      setError("Unable to read that file. Try a smaller file.");
+      setError("Unable to read that file. Check the format and try again.");
     }
   };
 
   const handleRemove = () => {
     writeStored(portalName, null);
-    setFile(null);
+    setAllRows([]);
+    setScheduleMeta(null);
     setError("");
+    setFaculty("All Faculty");
+    setSearch("");
+  };
+
+  const runScheduleExport = (format) => {
+    try {
+      setExporting(true);
+      const headers = [
+        "Topic",
+        "Days",
+        "Start",
+        "End",
+        "Faculty",
+        "Completion (%)",
+        "Status",
+      ];
+      const exportRows = rows.map((r) => [
+        r.topic,
+        r.days,
+        r.start,
+        r.end,
+        r.faculty,
+        r.completion,
+        r.status,
+      ]);
+      const filename = `schedule-${subject}-${month}`
+        .toLowerCase()
+        .replace(/\s+/g, "-");
+      const payload = {
+        headers,
+        rows: exportRows,
+        filename,
+        title: `Teaching Schedule · ${subject} · ${month}`,
+        sheetName: "Schedule",
+      };
+      if (format === "xlsx") downloadTableXlsx(payload);
+      else downloadTableSvg(payload);
+    } catch (err) {
+      console.error(`Export schedule ${format.toUpperCase()} error:`, err);
+      alert(`Unable to export schedule ${format.toUpperCase()} right now`);
+    } finally {
+      setExporting(false);
+    }
   };
 
   return (
     <div
       ref={backdropRef}
       onClick={handleBackdropClick}
-      className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{
+        background: "rgba(10, 18, 35, 0.62)",
+        backdropFilter: "blur(6px)",
+      }}
     >
-      <div className="bg-white rounded-3xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col border border-[#3B82F6]/30">
-        <div className="flex items-center justify-between p-6 border-b">
+      <div
+        className="relative flex flex-col bg-white shadow-2xl overflow-hidden"
+        style={{
+          width: "90%",
+          maxWidth: "1200px",
+          height: "90vh",
+          borderRadius: "24px",
+        }}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Teaching Schedule"
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-5 right-5 z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-gray-800 transition-all"
+          aria-label="Close modal"
+        >
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+            <path
+              d="M1 1l12 12M13 1L1 13"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        <div className="flex items-center justify-between px-8 pt-7 pb-5 border-b border-gray-100 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-pink-100 flex items-center justify-center">
-              <ClipboardList size={24} className="text-pink-600" />
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "#EFF6FF" }}
+            >
+              <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                <rect
+                  x="2"
+                  y="4"
+                  width="18"
+                  height="16"
+                  rx="2.5"
+                  fill="none"
+                  stroke="#3B82F6"
+                  strokeWidth="1.6"
+                />
+                <path d="M2 9h18" stroke="#3B82F6" strokeWidth="1.6" />
+                <rect x="7" y="1.5" width="2" height="5" rx="1" fill="#3B82F6" />
+                <rect x="13" y="1.5" width="2" height="5" rx="1" fill="#3B82F6" />
+                <path
+                  d="M6 13h2M10 13h2M14 13h2M6 16.5h2M10 16.5h2"
+                  stroke="#3B82F6"
+                  strokeWidth="1.3"
+                  strokeLinecap="round"
+                />
+              </svg>
             </div>
             <div>
-              <h2 className="text-2xl font-semibold text-black">Teaching Schedule</h2>
-              <p className="text-sm text-gray-600">
-                {portalName ? `${portalName} · Monthly Planning` : "Monthly Planning"}
+              <h2 className="text-lg font-bold text-gray-900 leading-tight">
+                Centre Teaching Schedule
+              </h2>
+              <p className="text-xs text-gray-500 mt-0.5 font-medium">
+                {portalName
+                  ? `${portalName} · Monthly Subject Planning & Coverage`
+                  : "Monthly Subject Planning & Coverage"}
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
+          <div
+            className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-xl border border-blue-100 flex-shrink-0"
+            style={{ background: "#EFF6FF" }}
           >
-            <X size={24} className="text-gray-500" />
-          </button>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <rect
+                x="1"
+                y="2"
+                width="12"
+                height="11"
+                rx="1.5"
+                fill="none"
+                stroke="#3B82F6"
+                strokeWidth="1.3"
+              />
+              <path d="M1 5.5h12" stroke="#3B82F6" strokeWidth="1.3" />
+            </svg>
+            <span className="text-sm font-bold text-blue-600">{month}</span>
+          </div>
         </div>
 
-        <div className="p-6 overflow-auto flex-1">
+        <div
+          className="flex flex-col flex-1 overflow-y-auto px-8 py-5 gap-5"
+          style={{ scrollbarWidth: "thin", scrollbarColor: "#cbd5e1 transparent" }}
+        >
           {error ? (
-            <div className="mb-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           ) : null}
 
-          {file ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-pink-200 bg-pink-50 px-4 py-3 text-sm">
-                <div className="min-w-0">
-                  <p className="font-medium text-pink-800 truncate">{file.name}</p>
-                  <p className="text-xs text-pink-600 mt-0.5">
-                    {file.size ? `${(file.size / 1024).toFixed(1)} KB` : "Uploaded schedule"}
-                  </p>
-                </div>
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    onClick={handleRemove}
-                    className="shrink-0 text-pink-600 hover:text-pink-800 text-xs font-semibold"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-              </div>
-              <SchedulePreview file={file} />
-            </div>
-          ) : (
-            <EmptySchedule
+          {!hasUpload ? (
+            <EmptyState
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
             />
+          ) : (
+            <>
+              {scheduleMeta ? (
+                <div className="flex items-center justify-between gap-3 rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-sm">
+                  <div className="min-w-0">
+                    <p className="font-semibold text-blue-800 truncate">
+                      {scheduleMeta.name}
+                    </p>
+                    <p className="text-xs text-blue-600 mt-0.5">
+                      {allRows.length} topic
+                      {allRows.length === 1 ? "" : "s"} loaded
+                    </p>
+                  </div>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={handleRemove}
+                      className="shrink-0 text-blue-600 hover:text-blue-800 text-xs font-semibold"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
+
+              <div className="flex gap-3 flex-wrap">
+                <SummaryCard
+                  label="Total Topics"
+                  value={total}
+                  accent="text-gray-800"
+                  icon="📚"
+                />
+                <SummaryCard
+                  label="Completed"
+                  value={completed}
+                  accent="text-emerald-600"
+                  icon="✅"
+                />
+                <SummaryCard
+                  label="Pending"
+                  value={pending}
+                  accent="text-orange-500"
+                  icon="⏳"
+                />
+              </div>
+
+              <div className="flex flex-wrap gap-3 items-end">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Subject
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={subject}
+                      onChange={(e) => setSubject(e.target.value)}
+                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[150px]"
+                    >
+                      {subjects.map((s) => (
+                        <option key={s}>{s}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      ▾
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Month
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={month}
+                      onChange={(e) => setMonth(e.target.value)}
+                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[140px]"
+                    >
+                      {months.map((m) => (
+                        <option key={m}>{m}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      ▾
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Faculty
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={faculty}
+                      onChange={(e) => setFaculty(e.target.value)}
+                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[140px]"
+                    >
+                      {facultyOptions.map((f) => (
+                        <option key={f}>{f}</option>
+                      ))}
+                    </select>
+                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
+                      ▾
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1 flex-1 min-w-[180px]">
+                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Search
+                  </label>
+                  <div className="relative">
+                    <svg
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 14 14"
+                      fill="none"
+                    >
+                      <circle
+                        cx="6"
+                        cy="6"
+                        r="4.5"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                      />
+                      <path
+                        d="M9.5 9.5l3 3"
+                        stroke="currentColor"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <input
+                      type="text"
+                      placeholder="Search Topic..."
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="w-full bg-white border border-gray-200 rounded-xl pl-8 pr-3 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {rows.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 gap-2 text-center">
+                  <p className="text-base font-bold text-gray-800">
+                    No topics for this filter
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    Try another subject, month, or faculty.
+                  </p>
+                </div>
+              ) : (
+                <div
+                  className="overflow-x-auto rounded-2xl border border-gray-100 flex-1"
+                  style={{ minHeight: 0 }}
+                >
+                  <table
+                    className="w-full text-sm border-collapse"
+                    style={{ minWidth: "720px" }}
+                  >
+                    <thead>
+                      <tr style={{ background: "#ccd2dd" }}>
+                        {[
+                          "Topic",
+                          "Planned Days",
+                          "Start Date",
+                          "End Date",
+                          "Faculty",
+                          "Completion",
+                          "Status",
+                        ].map((col, i, arr) => (
+                          <th
+                            key={col}
+                            className={`px-4 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap ${i === 0 ? "rounded-tl-2xl" : ""} ${i === arr.length - 1 ? "rounded-tr-2xl" : ""}`}
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, i) => (
+                        <tr
+                          key={`${row.topic}-${i}`}
+                          className="border-t border-gray-100 hover:bg-blue-50/50 transition-colors cursor-default"
+                          style={{
+                            background: i % 2 === 0 ? "#ffffff" : "#f9fafb",
+                          }}
+                        >
+                          <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">
+                            {row.topic}
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0" />
+                              {row.days} Days
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                            {row.start}
+                          </td>
+                          <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
+                            {row.end}
+                          </td>
+                          <td className="px-4 py-3.5 font-medium text-gray-700 whitespace-nowrap">
+                            {row.faculty}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <ProgressBar
+                              value={row.completion}
+                              status={row.status}
+                            />
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap">
+                            <StatusBadge status={row.status} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
         </div>
 
-        <div className="p-6 border-t flex flex-wrap items-center justify-end gap-3">
+        <div className="flex items-center justify-end gap-3 px-8 py-4 border-t border-gray-100 flex-shrink-0 bg-white">
           {!readOnly ? (
             <>
               <input
@@ -283,20 +827,40 @@ export default function Schedule({
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-6 py-3 border border-pink-300 text-pink-700 rounded-2xl hover:bg-pink-50 transition-colors font-medium inline-flex items-center gap-2"
+                className="px-5 py-2.5 rounded-xl border border-blue-200 text-sm font-semibold text-blue-600 hover:bg-blue-50 active:scale-95 transition-all flex items-center gap-2"
               >
-                <Upload size={18} />
-                {file ? "Replace Upload" : "Upload"}
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                  <path
+                    d="M7 9V3M4.5 5.5L7 3l2.5 2.5"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M2 10v1.5A1.5 1.5 0 003.5 13h7A1.5 1.5 0 0012 11.5V10"
+                    stroke="currentColor"
+                    strokeWidth="1.5"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                {hasUpload ? "Replace Upload" : "Upload"}
               </button>
             </>
           ) : null}
           <button
             type="button"
             onClick={onClose}
-            className="px-8 py-3 bg-[#0F172A] text-white rounded-2xl hover:bg-black transition-colors font-medium"
+            className="px-5 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 active:scale-95 transition-all"
           >
-            Close Schedule
+            Close
           </button>
+          <ExportDropdown
+            exporting={exporting}
+            onExportXlsx={() => runScheduleExport("xlsx")}
+            onExportSvg={() => runScheduleExport("svg")}
+            label="Export Schedule"
+          />
         </div>
       </div>
     </div>
