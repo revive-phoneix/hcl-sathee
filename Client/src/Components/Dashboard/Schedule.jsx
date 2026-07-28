@@ -13,18 +13,45 @@ const DEFAULT_MONTHS = [
 
 const MONTH_INDEX = {
   january: 0,
+  jan: 0,
   february: 1,
+  feb: 1,
   march: 2,
+  mar: 2,
   april: 3,
+  apr: 3,
   may: 4,
   june: 5,
+  jun: 5,
   july: 6,
+  jul: 6,
   august: 7,
+  aug: 7,
   september: 8,
+  sep: 8,
+  sept: 8,
   october: 9,
+  oct: 9,
   november: 10,
+  nov: 10,
   december: 11,
+  dec: 11,
 };
+
+const MONTH_NAMES = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const parseMonthLabel = (value) => {
   const text = String(value ?? "").trim();
@@ -34,7 +61,11 @@ const parseMonthLabel = (value) => {
   const monthIdx = MONTH_INDEX[match[1].toLowerCase()];
   const year = Number(match[2]);
   if (monthIdx == null || !Number.isFinite(year)) return null;
-  return { year, monthIdx, label: `${match[1][0].toUpperCase()}${match[1].slice(1).toLowerCase()} ${year}` };
+  return {
+    year,
+    monthIdx,
+    label: `${MONTH_NAMES[monthIdx]} ${year}`,
+  };
 };
 
 const sortMonthsAscending = (months = []) =>
@@ -136,12 +167,100 @@ const normalizeCompletion = (value, status) => {
   return 0;
 };
 
+const formatScheduleDate = (value) => {
+  if (value == null || value === "") return "";
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const day = String(value.getDate()).padStart(2, "0");
+    const mon = value.toLocaleString("en-US", { month: "short" });
+    return `${day} ${mon}`;
+  }
+  if (typeof value === "number" && Number.isFinite(value)) {
+    // Excel serial date support via Date offset is handled by sheet_to_json usually as Date;
+    // keep numeric as string fallback.
+    return String(value);
+  }
+  return String(value).trim();
+};
+
+const inferMonthFromDateValue = (value, fallbackYear = 2026) => {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    const monthName = value.toLocaleString("en-US", { month: "long" });
+    return normalizeMonthLabel(`${monthName} ${value.getFullYear()}`);
+  }
+
+  const text = String(value ?? "").trim();
+  if (!text) return null;
+
+  const withYear = text.match(
+    /^(\d{1,2})\s+([A-Za-z]{3,9})\s+(\d{4})$/
+  );
+  if (withYear) {
+    return normalizeMonthLabel(`${withYear[2]} ${withYear[3]}`);
+  }
+
+  const short = text.match(/^(\d{1,2})\s+([A-Za-z]{3,9})$/);
+  if (short) {
+    return normalizeMonthLabel(`${short[2]} ${fallbackYear}`);
+  }
+
+  const parsed = parseMonthLabel(text);
+  return parsed ? parsed.label : null;
+};
+
+const inferMetaFromSheetPrefix = (matrix, headerRowIndex) => {
+  let month = null;
+  let subject = null;
+  let faculty = null;
+  let yearHint = 2026;
+
+  for (let i = 0; i < headerRowIndex; i += 1) {
+    const row = matrix[i] || [];
+    const joined = row
+      .map((cell) => String(cell ?? "").trim())
+      .filter(Boolean)
+      .join(" ");
+    if (!joined) continue;
+
+    const titleMatch = joined.match(
+      /^([A-Za-z]+)\s+(\d{4})\s*[-–—:]\s*(.+)$/
+    );
+    if (titleMatch) {
+      month = normalizeMonthLabel(`${titleMatch[1]} ${titleMatch[2]}`);
+      yearHint = Number(titleMatch[2]) || yearHint;
+      const maybeSubject = titleMatch[3].trim();
+      if (maybeSubject && !/^faculty$/i.test(maybeSubject)) {
+        subject = maybeSubject;
+      }
+    }
+
+    const monthOnly = parseMonthLabel(joined);
+    if (!month && monthOnly) {
+      month = monthOnly.label;
+      yearHint = monthOnly.year;
+    }
+
+    const facultyIdx = row.findIndex(
+      (cell) => normalizeHeader(cell) === "faculty"
+    );
+    if (facultyIdx >= 0) {
+      const next = String(row[facultyIdx + 1] ?? "").trim();
+      if (next) faculty = next;
+    }
+  }
+
+  return { month, subject, faculty, yearHint };
+};
+
 const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => {
   const rows = [];
 
   workbook.SheetNames.forEach((sheetName) => {
     const sheet = workbook.Sheets[sheetName];
-    const matrix = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+    const matrix = XLSX.utils.sheet_to_json(sheet, {
+      header: 1,
+      defval: "",
+      raw: true,
+    });
     if (!matrix.length) return;
 
     const headerRowIndex = matrix.findIndex((row) =>
@@ -175,6 +294,7 @@ const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => 
 
     if (topicIdx < 0) return;
 
+    const prefixMeta = inferMetaFromSheetPrefix(matrix, headerRowIndex);
     const sheetSubjectGuess = DEFAULT_SUBJECTS.find(
       (s) => normalizeHeader(s) === normalizeHeader(sheetName)
     );
@@ -185,23 +305,47 @@ const parseScheduleWorkbook = (workbook, { fallbackSubject, fallbackMonth }) => 
       if (!topic) continue;
 
       const status = normalizeStatus(statusIdx >= 0 ? row[statusIdx] : "");
+      const startRaw = startIdx >= 0 ? row[startIdx] : "";
+      const endRaw = endIdx >= 0 ? row[endIdx] : "";
+      const start = formatScheduleDate(startRaw) || "—";
+      const end = formatScheduleDate(endRaw) || "—";
+
+      const monthFromColumn =
+        monthIdx >= 0
+          ? normalizeMonthLabel(row[monthIdx], "")
+          : "";
+      const monthFromDates =
+        inferMonthFromDateValue(startRaw, prefixMeta.yearHint) ||
+        inferMonthFromDateValue(endRaw, prefixMeta.yearHint) ||
+        inferMonthFromDateValue(start, prefixMeta.yearHint) ||
+        inferMonthFromDateValue(end, prefixMeta.yearHint);
+
+      const month =
+        monthFromColumn ||
+        prefixMeta.month ||
+        monthFromDates ||
+        normalizeMonthLabel(fallbackMonth, DEFAULT_MONTHS[0]);
+
       const subject =
         String(subjectIdx >= 0 ? row[subjectIdx] : "").trim() ||
+        prefixMeta.subject ||
         sheetSubjectGuess ||
         fallbackSubject ||
         "Mathematics";
-      const month = normalizeMonthLabel(
-        monthIdx >= 0 ? row[monthIdx] : "",
-        fallbackMonth || DEFAULT_MONTHS[0]
-      );
+
+      const faculty =
+        String(facultyIdx >= 0 ? row[facultyIdx] : "").trim() ||
+        prefixMeta.faculty ||
+        "—";
+
       rows.push({
         subject,
         month,
         topic,
         days: Number(daysIdx >= 0 ? row[daysIdx] : 0) || 0,
-        start: String(startIdx >= 0 ? row[startIdx] : "").trim() || "—",
-        end: String(endIdx >= 0 ? row[endIdx] : "").trim() || "—",
-        faculty: String(facultyIdx >= 0 ? row[facultyIdx] : "").trim() || "—",
+        start,
+        end,
+        faculty,
         completion: normalizeCompletion(
           completionIdx >= 0 ? row[completionIdx] : "",
           status
@@ -430,7 +574,7 @@ export default function Schedule({
     try {
       setError("");
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: true });
       const parsedRows = parseScheduleWorkbook(workbook, {
         fallbackSubject: subject,
         fallbackMonth: month,
