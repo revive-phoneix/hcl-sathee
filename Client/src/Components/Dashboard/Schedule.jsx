@@ -4,7 +4,14 @@ import ExportDropdown from "../common/ExportDropdown";
 import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
 
 const DEFAULT_SUBJECTS = ["Mathematics", "Physics", "Chemistry", "Biology", "English"];
-const DEFAULT_MONTHS = ["July 2026", "August 2026", "September 2026", "October 2026"];
+const DEFAULT_MONTHS = ["August 2026", "July 2026", "September 2026", "October 2026"];
+const DEFAULT_MONTH = "August 2026";
+
+const pickPreferredMonth = (months = []) => {
+  if (months.includes(DEFAULT_MONTH)) return DEFAULT_MONTH;
+  const august = months.find((m) => String(m).toLowerCase().startsWith("august"));
+  return august || months[0] || DEFAULT_MONTH;
+};
 
 const ACCEPT =
   ".xls,.xlsx,.csv,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv";
@@ -202,23 +209,6 @@ function ProgressBar({ value, status }) {
   );
 }
 
-function SummaryCard({ label, value, accent, icon }) {
-  return (
-    <div
-      className="flex-1 min-w-[130px] rounded-2xl p-4 flex flex-col gap-1"
-      style={{ background: "#ccd2dd" }}
-    >
-      <div className="flex items-center gap-2 mb-0.5">
-        <span className="text-base">{icon}</span>
-        <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">
-          {label}
-        </span>
-      </div>
-      <span className={`text-3xl font-bold leading-none ${accent}`}>{value}</span>
-    </div>
-  );
-}
-
 function EmptyState({ readOnly, onUploadClick }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 py-16 gap-5">
@@ -281,8 +271,7 @@ export default function Schedule({
   portalName = "",
 }) {
   const [subject, setSubject] = useState("Mathematics");
-  const [month, setMonth] = useState("July 2026");
-  const [faculty, setFaculty] = useState("All Faculty");
+  const [month, setMonth] = useState(DEFAULT_MONTH);
   const [search, setSearch] = useState("");
   const [scheduleMeta, setScheduleMeta] = useState(null);
   const [allRows, setAllRows] = useState([]);
@@ -318,10 +307,14 @@ export default function Schedule({
       });
       const first = stored.rows[0];
       if (first?.subject) setSubject(first.subject);
-      if (first?.month) setMonth(first.month);
+      const availableMonths = [
+        ...new Set(stored.rows.map((r) => r.month).filter(Boolean)),
+      ];
+      setMonth(pickPreferredMonth(availableMonths));
     } else {
       setAllRows([]);
       setScheduleMeta(null);
+      setMonth(DEFAULT_MONTH);
     }
   }, [isOpen, portalName]);
 
@@ -335,19 +328,12 @@ export default function Schedule({
     return fromData.length ? fromData : DEFAULT_MONTHS;
   }, [allRows]);
 
-  const facultyOptions = useMemo(() => {
-    const fromData = [
-      ...new Set(allRows.map((r) => r.faculty).filter((f) => f && f !== "—")),
-    ];
-    return ["All Faculty", ...(fromData.length ? fromData : [])];
-  }, [allRows]);
-
   useEffect(() => {
     if (!subjects.includes(subject) && subjects[0]) setSubject(subjects[0]);
   }, [subjects, subject]);
 
   useEffect(() => {
-    if (!months.includes(month) && months[0]) setMonth(months[0]);
+    if (!months.includes(month)) setMonth(pickPreferredMonth(months));
   }, [months, month]);
 
   if (!isOpen) return null;
@@ -357,14 +343,9 @@ export default function Schedule({
   const rows = allRows.filter((r) => {
     const matchesSubject = r.subject === subject;
     const matchesMonth = r.month === month;
-    const matchesFaculty = faculty === "All Faculty" || r.faculty === faculty;
     const matchesSearch = r.topic.toLowerCase().includes(search.toLowerCase());
-    return matchesSubject && matchesMonth && matchesFaculty && matchesSearch;
+    return matchesSubject && matchesMonth && matchesSearch;
   });
-
-  const total = rows.length;
-  const completed = rows.filter((r) => r.status === "Completed").length;
-  const pending = rows.filter((r) => r.status === "Pending").length;
 
   const handleBackdropClick = (e) => {
     if (e.target === backdropRef.current) onClose();
@@ -414,8 +395,11 @@ export default function Schedule({
       setAllRows(parsedRows);
       setScheduleMeta({ name: file.name, updatedAt: payload.updatedAt });
       setSubject(parsedRows[0].subject);
-      setMonth(parsedRows[0].month);
-      setFaculty("All Faculty");
+      setMonth(
+        pickPreferredMonth([
+          ...new Set(parsedRows.map((r) => r.month).filter(Boolean)),
+        ])
+      );
       setSearch("");
     } catch (err) {
       console.error(err);
@@ -428,7 +412,7 @@ export default function Schedule({
     setAllRows([]);
     setScheduleMeta(null);
     setError("");
-    setFaculty("All Faculty");
+    setMonth(DEFAULT_MONTH);
     setSearch("");
   };
 
@@ -611,27 +595,6 @@ export default function Schedule({
                 </div>
               ) : null}
 
-              <div className="flex gap-3 flex-wrap">
-                <SummaryCard
-                  label="Total Topics"
-                  value={total}
-                  accent="text-gray-800"
-                  icon="📚"
-                />
-                <SummaryCard
-                  label="Completed"
-                  value={completed}
-                  accent="text-emerald-600"
-                  icon="✅"
-                />
-                <SummaryCard
-                  label="Pending"
-                  value={pending}
-                  accent="text-orange-500"
-                  icon="⏳"
-                />
-              </div>
-
               <div className="flex flex-wrap gap-3 items-end">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -665,26 +628,6 @@ export default function Schedule({
                     >
                       {months.map((m) => (
                         <option key={m}>{m}</option>
-                      ))}
-                    </select>
-                    <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
-                      ▾
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                    Faculty
-                  </label>
-                  <div className="relative">
-                    <select
-                      value={faculty}
-                      onChange={(e) => setFaculty(e.target.value)}
-                      className="appearance-none bg-white border border-gray-200 rounded-xl px-3 py-2.5 pr-7 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 cursor-pointer transition-all min-w-[140px]"
-                    >
-                      {facultyOptions.map((f) => (
-                        <option key={f}>{f}</option>
                       ))}
                     </select>
                     <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">
@@ -736,7 +679,7 @@ export default function Schedule({
                     No topics for this filter
                   </p>
                   <p className="text-sm text-gray-500">
-                    Try another subject, month, or faculty.
+                    Try another subject or month.
                   </p>
                 </div>
               ) : (
