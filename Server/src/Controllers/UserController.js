@@ -85,7 +85,7 @@ exports.addUser = wrap(
       role,
       centre: normalizedCentre,
       availableDays: isMitra(role) ? normalizedDays : [],
-      isVishist: isMitra(role) ? Boolean(isVishist) : false,
+      ...(isMitra(role) ? { isVishist: Boolean(isVishist) } : {}),
       password: null,
     });
 
@@ -141,7 +141,10 @@ exports.updateUser = wrap(
       patch.availableDays = User.normalizeAvailableDays(availableDays);
     }
     if (isVishist != null) {
-      patch.isVishist = User.normalizeIsVishist(existing.role, isVishist);
+      if (isMitra(existing.role)) {
+        patch.isVishist = User.normalizeIsVishist(existing.role, isVishist);
+      }
+      // Non-Mitra: never store isVishist
     }
     if (!Object.keys(patch).length) {
       return fail(res, 400, "No valid fields to update");

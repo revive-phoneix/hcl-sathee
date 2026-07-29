@@ -37,11 +37,18 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
     setError("");
 
     try {
-      await onAddUser({
-        ...form,
+      const payload = {
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        role: form.role,
+        designation: form.designation,
         centre: form.centre || defaultCentre,
-        isVishist: form.role === "SATHEE MITRA" ? Boolean(form.isVishist) : false,
-      });
+      };
+      if (form.role === "SATHEE MITRA") {
+        payload.isVishist = Boolean(form.isVishist);
+      }
+      await onAddUser(payload);
     } catch (submitError) {
       setError(submitError.message || "Unable to add user");
     }

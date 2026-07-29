@@ -1,3 +1,4 @@
+const { FieldValue } = require("firebase-admin/firestore");
 const { getDb } = require("../config/firebase");
 const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
 
@@ -39,29 +40,39 @@ const normalizeAvailableDays = (value) => {
 const isMitraRole = (role = "") =>
   String(role || "").trim().toUpperCase() === "SATHEE MITRA";
 
-/** isVishist only applies to Sathee Mitra; everyone else is false. */
+/** isVishist only for Sathee Mitra (boolean). Non-Mitra → null (do not store). */
 const normalizeIsVishist = (role, value) => {
-  if (!isMitraRole(role)) return false;
+  if (!isMitraRole(role)) return null;
   return value === true || value === "true" || value === 1 || value === "1";
 };
 
-const toApiUser = (docId, data) => ({
-  id: Number(docId) || docId,
-  name: data.name,
-  email: typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email,
-  password: data.password == null ? null : String(data.password),
-  phone: data.phone ?? null,
-  role: data.role,
-  centre: data.centre ?? null,
-  availableDays: normalizeAvailableDays(data.availableDays),
-  isVishist: normalizeIsVishist(data.role, data.isVishist),
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
+const toApiUser = (docId, data) => {
+  const user = {
+    id: Number(docId) || docId,
+    name: data.name,
+    email: typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email,
+    password: data.password == null ? null : String(data.password),
+    phone: data.phone ?? null,
+    role: data.role,
+    centre: data.centre ?? null,
+    availableDays: normalizeAvailableDays(data.availableDays),
+    created_at: toDate(data.created_at),
+    updated_at: toDate(data.updated_at),
+  };
+
+  if (isMitraRole(data.role)) {
+    user.isVishist = Boolean(normalizeIsVishist(data.role, data.isVishist));
+  }
+
+  return user;
+};
 
 let isVishistBackfillDone = false;
 
-/** Existing Sathee Mitra without isVishist → write false once. */
+/**
+ * - Sathee Mitra missing isVishist → set false
+ * - Non-Mitra with isVishist present → delete the field
+ */
 const backfillMissingIsVishist = async () => {
   if (isVishistBackfillDone) return;
   isVishistBackfillDone = true;
@@ -73,15 +84,27 @@ const backfillMissingIsVishist = async () => {
 
     for (const doc of snap.docs) {
       const data = doc.data() || {};
-      if (!isMitraRole(data.role)) continue;
-      if (Object.prototype.hasOwnProperty.call(data, "isVishist")) continue;
-      batch.update(doc.ref, { isVishist: false, updated_at: new Date() });
-      ops += 1;
+      const hasField = Object.prototype.hasOwnProperty.call(data, "isVishist");
+
+      if (isMitraRole(data.role)) {
+        if (hasField) continue;
+        batch.update(doc.ref, { isVishist: false, updated_at: new Date() });
+        ops += 1;
+        continue;
+      }
+
+      if (hasField) {
+        batch.update(doc.ref, {
+          isVishist: FieldValue.delete(),
+          updated_at: new Date(),
+        });
+        ops += 1;
+      }
     }
 
     if (ops > 0) {
       await batch.commit();
-      console.log(`Backfilled isVishist=false on ${ops} Sathee Mitra user(s)`);
+      console.log(`Synced isVishist field on ${ops} user document(s)`);
     }
   } catch (error) {
     console.error("isVishist backfill failed:", error);
@@ -132,10 +155,13 @@ const create = async (data) => {
     availableDays: isMitraRole(role)
       ? normalizeAvailableDays(data.availableDays)
       : [],
-    isVishist: normalizeIsVishist(role, data.isVishist),
     created_at: now,
     updated_at: now,
   };
+
+  if (isMitraRole(role)) {
+    payload.isVishist = Boolean(normalizeIsVishist(role, data.isVishist));
+  }
 
   await usersRef().doc(String(id)).set(payload);
   return toApiUser(String(id), payload);
@@ -155,13 +181,22 @@ const update = async (id, data) => {
       : [];
   }
 
-  if (Object.prototype.hasOwnProperty.call(data, "isVishist") || data.role != null) {
-    updated.isVishist = normalizeIsVishist(
-      nextRole,
-      Object.prototype.hasOwnProperty.call(data, "isVishist")
-        ? data.isVishist
-        : existing.isVishist
-    );
+  if (
+    Object.prototype.hasOwnProperty.call(data, "isVishist") ||
+    data.role != null
+  ) {
+    if (isMitraRole(nextRole)) {
+      updated.isVishist = Boolean(
+        normalizeIsVishist(
+          nextRole,
+          Object.prototype.hasOwnProperty.call(data, "isVishist")
+            ? data.isVishist
+            : existing.isVishist
+        )
+      );
+    } else {
+      updated.isVishist = FieldValue.delete();
+    }
   }
 
   await ref.update(updated);
@@ -188,10 +223,13 @@ const importFromMysql = async (row) => {
     role: row.role,
     centre: row.centre ?? null,
     availableDays: normalizeAvailableDays(row.availableDays),
-    isVishist: normalizeIsVishist(row.role, row.isVishist),
     created_at: toDate(row.created_at) || new Date(),
     updated_at: toDate(row.updated_at) || new Date(),
   };
+
+  if (isMitraRole(row.role)) {
+    payload.isVishist = Boolean(normalizeIsVishist(row.role, row.isVishist));
+  }
 
   await usersRef().doc(String(id)).set(payload);
   return toApiUser(String(id), payload);
