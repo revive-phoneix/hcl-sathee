@@ -41,10 +41,12 @@ const authenticate = (req, res, next) => {
   }
 };
 
-/** ADMIN and HCL PARTNER may access (typically GET / view). */
+/** ADMIN, HCL PARTNER, and SATHEE MITRA may access (typically GET / view). */
 const requireAdminOrPartner = (req, res, next) => {
   const role = req.user?.role;
-  if (isAdminRole(role) || isHclPartnerRole(role)) return next();
+  if (isAdminRole(role) || isHclPartnerRole(role) || isSatheeMitraRole(role)) {
+    return next();
+  }
   return res.status(403).json({
     success: false,
     message: "Access denied for this role",

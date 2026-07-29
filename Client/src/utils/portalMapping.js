@@ -50,6 +50,9 @@ export const canEnterAdminDashboard = (userRole = "") => isAdminRole(userRole);
 /** HCL PARTNER may enter the partner (view-only) dashboard pages. */
 export const canEnterPartnerDashboard = (userRole = "") => isHclPartnerRole(userRole);
 
+/** SATHEE MITRA may enter the Mitra dashboard (schedule/timetable editable; no Users page). */
+export const canEnterSatheeMitraDashboard = (userRole = "") => isSatheeMitraRole(userRole);
+
 export const PORTAL_OPTIONS = [
   { title: "HCL SATHEE RAJASTHAN", subtitle: "Rajasthan Learning Portal" },
   { title: "HCL SATHEE JHARKHAND", subtitle: "Jharkhand Learning Portal" },

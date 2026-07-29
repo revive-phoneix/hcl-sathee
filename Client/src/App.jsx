@@ -13,6 +13,8 @@ import CardSelector_1 from "./Pages/Selector/CardSelector_1";
 import CardSelector_2 from "./Pages/Selector/CardSelector_2";
 import Dashboard from "./Pages/Dashboard/AdminDashboard";
 import HCLPartnerDashboard from "./Pages/Dashboard/HCLPartnerDashboard";
+import SatheeMitraDashboard from "./Pages/Dashboard/SatheeMitraDashboard";
+import SatheeMitraPlaceholder from "./Pages/Dashboard/SatheeMitraPlaceholder";
 import AdminAttendance from "./Pages/Attendance/AdminAttendance";
 import HCLPartnerAttendance from "./Pages/Attendance/HCLPartnerAttendance";
 import AdminUser from "./Pages/User/AdminUser";
@@ -20,12 +22,14 @@ import Student from "./Pages/Student/Student";
 import PartnerStudents from "./Pages/Student/View";
 import AdminAnnouncements from "./Pages/Announcements/AdminAnnouncements";
 import HCLPartnerAnnouncements from "./Pages/Announcements/HCLPartnerAnnouncements";
+import SatheeMitraAnnouncements from "./Pages/Announcements/SatheeMitraAnnouncements";
 import AdminAnalytics from "./Pages/Analytics/AdminAnalytics";
 import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
   canEnterPartnerDashboard,
+  canEnterSatheeMitraDashboard,
 } from "./utils/portalMapping";
 import { clearSession, getSession, setSession, updateSession } from "./utils/authSession";
 import { getAuthToken } from "./utils/authToken";
@@ -64,8 +68,25 @@ const PARTNER_NAV_PATHS = [
   "/partner/announcements",
 ];
 
+const MITRA_PATH_TO_NAV = {
+  "/mitra/dashboard": 0,
+  "/mitra/attendance": 1,
+  "/mitra/analytics": 2,
+  "/mitra/students": 3,
+  "/mitra/announcements": 4,
+};
+
+const MITRA_NAV_PATHS = [
+  "/mitra/dashboard",
+  "/mitra/attendance",
+  "/mitra/analytics",
+  "/mitra/students",
+  "/mitra/announcements",
+];
+
 const ADMIN_PATHS = new Set(ADMIN_NAV_PATHS);
 const PARTNER_PATHS = new Set(PARTNER_NAV_PATHS);
+const MITRA_PATHS = new Set(MITRA_NAV_PATHS);
 
 const readInitialSession = () => {
   if (!getAuthToken()) return null;
@@ -92,6 +113,7 @@ const AppContent = () => {
 
   const isAdmin = canEnterAdminDashboard(userRole);
   const isPartner = canEnterPartnerDashboard(userRole);
+  const isMitra = canEnterSatheeMitraDashboard(userRole);
 
   const adminNavItems = [
     { icon: LayoutDashboard, label: "Dashboard" },
@@ -110,9 +132,19 @@ const AppContent = () => {
     { icon: Megaphone, label: "Announcements" },
   ];
 
-  const activeNav = isPartner
-    ? PARTNER_PATH_TO_NAV[location.pathname] ?? 0
-    : ADMIN_PATH_TO_NAV[location.pathname] ?? 0;
+  const mitraNavItems = [
+    { icon: LayoutDashboard, label: "Dashboard" },
+    { icon: CalendarDays, label: "Attendance Record" },
+    { icon: TrendingUp, label: "Progress and Analytics" },
+    { icon: IdCard, label: "Students" },
+    { icon: Megaphone, label: "Announcements" },
+  ];
+
+  const activeNav = isMitra
+    ? MITRA_PATH_TO_NAV[location.pathname] ?? 0
+    : isPartner
+      ? PARTNER_PATH_TO_NAV[location.pathname] ?? 0
+      : ADMIN_PATH_TO_NAV[location.pathname] ?? 0;
 
   const handleLogout = () => {
     clearSession();
@@ -134,6 +166,11 @@ const AppContent = () => {
     if (path) navigate(path);
   };
 
+  const handleMitraNavChange = (index) => {
+    const path = MITRA_NAV_PATHS[index];
+    if (path) navigate(path);
+  };
+
   const selectPortal = (name) => {
     setSelectedPortal(name);
     updateSession({ portal: name });
@@ -152,6 +189,14 @@ const AppContent = () => {
     navItems: partnerNavItems,
     activeNav,
     onNavChange: handlePartnerNavChange,
+    onLogout: handleLogout,
+  };
+
+  const mitraLayout = {
+    portalName: selectedPortal,
+    navItems: mitraNavItems,
+    activeNav,
+    onNavChange: handleMitraNavChange,
     onLogout: handleLogout,
   };
 
@@ -200,6 +245,15 @@ const AppContent = () => {
     }
   }
 
+  if (MITRA_PATHS.has(location.pathname)) {
+    if (!isMitra || !selectedPortal) {
+      return <Navigate to="/portals" replace />;
+    }
+    if (!canAccessPortal(userCentre, selectedPortal, userRole)) {
+      return <Navigate to="/portals" replace />;
+    }
+  }
+
   return (
     <Routes>
       <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} />} />
@@ -222,6 +276,12 @@ const AppContent = () => {
               if (canEnterPartnerDashboard(userRole)) {
                 selectPortal(name);
                 navigate("/partner/dashboard");
+                return;
+              }
+
+              if (canEnterSatheeMitraDashboard(userRole)) {
+                selectPortal(name);
+                navigate("/mitra/dashboard");
               }
             }}
           />
@@ -248,6 +308,13 @@ const AppContent = () => {
         path="/partner/announcements"
         element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
       />
+
+      {/* Sathee Mitra routes (no Users; schedule/timetable on dashboard; rest placeholders) */}
+      <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
+      <Route path="/mitra/attendance" element={<SatheeMitraPlaceholder {...mitraLayout} title="Attendance Record" />} />
+      <Route path="/mitra/analytics" element={<SatheeMitraPlaceholder {...mitraLayout} title="Progress and Analytics" />} />
+      <Route path="/mitra/students" element={<SatheeMitraPlaceholder {...mitraLayout} title="Students" />} />
+      <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

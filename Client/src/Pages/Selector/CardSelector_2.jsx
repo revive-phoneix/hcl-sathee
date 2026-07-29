@@ -1,34 +1,33 @@
 import { useState } from "react";
-import { MapPin, ArrowRight, ShieldAlert, Construction } from "lucide-react";
+import { MapPin, ArrowRight, ShieldAlert } from "lucide-react";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
   canEnterPartnerDashboard,
-  isSatheeMitraRole,
+  canEnterSatheeMitraDashboard,
   PORTAL_OPTIONS,
 } from "../../utils/portalMapping";
 
 export default function CardSelector_2({ openDashboard, userCentre, userRole }) {
   const [accessMessage, setAccessMessage] = useState("");
-  const [comingSoon, setComingSoon] = useState(false);
 
   const handleOpenPortal = (portalTitle) => {
     if (!canAccessPortal(userCentre, portalTitle, userRole)) {
-      setComingSoon(false);
       setAccessMessage("ACCESS DENIED");
       return;
     }
 
-    if (canEnterAdminDashboard(userRole) || canEnterPartnerDashboard(userRole)) {
+    if (
+      canEnterAdminDashboard(userRole) ||
+      canEnterPartnerDashboard(userRole) ||
+      canEnterSatheeMitraDashboard(userRole)
+    ) {
       setAccessMessage("");
-      setComingSoon(false);
       openDashboard(portalTitle);
       return;
     }
 
-    // Sathee Mitra (and any other non-ready roles)
-    setAccessMessage("");
-    setComingSoon(true);
+    setAccessMessage("ACCESS DENIED");
   };
 
   return (
@@ -44,20 +43,6 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
         <div className="mx-10 mb-2 flex items-center gap-3 rounded-2xl border border-red-300 bg-red-50 px-5 py-4 text-red-700">
           <ShieldAlert size={22} className="shrink-0" />
           <p className="text-sm font-bold tracking-wide">{accessMessage}</p>
-        </div>
-      )}
-
-      {comingSoon && (
-        <div className="mx-10 mb-2 flex items-center gap-3 rounded-2xl border border-amber-300 bg-amber-50 px-5 py-4 text-amber-800">
-          <Construction size={22} className="shrink-0" />
-          <div>
-            <p className="text-sm font-bold tracking-wide">COMING SOON</p>
-            <p className="text-xs mt-0.5 text-amber-700">
-              {isSatheeMitraRole(userRole)
-                ? "Sathee Mitra pages are under development. Please check back later."
-                : "This portal experience is not available for your role yet."}
-            </p>
-          </div>
         </div>
       )}
 

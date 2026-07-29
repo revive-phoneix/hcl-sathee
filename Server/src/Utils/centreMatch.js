@@ -38,10 +38,10 @@ const isHclPartnerRole = (role = "") =>
 const isSatheeMitraRole = (role = "") =>
   String(role || "").trim().toUpperCase() === "SATHEE MITRA";
 
-/** Partners only see their centre; admins see everything. */
+/** Partners and Mitras only see their centre; admins see everything. */
 const filterByUserCentre = (items, user, centreField = "centre") => {
   if (!user || isAdminRole(user.role)) return items;
-  if (!isHclPartnerRole(user.role)) return [];
+  if (!isHclPartnerRole(user.role) && !isSatheeMitraRole(user.role)) return [];
   return items.filter((item) => matchesCentre(item?.[centreField], user.centre));
 };
 
