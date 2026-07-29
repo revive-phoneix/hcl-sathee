@@ -28,7 +28,12 @@ app.use(
 app.use(express.json());
 
 app.get("/", (_req, res) => {
-  res.json({ success: true, message: "SATHEE Backend is running..." });
+  res.json({
+    success: true,
+    message: "SATHEE Backend is running...",
+    build: "mitra-view-v2",
+    viewerRoles: ["ADMIN", "HCL PARTNER", "SATHEE MITRA"],
+  });
 });
 
 app.use("/api/auth", authRoutes);

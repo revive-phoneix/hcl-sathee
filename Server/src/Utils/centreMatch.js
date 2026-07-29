@@ -29,14 +29,28 @@ const matchesCentre = (itemCentre, userCentre) => {
   return getCanonicalCentreKey(itemCentre) === getCanonicalCentreKey(userCentre);
 };
 
-const isAdminRole = (role = "") =>
-  String(role || "").trim().toUpperCase() === "ADMIN";
+const normalizeRole = (role = "") =>
+  String(role || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ");
 
-const isHclPartnerRole = (role = "") =>
-  String(role || "").trim().toUpperCase() === "HCL PARTNER";
+const isAdminRole = (role = "") => normalizeRole(role) === "ADMIN";
 
-const isSatheeMitraRole = (role = "") =>
-  String(role || "").trim().toUpperCase() === "SATHEE MITRA";
+const isHclPartnerRole = (role = "") => normalizeRole(role) === "HCL PARTNER";
+
+const isSatheeMitraRole = (role = "") => {
+  const normalized = normalizeRole(role);
+  return (
+    normalized === "SATHEE MITRA" ||
+    normalized.replace(/\s/g, "") === "SATHEEMITRA"
+  );
+};
+
+/** True for roles allowed to view portal data (admin / partner / mitra). */
+const isPortalViewerRole = (role = "") =>
+  isAdminRole(role) || isHclPartnerRole(role) || isSatheeMitraRole(role);
 
 /** Partners and Mitras only see their centre; admins see everything. */
 const filterByUserCentre = (items, user, centreField = "centre") => {
@@ -50,8 +64,10 @@ module.exports = {
   normalizeCentreValue,
   getCanonicalCentreKey,
   matchesCentre,
+  normalizeRole,
   isAdminRole,
   isHclPartnerRole,
   isSatheeMitraRole,
+  isPortalViewerRole,
   filterByUserCentre,
 };

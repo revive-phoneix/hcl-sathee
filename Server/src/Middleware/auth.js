@@ -1,7 +1,7 @@
 const jwt = require("jsonwebtoken");
 const {
   isAdminRole,
-  isHclPartnerRole,
+  isPortalViewerRole,
   isSatheeMitraRole,
 } = require("../Utils/centreMatch");
 
@@ -41,15 +41,17 @@ const authenticate = (req, res, next) => {
   }
 };
 
-/** ADMIN, HCL PARTNER, and SATHEE MITRA may access (typically GET / view). */
+/**
+ * ADMIN, HCL PARTNER, and SATHEE MITRA may access (typically GET / view).
+ * Kept name requireAdminOrPartner for existing route imports.
+ */
 const requireAdminOrPartner = (req, res, next) => {
   const role = req.user?.role;
-  if (isAdminRole(role) || isHclPartnerRole(role) || isSatheeMitraRole(role)) {
-    return next();
-  }
+  if (isPortalViewerRole(role)) return next();
   return res.status(403).json({
     success: false,
     message: "Access denied for this role",
+    role: role || null,
   });
 };
 
