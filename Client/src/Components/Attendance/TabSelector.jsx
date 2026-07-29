@@ -10,11 +10,6 @@ const TYPE_OPTIONS = [
   { value: "monthly", label: "Monthly" },
 ];
 
-const PARTNER_TABS = [
-  ...TYPE_OPTIONS,
-  { value: "sathee-mitra", label: "Sathee Mitra" },
-];
-
 const selectClass =
   "min-w-[160px] px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors";
 
@@ -25,31 +20,14 @@ const pillClass = (active) =>
       : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
   }`;
 
-/** Admin: type + centre dropdowns + Sathee Mitra. Partner: original tab pills. */
+/** Shared attendance filters. Centre dropdown is admin-only. */
 export default function TabSelector({
   activeTab,
   setActiveTab,
   selectedCentre = "",
   setSelectedCentre,
-  adminFilters = false,
+  showCentreFilter = false,
 }) {
-  if (!adminFilters) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 mb-5">
-        {PARTNER_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            type="button"
-            onClick={() => setActiveTab(tab.value)}
-            className={pillClass(activeTab === tab.value)}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    );
-  }
-
   const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
     ? activeTab
     : "";
@@ -70,19 +48,21 @@ export default function TabSelector({
         ))}
       </select>
 
-      <select
-        value={selectedCentre}
-        onChange={(e) => setSelectedCentre?.(e.target.value)}
-        className={selectClass}
-        aria-label="Select centre"
-      >
-        <option value="">Select Centre</option>
-        {CENTRE_OPTIONS.map((centre) => (
-          <option key={centre} value={centre}>
-            {centre}
-          </option>
-        ))}
-      </select>
+      {showCentreFilter ? (
+        <select
+          value={selectedCentre}
+          onChange={(e) => setSelectedCentre?.(e.target.value)}
+          className={selectClass}
+          aria-label="Select centre"
+        >
+          <option value="">Select Centre</option>
+          {CENTRE_OPTIONS.map((centre) => (
+            <option key={centre} value={centre}>
+              {centre}
+            </option>
+          ))}
+        </select>
+      ) : null}
 
       <button
         type="button"

@@ -4,7 +4,6 @@ import { MainLayout } from "../../Components/MainLayout";
 import TabSelector from "../../Components/Attendance/TabSelector";
 import AttendanceToolbar from "../../Components/Attendance/AttendanceToolbar";
 import AttendanceTable from "../../Components/Attendance/AttendanceTable";
-import SummaryCards from "../../Components/Attendance/SummaryCards";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import { fetchUsers } from "../../services/users";
 import { fetchStudents } from "../../services/students";
@@ -18,11 +17,6 @@ import { WEEKDAYS } from "../../utils/availableDays";
 
 const COLUMN_LABEL = { daily: "Day", weekly: "Week", monthly: "Month" };
 const PERIOD_TABS = new Set(["daily", "weekly", "monthly"]);
-const PERCENT_HINT = {
-  daily: "Centre % = average of all students that day",
-  weekly: "Week % = average of centre daily %",
-  monthly: "Month % = average of centre daily %",
-};
 
 const MONTH_LABELS = [
   "January",
@@ -201,14 +195,6 @@ const fetchList = async (fetcher, onSuccess, onLoading, errorLabel) => {
   }
 };
 
-const FooterMeta = ({ children }) => (
-  <>
-    {" "}
-    ·{" "}
-    <span className="font-medium text-gray-600">{children}</span>
-  </>
-);
-
 export default function AdminAttendance({
   portalName = "HCL SATHEE",
   navItems,
@@ -219,7 +205,7 @@ export default function AdminAttendance({
   roleLabel = "Admin Portal",
 }) {
   const isAdminView = !readOnly;
-  const [activeTab, setActiveTab] = useState(isAdminView ? "" : "daily");
+  const [activeTab, setActiveTab] = useState("");
   const [selectedCentre, setSelectedCentre] = useState("");
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => toInputDate());
@@ -234,13 +220,11 @@ export default function AdminAttendance({
 
   const isMitraTab = activeTab === "sathee-mitra";
   const filtersReady =
-    !isAdminView ||
     isMitraTab ||
-    (PERIOD_TABS.has(activeTab) && Boolean(selectedCentre));
+    (PERIOD_TABS.has(activeTab) &&
+      (!isAdminView || Boolean(selectedCentre)));
 
-  const centreScope = isAdminView
-    ? selectedCentre
-    : portalName;
+  const centreScope = isAdminView ? selectedCentre : portalName;
 
   const centreStudents = useMemo(
     () =>
@@ -353,33 +337,6 @@ export default function AdminAttendance({
     return tableRows.filter((row) => row.label.toLowerCase().includes(q));
   }, [tableRows, search]);
 
-  const summary = useMemo(() => {
-    const withPercent = filtered.filter(
-      (row) => row.percent != null && !Number.isNaN(row.percent)
-    );
-    if (!withPercent.length) {
-      return {
-        average: "—",
-        highest: "—",
-        lowest: "—",
-        records: String(filtered.length),
-      };
-    }
-
-    const avg =
-      withPercent.reduce((sum, row) => sum + row.percent, 0) / withPercent.length;
-    const sorted = [...withPercent].sort((a, b) => b.percent - a.percent);
-    const high = sorted[0];
-    const low = sorted[sorted.length - 1];
-
-    return {
-      average: `${avg.toFixed(1)}%`,
-      highest: `${Math.round(high.percent)}% — ${high.label}`,
-      lowest: `${Math.round(low.percent)}% — ${low.label}`,
-      records: String(filtered.length),
-    };
-  }, [filtered]);
-
   const loadMitras = useCallback(
     () => fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch Sathee Mitra error"),
     []
@@ -487,7 +444,7 @@ export default function AdminAttendance({
           setActiveTab={setActiveTab}
           selectedCentre={selectedCentre}
           setSelectedCentre={setSelectedCentre}
-          adminFilters={isAdminView}
+          showCentreFilter={isAdminView}
         />
 
         <div className="bg-white rounded-2xl shadow-sm border border-[rgba(0,0,0,0.06)] overflow-hidden">
@@ -515,10 +472,14 @@ export default function AdminAttendance({
           {!isMitraTab && !filtersReady ? (
             <div className="px-6 py-16 text-center">
               <p className="text-sm font-medium text-gray-700">
-                Select Type and Centre to view attendance
+                {isAdminView
+                  ? "Select Type and Centre to view attendance"
+                  : "Select Type to view attendance"}
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                Both dropdowns are required before records are shown.
+                {isAdminView
+                  ? "Both dropdowns are required before records are shown."
+                  : "Choose Daily, Weekly, or Monthly to continue."}
               </p>
             </div>
           ) : isMitraTab ? (
@@ -535,37 +496,7 @@ export default function AdminAttendance({
               loading={busy}
             />
           )}
-
-          <div className="flex items-center justify-between px-6 py-3.5 border-t border-[rgba(0,0,0,0.05)] bg-[#fafbfc]">
-            <p className="text-xs text-gray-400">
-              {isMitraTab ? (
-                <>
-                  Showing{" "}
-                  <span className="font-medium text-gray-600">{centreMitras.length}</span>{" "}
-                  Sathee Mitra
-                </>
-              ) : !filtersReady ? (
-                <>Select Type and Centre to continue</>
-              ) : (
-                <>
-                  Showing {filtered.length} of {tableRows.length} records
-                  {periodMeta.label ? <FooterMeta>{periodMeta.label}</FooterMeta> : null}
-                  {selectedCentre || !isAdminView ? (
-                    <FooterMeta>{isAdminView ? selectedCentre : portalName}</FooterMeta>
-                  ) : null}
-                  {centreStudentIds.length ? (
-                    <FooterMeta>{centreStudentIds.length} students</FooterMeta>
-                  ) : null}
-                </>
-              )}
-            </p>
-            <p className="text-xs text-gray-400">{PERCENT_HINT[activeTab] ?? null}</p>
-          </div>
         </div>
-
-        {!isMitraTab && filtersReady ? (
-          <SummaryCards activeTab={activeTab} summary={summary} />
-        ) : null}
       </div>
     </MainLayout>
   );
