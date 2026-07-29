@@ -417,12 +417,14 @@ export default function Schedule({
           >
             Close
           </button>
-          <ExportDropdown
-            exporting={exporting}
-            onExportXlsx={() => runScheduleExport("xlsx")}
-            onExportSvg={() => runScheduleExport("svg")}
-            label="Export Schedule"
-          />
+          {!readOnly ? (
+            <ExportDropdown
+              exporting={exporting}
+              onExportXlsx={() => runScheduleExport("xlsx")}
+              onExportSvg={() => runScheduleExport("svg")}
+              label="Export Schedule"
+            />
+          ) : null}
         </div>
       </div>
     </div>

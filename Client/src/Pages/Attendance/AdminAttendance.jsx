@@ -461,6 +461,7 @@ export default function AdminAttendance({
             onExportXlsx={() => runAttendanceExport("xlsx")}
             onExportSvg={() => runAttendanceExport("svg")}
             exporting={exporting}
+            showExport={!readOnly}
           />
 
           {error && !isMitraTab ? (

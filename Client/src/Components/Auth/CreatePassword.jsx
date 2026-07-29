@@ -4,11 +4,11 @@ import {
   AuthAlerts,
   AuthCard,
   Field,
+  PasswordField,
   PasswordRequirements,
   authPost,
   btnPrimaryClass,
   getAuthErrorMessage,
-  inputClass,
   lockedInputClass,
 } from "./authUi";
 import { validatePasswordPolicy } from "../../utils/passwordPolicy";
@@ -76,22 +76,18 @@ export default function CreatePassword() {
           <input type="email" value={form.email} readOnly className={lockedInputClass} required />
         </Field>
         <Field label="Create Password">
-          <input
-            type="password"
+          <PasswordField
             value={form.password}
             onChange={set("password")}
-            className={inputClass}
             placeholder="Create a strong password"
             required
           />
           <PasswordRequirements password={form.password} />
         </Field>
         <Field label="Confirm Password">
-          <input
-            type="password"
+          <PasswordField
             value={form.confirmPassword}
             onChange={set("confirmPassword")}
-            className={inputClass}
             required
           />
         </Field>

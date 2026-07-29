@@ -12,6 +12,7 @@ export default function AttendanceToolbar({
   onExportXlsx,
   onExportSvg,
   exporting = false,
+  showExport = true,
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-4 border-b border-[rgba(0,0,0,0.06)]">
@@ -46,11 +47,13 @@ export default function AttendanceToolbar({
           </label>
         )}
 
-        <ExportDropdown
-          exporting={exporting}
-          onExportXlsx={onExportXlsx}
-          onExportSvg={onExportSvg}
-        />
+        {showExport ? (
+          <ExportDropdown
+            exporting={exporting}
+            onExportXlsx={onExportXlsx}
+            onExportSvg={onExportSvg}
+          />
+        ) : null}
       </div>
     </div>
   );

@@ -4,6 +4,7 @@ import {
   AuthAlerts,
   AuthCard,
   Field,
+  PasswordField,
   PasswordRequirements,
   authPost,
   btnPrimaryClass,
@@ -128,22 +129,18 @@ export default function ForgetPassword() {
             </Field>
           ))}
           <Field label="New Password">
-            <input
-              type="password"
+            <PasswordField
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className={inputClass}
               placeholder="Create a strong password"
               required
             />
             <PasswordRequirements password={password} />
           </Field>
           <Field label="Confirm New Password">
-            <input
-              type="password"
+            <PasswordField
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className={inputClass}
               required
             />
           </Field>

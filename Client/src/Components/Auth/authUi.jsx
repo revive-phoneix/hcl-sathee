@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { API_URL } from "../../config/api";
 import { getAuthErrorMessage, postWithColdStartRetry } from "../../utils/apiRequest";
 import { getPasswordRuleStatus } from "../../utils/passwordPolicy";
@@ -25,6 +27,39 @@ export function Field({ label, children }) {
     <div>
       <label className="mb-1 block text-sm font-medium text-slate-700">{label}</label>
       {children}
+    </div>
+  );
+}
+
+export function PasswordField({
+  value,
+  onChange,
+  placeholder = "",
+  required = false,
+  autoComplete = "new-password",
+  className = inputClass,
+}) {
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="relative">
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        className={`${className} pr-11`}
+        placeholder={placeholder}
+        required={required}
+        autoComplete={autoComplete}
+      />
+      <button
+        type="button"
+        onClick={() => setVisible((v) => !v)}
+        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-700"
+        aria-label={visible ? "Hide password" : "Show password"}
+      >
+        {visible ? <EyeOff size={18} /> : <Eye size={18} />}
+      </button>
     </div>
   );
 }
