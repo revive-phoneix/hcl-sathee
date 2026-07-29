@@ -12,15 +12,7 @@ exports.getEquipments = wrap(
 
 exports.addEquipment = wrap(
   async (req, res) => {
-    const {
-      name,
-      description,
-      quantity,
-      serialNumber,
-      warrantyStatus,
-      expiryDate,
-      centre,
-    } = req.body;
+    const { name, description, quantity, serialNumber, centre } = req.body;
 
     if (!name?.trim() || !description?.trim()) {
       return fail(res, 400, "Equipment name and description are required");
@@ -31,16 +23,10 @@ exports.addEquipment = wrap(
     if (String(description).trim().length > 250) {
       return fail(res, 400, "Equipment description must be at most 250 characters");
     }
-    if (!warrantyStatus || !Equipment.WARRANTY_STATUSES.includes(warrantyStatus)) {
-      return fail(res, 400, "Valid warranty status is required");
-    }
 
     const qty = Number(quantity);
     if (!Number.isFinite(qty) || qty < 1) {
       return fail(res, 400, "Quantity must be a positive number");
-    }
-    if (!expiryDate) {
-      return fail(res, 400, "Date of expiry is required");
     }
 
     const normalizedCentre = centre?.trim() || null;
@@ -56,8 +42,6 @@ exports.addEquipment = wrap(
       description: description.trim(),
       quantity: qty,
       serialNumber: serialNumber?.trim() || null,
-      warrantyStatus,
-      expiryDate,
       centre: normalizedCentre,
     });
 

@@ -1,5 +1,5 @@
 const { getDb } = require("../config/firebase");
-const { toDate, toDateOnly, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "equipments";
 
@@ -7,21 +7,12 @@ const equipmentsRef = () => getDb().collection(COLLECTION);
 const findDocRefById = (id) => findRef(equipmentsRef(), id);
 const getNextId = () => nextId(equipmentsRef());
 
-const WARRANTY_STATUSES = [
-  "Under Warranty",
-  "Out of Warranty",
-  "Expired",
-  "Not Applicable",
-];
-
 const toApiEquipment = (docId, data) => ({
   id: Number(docId) || docId,
   name: data.name ?? "",
   description: data.description ?? "",
   quantity: Number(data.quantity) || 0,
   serialNumber: data.serialNumber ?? null,
-  warrantyStatus: data.warrantyStatus ?? null,
-  expiryDate: toDateOnly(data.expiryDate),
   centre: data.centre ?? null,
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
@@ -48,8 +39,6 @@ const create = async (data) => {
     description: data.description,
     quantity: Number(data.quantity) || 0,
     serialNumber: data.serialNumber ?? null,
-    warrantyStatus: data.warrantyStatus,
-    expiryDate: toDateOnly(data.expiryDate),
     centre: data.centre ?? null,
     created_at: now,
     updated_at: now,
@@ -67,7 +56,6 @@ const destroy = async (id) => {
 };
 
 module.exports = {
-  WARRANTY_STATUSES,
   findAll,
   findById,
   create,

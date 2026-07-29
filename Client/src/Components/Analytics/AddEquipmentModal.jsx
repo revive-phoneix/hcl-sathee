@@ -2,19 +2,10 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 
-const WARRANTY_STATUSES = [
-  "Under Warranty",
-  "Out of Warranty",
-  "Expired",
-  "Not Applicable",
-];
-
 const EMPTY_FORM = {
   name: "",
   description: "",
-  warrantyStatus: "",
   quantity: "",
-  expiryDate: "",
   serialNumber: "",
 };
 
@@ -65,16 +56,8 @@ export default function AddEquipmentModal({
       setError("Equipment description must be at most 250 characters");
       return;
     }
-    if (!form.warrantyStatus) {
-      setError("Warranty status is required");
-      return;
-    }
     if (!form.quantity || Number(form.quantity) < 1) {
       setError("Enter a valid quantity");
-      return;
-    }
-    if (!form.expiryDate) {
-      setError("Date of expiry is required");
       return;
     }
 
@@ -83,9 +66,7 @@ export default function AddEquipmentModal({
       await onSubmit({
         name: form.name.trim(),
         description: form.description.trim(),
-        warrantyStatus: form.warrantyStatus,
         quantity: Number(form.quantity),
-        expiryDate: form.expiryDate,
         serialNumber: form.serialNumber.trim() || null,
         centre: defaultCentre,
       });
@@ -135,22 +116,6 @@ export default function AddEquipmentModal({
           </FormField>
 
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Warranty Status" required>
-              <select
-                value={form.warrantyStatus}
-                onChange={(e) => update("warrantyStatus", e.target.value)}
-                className={inputClass}
-                required
-              >
-                <option value="">Select</option>
-                {WARRANTY_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-            </FormField>
-
             <FormField label="Quantity" required>
               <input
                 type="number"
@@ -159,18 +124,6 @@ export default function AddEquipmentModal({
                 onChange={(e) => update("quantity", e.target.value)}
                 className={inputClass}
                 placeholder="Enter Quantity of Equipment"
-                required
-              />
-            </FormField>
-          </div>
-
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <FormField label="Date of Expiry" required>
-              <input
-                type="date"
-                value={form.expiryDate}
-                onChange={(e) => update("expiryDate", e.target.value)}
-                className={inputClass}
                 required
               />
             </FormField>
