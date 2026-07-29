@@ -1,6 +1,28 @@
 const Announcement = require("../Models/Announcement");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
-const { filterByUserCentre } = require("../Utils/centreMatch");
+const {
+  isAdminRole,
+  isHclPartnerRole,
+  isSatheeMitraRole,
+  matchesCentre,
+} = require("../Utils/centreMatch");
+
+const parseOtherCentres = (raw) => {
+  if (raw == null || raw === "") return null;
+  let list = raw;
+  if (typeof raw === "string") {
+    try {
+      list = JSON.parse(raw);
+    } catch {
+      list = raw.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(list)) return null;
+  const cleaned = [
+    ...new Set(list.map((c) => String(c || "").trim()).filter(Boolean)),
+  ];
+  return cleaned.length ? cleaned : null;
+};
 
 const parseBody = (req) => {
   const body = req.body || {};
@@ -11,13 +33,26 @@ const parseBody = (req) => {
     priority: body.priority,
     postedBy: body.postedBy,
     centre: body.centre,
+    otherCentres: parseOtherCentres(body.otherCentres ?? body["other-centres"]),
     attachmentName: body.attachmentName,
   };
 };
 
+/** Visible if centre matches, or user centre is listed in other-centres. */
+const filterAnnouncementsForUser = (items, user) => {
+  if (!user || isAdminRole(user.role)) return items;
+  if (!isHclPartnerRole(user.role) && !isSatheeMitraRole(user.role)) return [];
+
+  return items.filter((item) => {
+    if (matchesCentre(item.centre, user.centre)) return true;
+    const others = Array.isArray(item.otherCentres) ? item.otherCentres : [];
+    return others.some((centre) => matchesCentre(centre, user.centre));
+  });
+};
+
 exports.getAnnouncements = wrap(
   async (req, res) => {
-    const announcements = filterByUserCentre(
+    const announcements = filterAnnouncementsForUser(
       await Announcement.findAll(),
       req.user
     );
@@ -28,7 +63,7 @@ exports.getAnnouncements = wrap(
 
 exports.addAnnouncement = wrap(
   async (req, res) => {
-    const { title, description, category, priority, postedBy, centre } =
+    const { title, description, category, priority, postedBy, centre, otherCentres } =
       parseBody(req);
 
     if (!String(title || "").trim() || !String(description || "").trim()) {
@@ -60,6 +95,7 @@ exports.addAnnouncement = wrap(
       priority: priority || "Medium",
       postedBy: String(postedBy || "").trim() || "Admin",
       centre: String(centre || "").trim() || null,
+      otherCentres,
       ...attachment,
     });
 
@@ -75,7 +111,8 @@ exports.addAnnouncement = wrap(
 exports.updateAnnouncement = wrap(
   async (req, res) => {
     const { id } = req.params;
-    const { title, description, category, priority, centre } = parseBody(req);
+    const { title, description, category, priority, centre, otherCentres } =
+      parseBody(req);
 
     const existing = await Announcement.findById(id);
     if (!existing) {
@@ -94,6 +131,11 @@ exports.updateAnnouncement = wrap(
         centre === undefined || centre === null
           ? existing.centre
           : String(centre).trim() || null,
+      otherCentres:
+        req.body.otherCentres !== undefined ||
+        req.body["other-centres"] !== undefined
+          ? otherCentres
+          : existing.otherCentres,
     };
 
     if (req.file) {

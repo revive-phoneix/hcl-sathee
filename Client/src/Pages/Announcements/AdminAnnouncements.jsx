@@ -12,6 +12,7 @@ import {
 } from "../../services/announcements";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import {
+  getCanonicalCentreKey,
   getCentreValueFromPortal,
   matchesPortalCentre,
 } from "../../utils/portalMapping";
@@ -71,7 +72,12 @@ export default function AdminAnnouncements({
 
   const centreAnnouncements = useMemo(
     () =>
-      announcements.filter((a) => matchesPortalCentre(a.centre, portalName)),
+      announcements.filter(
+        (a) =>
+          matchesPortalCentre(a.centre, portalName) ||
+          (Array.isArray(a.otherCentres) &&
+            a.otherCentres.some((c) => matchesPortalCentre(c, portalName)))
+      ),
     [announcements, portalName]
   );
 
@@ -98,90 +104,45 @@ export default function AdminAnnouncements({
     setError("");
 
     try {
-      const centres = data.centres?.length
-        ? data.centres
-        : [getCentreValueFromPortal(portalName)].filter(Boolean);
+      const selected = [...new Set((data.centres || []).filter(Boolean))];
 
-      if (!centres.length) {
+      if (!selected.length) {
         setError("Select at least one centre for the announcement");
         return;
       }
 
-      const basePayload = {
+      // Targets = checked centres only (not always the posting portal).
+      // Prefer posting portal as primary centre when it is among the selection.
+      const primaryCentre =
+        selected.find((c) => matchesPortalCentre(c, portalName)) ||
+        selected[0];
+
+      const otherCentresList = selected.filter(
+        (c) =>
+          getCanonicalCentreKey(c) !== getCanonicalCentreKey(primaryCentre)
+      );
+      const otherCentres = otherCentresList.length ? otherCentresList : null;
+
+      const payload = {
         title: data.title,
         description: data.description,
         category: data.category,
         priority: data.priority,
         postedBy: userName || "Admin",
+        centre: primaryCentre,
+        otherCentres,
         attachment: data.attachment || null,
       };
 
       if (editId !== null) {
-        const [primaryCentre, ...extraCentres] = centres;
-        const updated = await updateAnnouncement(editId, {
-          ...basePayload,
-          centre: primaryCentre,
-        });
+        const updated = await updateAnnouncement(editId, payload);
         setAnnouncements((prev) =>
           prev.map((a) => (a.id === editId ? updated : a))
         );
-
-        if (extraCentres.length) {
-          const sharedAttachment = {
-            attachmentName: updated.attachmentName,
-            attachmentUrl: updated.attachmentUrl,
-            attachmentType: updated.attachmentType,
-            attachmentPath: updated.attachmentPath,
-          };
-          const createdList = await Promise.all(
-            extraCentres.map((centre) =>
-              createAnnouncement({
-                title: basePayload.title,
-                description: basePayload.description,
-                category: basePayload.category,
-                priority: basePayload.priority,
-                postedBy: basePayload.postedBy,
-                centre,
-                ...sharedAttachment,
-              })
-            )
-          );
-          setAnnouncements((prev) => [...createdList, ...prev]);
-        }
-
         setEditId(null);
       } else {
-        const [primaryCentre, ...extraCentres] = centres;
-        const first = await createAnnouncement({
-          ...basePayload,
-          centre: primaryCentre,
-        });
-        const createdList = [first];
-
-        if (extraCentres.length) {
-          const sharedAttachment = {
-            attachmentName: first.attachmentName,
-            attachmentUrl: first.attachmentUrl,
-            attachmentType: first.attachmentType,
-            attachmentPath: first.attachmentPath,
-          };
-          const rest = await Promise.all(
-            extraCentres.map((centre) =>
-              createAnnouncement({
-                title: basePayload.title,
-                description: basePayload.description,
-                category: basePayload.category,
-                priority: basePayload.priority,
-                postedBy: basePayload.postedBy,
-                centre,
-                ...sharedAttachment,
-              })
-            )
-          );
-          createdList.push(...rest);
-        }
-
-        setAnnouncements((prev) => [...createdList, ...prev]);
+        const created = await createAnnouncement(payload);
+        setAnnouncements((prev) => [created, ...prev]);
       }
 
       setShowModal(false);

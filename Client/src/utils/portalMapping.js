@@ -14,7 +14,7 @@ const normalizeCentreValue = (value = "") =>
 const matchCentreRule = (normalized) =>
   CENTRE_RULES.find((rule) => rule.patterns.some((pattern) => normalized.includes(pattern)));
 
-const getCanonicalCentreKey = (value = "") => {
+export const getCanonicalCentreKey = (value = "") => {
   const normalized = normalizeCentreValue(value);
   return matchCentreRule(normalized)?.key ?? normalized;
 };

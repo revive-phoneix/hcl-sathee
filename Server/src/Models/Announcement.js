@@ -13,6 +13,28 @@ const announcementsRef = () => getDb().collection(COLLECTION);
 const findDocRefById = (id) => findRef(announcementsRef(), id);
 const getNextId = () => nextId(announcementsRef());
 
+/** Normalize other-centres to null or a non-empty string array. */
+const normalizeOtherCentres = (value) => {
+  if (value == null || value === "") return null;
+  let list = value;
+  if (typeof value === "string") {
+    try {
+      list = JSON.parse(value);
+    } catch {
+      list = value.split(",").map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  if (!Array.isArray(list)) return null;
+  const cleaned = [
+    ...new Set(
+      list
+        .map((c) => String(c || "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  return cleaned.length ? cleaned : null;
+};
+
 const toApiAnnouncement = (docId, data) => ({
   id: Number(docId) || docId,
   title: data.title,
@@ -21,6 +43,9 @@ const toApiAnnouncement = (docId, data) => ({
   priority: data.priority || "Medium",
   postedBy: data.postedBy || "Admin",
   centre: data.centre ?? null,
+  otherCentres: normalizeOtherCentres(
+    data.otherCentres ?? data["other-centres"]
+  ),
   attachmentName: data.attachmentName ?? null,
   attachmentUrl: data.attachmentUrl ?? null,
   attachmentType: data.attachmentType ?? null,
@@ -120,6 +145,9 @@ const uploadAttachment = async (file) => {
 const create = async (data) => {
   const now = new Date();
   const id = await getNextId();
+  const otherCentres = normalizeOtherCentres(
+    data.otherCentres ?? data["other-centres"]
+  );
   const payload = {
     id,
     title: data.title,
@@ -128,6 +156,8 @@ const create = async (data) => {
     priority: data.priority || "Medium",
     postedBy: data.postedBy || "Admin",
     centre: data.centre ?? null,
+    otherCentres,
+    "other-centres": otherCentres,
     attachmentName: data.attachmentName ?? null,
     attachmentUrl: data.attachmentUrl ?? null,
     attachmentType: data.attachmentType ?? null,
@@ -148,6 +178,17 @@ const update = async (id, data) => {
   Object.entries(data || {}).forEach(([key, value]) => {
     if (value !== undefined) updated[key] = value;
   });
+
+  if (
+    Object.prototype.hasOwnProperty.call(updated, "otherCentres") ||
+    Object.prototype.hasOwnProperty.call(updated, "other-centres")
+  ) {
+    const otherCentres = normalizeOtherCentres(
+      updated.otherCentres ?? updated["other-centres"]
+    );
+    updated.otherCentres = otherCentres;
+    updated["other-centres"] = otherCentres;
+  }
 
   // merge:true safely adds new attachment fields on older announcement docs
   await ref.set(updated, { merge: true });
@@ -173,6 +214,8 @@ const importFromMysql = async (row) => {
     priority: row.priority || "Medium",
     postedBy: row.postedBy || "Admin",
     centre: row.centre ?? null,
+    otherCentres: null,
+    "other-centres": null,
     attachmentName: row.attachmentName ?? null,
     attachmentUrl: row.attachmentUrl ?? null,
     attachmentType: row.attachmentType ?? null,

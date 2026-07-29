@@ -38,6 +38,18 @@ const buildAnnouncementFormData = (payload) => {
     }
   });
 
+  // null = only posting centre; array = extra centres this post also covers
+  if (Object.prototype.hasOwnProperty.call(payload, "otherCentres")) {
+    formData.append(
+      "otherCentres",
+      payload.otherCentres == null ? "" : JSON.stringify(payload.otherCentres)
+    );
+    formData.append(
+      "other-centres",
+      payload.otherCentres == null ? "" : JSON.stringify(payload.otherCentres)
+    );
+  }
+
   if (payload.attachment instanceof File) {
     formData.append("attachment", payload.attachment);
   }

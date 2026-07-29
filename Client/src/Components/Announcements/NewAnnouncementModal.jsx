@@ -1,10 +1,23 @@
 import { useState } from "react";
+import { getCanonicalCentreKey } from "../../utils/portalMapping";
 
 const CENTRE_OPTIONS = [
   "HCL RAJASTHAN",
   "HCL JHARKHAND",
   "HCL MADHYA PRADESH",
 ];
+
+const sameCentre = (a, b) =>
+  Boolean(a) &&
+  Boolean(b) &&
+  getCanonicalCentreKey(a) === getCanonicalCentreKey(b);
+
+const resolveDefaultCentre = (defaultCentre) => {
+  if (!defaultCentre) return null;
+  return (
+    CENTRE_OPTIONS.find((option) => sameCentre(option, defaultCentre)) || null
+  );
+};
 
 export default function NewAnnouncementModal({
   onClose,
@@ -13,11 +26,21 @@ export default function NewAnnouncementModal({
   submitting = false,
   defaultCentre = null,
 }) {
-  const initialCentres = editData?.centre
-    ? [editData.centre]
-    : defaultCentre
-      ? [defaultCentre]
-      : [];
+  const portalCentre = resolveDefaultCentre(defaultCentre);
+
+  const initialCentres = (() => {
+    if (editData) {
+      const primary = editData.centre ? [editData.centre] : [];
+      const extras = Array.isArray(editData.otherCentres)
+        ? editData.otherCentres
+        : [];
+      const merged = [...new Set([...primary, ...extras])]
+        .map((c) => resolveDefaultCentre(c) || c)
+        .filter(Boolean);
+      return merged.length ? merged : portalCentre ? [portalCentre] : [];
+    }
+    return portalCentre ? [portalCentre] : [];
+  })();
 
   const [form, setForm] = useState({
     title: editData?.title || "",
@@ -35,10 +58,18 @@ export default function NewAnnouncementModal({
   const toggleCentre = (centre) => {
     setCentreError("");
     setForm((prev) => {
-      const selected = prev.centres.includes(centre)
-        ? prev.centres.filter((c) => c !== centre)
-        : [...prev.centres, centre];
-      return { ...prev, centres: selected };
+      const isSelected = prev.centres.some((c) => sameCentre(c, centre));
+      if (isSelected) {
+        if (prev.centres.length === 1) {
+          setCentreError("At least one centre must remain selected.");
+          return prev;
+        }
+        return {
+          ...prev,
+          centres: prev.centres.filter((c) => !sameCentre(c, centre)),
+        };
+      }
+      return { ...prev, centres: [...prev.centres, centre] };
     });
   };
 
@@ -123,7 +154,7 @@ export default function NewAnnouncementModal({
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {CENTRE_OPTIONS.map((centre) => {
-                const checked = form.centres.includes(centre);
+                const checked = form.centres.some((c) => sameCentre(c, centre));
                 return (
                   <label
                     key={centre}
@@ -141,6 +172,11 @@ export default function NewAnnouncementModal({
                     />
                     <span className="text-sm font-medium text-slate-700">
                       {centre.replace("HCL ", "")}
+                      {portalCentre && sameCentre(centre, portalCentre) ? (
+                        <span className="ml-1 text-xs font-normal text-slate-400">
+                          (this portal)
+                        </span>
+                      ) : null}
                     </span>
                   </label>
                 );
