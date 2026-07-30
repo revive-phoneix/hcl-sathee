@@ -9,6 +9,7 @@ import { createUser, fetchUsers, removeUser } from "../../services/users";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { getInitials } from "../../utils/studentMetrics";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 const ROLE_FILTERS = ["All Users", "ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 
@@ -40,6 +41,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   const [passwordSetupLink, setPasswordSetupLink] = useState("");
   const [userToDelete, setUserToDelete] = useState(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  useEscapeToClose(() => setUserToDelete(null), Boolean(userToDelete) && !deletingUser);
 
   const loadUsers = useCallback(async () => {
     try {

@@ -54,7 +54,19 @@ export default function CreatePassword() {
       );
       setStatusText("");
       setMessage("Password created successfully. You can now sign in.");
-      setTimeout(() => navigate("/"), 1200);
+      setTimeout(
+        () =>
+          navigate("/", {
+            replace: true,
+            state: {
+              loginPrefill: {
+                name: form.name.trim(),
+                email: form.email.trim().toLowerCase(),
+              },
+            },
+          }),
+        1200
+      );
     } catch (err) {
       setStatusText("");
       setError(getAuthErrorMessage(err, "Unable to create password right now."));

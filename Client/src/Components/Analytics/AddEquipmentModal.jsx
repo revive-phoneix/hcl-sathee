@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 const EMPTY_FORM = {
   name: "",
@@ -34,6 +35,7 @@ export default function AddEquipmentModal({
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
   const [form, setForm] = useState(EMPTY_FORM);
   const [error, setError] = useState("");
+  useEscapeToClose(onClose, open);
 
   if (!open) return null;
 

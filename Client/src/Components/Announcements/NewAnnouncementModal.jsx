@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { getCanonicalCentreKey } from "../../utils/portalMapping";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 const CENTRE_OPTIONS = [
   "HCL RAJASTHAN",
@@ -52,6 +53,7 @@ export default function NewAnnouncementModal({
   });
   const [centreError, setCentreError] = useState("");
   const [attachmentError, setAttachmentError] = useState("");
+  useEscapeToClose(onClose);
   const needsReupload =
     Boolean(editData?.attachmentName) && !editData?.attachmentUrl;
 

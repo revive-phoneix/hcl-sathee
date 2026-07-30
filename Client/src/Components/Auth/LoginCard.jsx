@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, ArrowRight } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { API_URL } from "../../config/api";
 import { getAuthErrorMessage, postWithColdStartRetry } from "../../utils/apiRequest";
 import { setAuthToken } from "../../utils/authToken";
@@ -59,6 +59,7 @@ const writeRemembered = ({ name, email, password }) => {
 
 export default function AdminLoginCard({ onLoginSuccess }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -68,12 +69,26 @@ export default function AdminLoginCard({ onLoginSuccess }) {
   const [formData, setFormData] = useState({ name: "", email: "", password: "" });
 
   useEffect(() => {
-    const saved = readRemembered();
-    if (saved) {
-      setFormData(saved);
-      setRememberMe(true);
+    const prefill = location.state?.loginPrefill;
+    if (prefill?.name || prefill?.email) {
+      setFormData({
+        name: String(prefill.name || "").trim(),
+        email: String(prefill.email || "").trim().toLowerCase(),
+        password: "",
+      });
+      setRememberMe(false);
+      // Drop one-shot prefill so a later refresh uses Remember me as usual.
+      navigate(location.pathname, { replace: true, state: {} });
+    } else {
+      const saved = readRemembered();
+      if (saved) {
+        setFormData(saved);
+        setRememberMe(true);
+      }
     }
     setHydrated(true);
+    // Only hydrate once on mount from navigation state or Remember me.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Keep storage in sync whenever Remember me is on and fields change.

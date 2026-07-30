@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { updateUser } from "../../services/users";
 import { WEEKDAYS, formatAvailableDays } from "../../utils/availableDays";
 import { mentorInitial } from "./analyticsUi";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 const overlayStyle = {
   position: "fixed",
@@ -60,6 +61,7 @@ export default function MentorDetailsModal({
   const [formData, setFormData] = useState(mentor || {});
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  useEscapeToClose(onClose, open);
 
   useEffect(() => {
     setFormData(mentor || {});

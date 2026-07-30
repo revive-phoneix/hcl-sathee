@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 export default function NewUser({ onClose, onAddUser, submittingUser, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
@@ -16,6 +17,7 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
   });
 
   const [error, setError] = useState("");
+  useEscapeToClose(onClose);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

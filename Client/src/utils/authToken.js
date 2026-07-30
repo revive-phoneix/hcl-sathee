@@ -1,8 +1,15 @@
 const AUTH_TOKEN_KEY = "hcl_sathee_auth_token";
 
+// Drop any old persistent login so browser reopen always starts at login.
+try {
+  localStorage.removeItem(AUTH_TOKEN_KEY);
+} catch {
+  // ignore
+}
+
 export const getAuthToken = () => {
   try {
-    return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+    return sessionStorage.getItem(AUTH_TOKEN_KEY) || "";
   } catch {
     return "";
   }
@@ -10,8 +17,8 @@ export const getAuthToken = () => {
 
 export const setAuthToken = (token) => {
   try {
-    if (token) localStorage.setItem(AUTH_TOKEN_KEY, token);
-    else localStorage.removeItem(AUTH_TOKEN_KEY);
+    if (token) sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+    else sessionStorage.removeItem(AUTH_TOKEN_KEY);
   } catch {
     // ignore storage errors
   }

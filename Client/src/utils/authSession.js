@@ -2,10 +2,17 @@ import { getAuthToken, clearAuthToken } from "./authToken";
 
 const SESSION_KEY = "hcl_sathee_session";
 
+// Drop any old persistent session so browser reopen always starts at login.
+try {
+  localStorage.removeItem(SESSION_KEY);
+} catch {
+  // ignore
+}
+
 export const getSession = () => {
   try {
     if (!getAuthToken()) return null;
-    const raw = localStorage.getItem(SESSION_KEY);
+    const raw = sessionStorage.getItem(SESSION_KEY);
     if (!raw) return null;
     const session = JSON.parse(raw);
     if (!session || typeof session !== "object") return null;
@@ -23,10 +30,10 @@ export const getSession = () => {
 export const setSession = (session) => {
   try {
     if (!session) {
-      localStorage.removeItem(SESSION_KEY);
+      sessionStorage.removeItem(SESSION_KEY);
       return;
     }
-    localStorage.setItem(
+    sessionStorage.setItem(
       SESSION_KEY,
       JSON.stringify({
         name: session.name || "",
@@ -52,6 +59,7 @@ export const updateSession = (patch) => {
 
 export const clearSession = () => {
   try {
+    sessionStorage.removeItem(SESSION_KEY);
     localStorage.removeItem(SESSION_KEY);
   } catch {
     // ignore

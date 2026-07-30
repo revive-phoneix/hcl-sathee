@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(null);
+  useEscapeToClose(onClose, open);
 
   useEffect(() => {
     if (student) {

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 const courses = ["JEE", "NEET", "CLAT", "SSC", "IBPS", "RRB", "ICAR", "CUET"];
 const casteCategories = ["General", "OBC", "SC", "ST", "EWS"];
@@ -25,6 +26,7 @@ const createEmptyForm = (centre) => ({
 export default function NewStudent({ open, onClose, onSubmit, error, submitting, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
   const [form, setForm] = useState(() => createEmptyForm(defaultCentre));
+  useEscapeToClose(onClose, open);
 
   if (!open) return null;
 

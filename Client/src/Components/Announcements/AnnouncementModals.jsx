@@ -1,3 +1,5 @@
+import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+
 const isPdf = (announcement) => {
   const type = String(announcement.attachmentType || "").toLowerCase();
   const name = String(announcement.attachmentName || "").toLowerCase();
@@ -15,6 +17,8 @@ const isImage = (announcement) => {
 };
 
 export function ConfirmDeleteModal({ title, onCancel, onConfirm }) {
+  useEscapeToClose(onCancel);
+
   return (
     <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4 text-black">
       <div className="bg-white rounded-3xl p-10 max-w-md text-center">
@@ -40,6 +44,8 @@ export function ConfirmDeleteModal({ title, onCancel, onConfirm }) {
 }
 
 export function ViewModal({ announcement, onClose }) {
+  useEscapeToClose(onClose, Boolean(announcement));
+
   if (!announcement) return null;
 
   const hasAttachment = Boolean(announcement.attachmentUrl);

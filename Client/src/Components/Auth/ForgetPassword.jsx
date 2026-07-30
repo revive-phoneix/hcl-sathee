@@ -84,7 +84,19 @@ export default function ForgetPassword() {
       );
       setStatusText("");
       setMessage("Password updated successfully. You can now sign in.");
-      setTimeout(() => navigate("/"), 1200);
+      setTimeout(
+        () =>
+          navigate("/", {
+            replace: true,
+            state: {
+              loginPrefill: {
+                name: account.name.trim(),
+                email: account.email.trim().toLowerCase(),
+              },
+            },
+          }),
+        1200
+      );
     });
   };
 
