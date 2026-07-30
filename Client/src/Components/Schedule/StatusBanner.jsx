@@ -5,7 +5,9 @@ export default function StatusBanner({ meta, topicCount, months, isDirty }) {
       <p className="font-semibold text-blue-800 truncate">{meta.lastFile || meta.name}</p>
       <p className="text-xs text-blue-600 mt-0.5">
         {topicCount} topic{topicCount === 1 ? "" : "s"} · {months.join(", ") || "No months"}
-        {isDirty ? " · Unsaved changes — click Save" : " · Saved"}
+        {isDirty
+          ? " · Not synced — tap Save"
+          : " · Saved to cloud (phone & laptop)"}
       </p>
     </div>
   );

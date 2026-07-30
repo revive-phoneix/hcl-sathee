@@ -12,7 +12,7 @@ export default function EmptyState({ readOnly, onUploadClick }) {
         <p className="text-sm text-gray-500 mt-1 max-w-xs leading-relaxed">
           {readOnly
             ? "No teaching schedule has been uploaded for this centre yet."
-            : "Upload an Excel or CSV schedule, then Save. You can add more months later."}
+            : "Upload an Excel or CSV schedule. It saves to the cloud automatically so phones can see it."}
         </p>
       </div>
       {!readOnly ? (

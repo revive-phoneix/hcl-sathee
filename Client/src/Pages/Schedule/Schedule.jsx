@@ -20,6 +20,7 @@ import {
   mergeScheduleRows,
   monthsFromRows,
   parseScheduleFile,
+  readLocalSchedule,
   repairScheduleRows,
   scheduleMetaLabel,
 } from "../../Components/Schedule";
@@ -84,6 +85,20 @@ export default function Schedule({
       setIsDirty(false);
       setBannerVisible(false);
       setDeleteOpen(false);
+
+      // Show device cache immediately (helps when Render is cold).
+      const local = readLocalSchedule(portalName);
+      if (local?.rows?.length) {
+        const repairedLocal = repairScheduleRows(local.rows);
+        setAllRows(repairedLocal);
+        setScheduleMeta({
+          ...scheduleMetaLabel(repairedLocal, local.lastFile || local.name),
+          updatedAt: local.updatedAt || null,
+        });
+        if (repairedLocal[0]?.subject) setSubject(repairedLocal[0].subject);
+        setMonth(firstMonth(monthsFromRows(repairedLocal)));
+      }
+
       setLoading(true);
       try {
         const stored = await loadScheduleForPortal(portalName, {
@@ -92,9 +107,11 @@ export default function Schedule({
         if (cancelled) return;
 
         if (!stored?.rows?.length) {
-          setAllRows([]);
-          setScheduleMeta(null);
-          setMonth(DEFAULT_MONTHS[0]);
+          if (!local?.rows?.length) {
+            setAllRows([]);
+            setScheduleMeta(null);
+            setMonth(DEFAULT_MONTHS[0]);
+          }
           return;
         }
 
@@ -127,8 +144,10 @@ export default function Schedule({
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setAllRows([]);
-          setScheduleMeta(null);
+          if (!local?.rows?.length) {
+            setAllRows([]);
+            setScheduleMeta(null);
+          }
           setError(getApiErrorMessage(err, "Unable to load schedule"));
         }
       } finally {
@@ -191,6 +210,7 @@ export default function Schedule({
 
     try {
       setError("");
+      setSaving(true);
       const parsedRows = await parseScheduleFile(file, {
         fallbackSubject: subject,
         fallbackMonth: month,
@@ -204,16 +224,33 @@ export default function Schedule({
 
       const merged = mergeScheduleRows(allRows, parsedRows);
       const uploadedMonths = monthsFromRows(parsedRows);
+      const meta = scheduleMetaLabel(merged, file.name);
+
       setAllRows(merged);
-      setIsDirty(true);
-      setScheduleMeta(scheduleMetaLabel(merged, file.name));
-      flashStatusBanner();
+      setScheduleMeta(meta);
       setSubject(parsedRows[0].subject);
       setMonth(firstMonth(uploadedMonths));
       setSearch("");
+
+      // Auto-save to Firestore so phone/laptop stay in sync (same as timetable).
+      const saved = await saveSchedule(portalName, { ...meta, rows: merged });
+      setScheduleMeta({
+        ...meta,
+        updatedAt: saved?.updatedAt || new Date().toISOString(),
+      });
+      setIsDirty(false);
+      flashStatusBanner();
     } catch (err) {
       console.error(err);
-      setError("Unable to read that file. Check the format and try again.");
+      setIsDirty(true);
+      setError(
+        getApiErrorMessage(
+          err,
+          "Schedule was read but could not sync to the server. Tap Save to retry."
+        )
+      );
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -373,7 +410,7 @@ export default function Schedule({
             </div>
           ) : null}
 
-          {loading ? (
+          {loading && !hasUpload ? (
             <p className="py-16 text-center text-sm text-slate-500">Loading schedule…</p>
           ) : !hasUpload ? (
             <EmptyState
