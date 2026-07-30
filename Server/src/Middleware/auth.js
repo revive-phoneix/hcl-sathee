@@ -64,6 +64,16 @@ const requireAdmin = (req, res, next) => {
   });
 };
 
+/** ADMIN or SATHEE MITRA may add/edit students (not HCL Partner). */
+const requireAdminOrMitra = (req, res, next) => {
+  const role = req.user?.role;
+  if (isAdminRole(role) || isSatheeMitraRole(role)) return next();
+  return res.status(403).json({
+    success: false,
+    message: "Admin or Sathee Mitra access required",
+  });
+};
+
 /** Only SATHEE MITRA may upload their own attendance photos. */
 const requireSatheeMitra = (req, res, next) => {
   if (isSatheeMitraRole(req.user?.role)) return next();
@@ -77,5 +87,6 @@ module.exports = {
   authenticate,
   requireAdminOrPartner,
   requireAdmin,
+  requireAdminOrMitra,
   requireSatheeMitra,
 };

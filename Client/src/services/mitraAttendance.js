@@ -10,6 +10,7 @@ export const fetchMitraAttendance = async (date) => {
 export const uploadMitraAttendancePhoto = async ({
   userId,
   name,
+  email,
   centre,
   centreId,
   date,
@@ -20,6 +21,7 @@ export const uploadMitraAttendancePhoto = async ({
   formData.append("photo", file);
   formData.append("userId", String(userId));
   formData.append("name", name || "");
+  formData.append("email", email || "");
   formData.append("centre", centre || "");
   if (centreId) formData.append("centreId", centreId);
   formData.append("date", date);

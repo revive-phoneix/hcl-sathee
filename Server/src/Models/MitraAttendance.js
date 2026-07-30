@@ -1,8 +1,10 @@
-const { getDb, getBucket } = require("../config/firebase");
+const { getDb, withStorageBucket } = require("../config/firebase");
 const path = require("path");
 const { toDate } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "mitraAttendances";
+/** Firestore docs max ~1MB; keep headroom for arrival + departure metadata. */
+const MAX_INLINE_BYTES = 700 * 1024;
 
 const attendancesRef = () => getDb().collection(COLLECTION);
 
@@ -10,6 +12,7 @@ const toApiRecord = (docId, data) => ({
   id: docId,
   userId: data.userId,
   name: data.name ?? null,
+  email: data.email ?? null,
   centre: data.centre ?? null,
   centreId: data.centreId ?? null,
   date: data.date,
@@ -35,11 +38,26 @@ const findByUserAndDate = async (userId, date) => {
   return toApiRecord(doc.id, doc.data());
 };
 
-const uploadPhoto = async (file, userId, date, type) => {
+const toInlinePhoto = (file) => {
+  if (!file?.buffer?.length) {
+    throw new Error("Photo file is missing or empty");
+  }
+  if (file.buffer.length > MAX_INLINE_BYTES) {
+    throw new Error(
+      "Photo is too large for fallback storage (max ~700 KB). Enable Firebase Storage or use a smaller image."
+    );
+  }
+  const contentType = file.mimetype || "image/jpeg";
+  return {
+    url: `data:${contentType};base64,${file.buffer.toString("base64")}`,
+    storagePath: null,
+  };
+};
+
+const uploadPhotoToBucket = async (bucket, file, userId, date, type) => {
   const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
   const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
   const storagePath = `mitra-attendance/${userId}/${date}/${type}-${Date.now()}${safeExt}`;
-  const bucket = getBucket();
   const storageFile = bucket.file(storagePath);
 
   await storageFile.save(file.buffer, {
@@ -50,18 +68,49 @@ const uploadPhoto = async (file, userId, date, type) => {
     resumable: false,
   });
 
-  // Long-lived signed URL for viewing photos in the admin UI
-  const [url] = await storageFile.getSignedUrl({
-    action: "read",
-    expires: "03-01-2500",
-  });
+  let url;
+  try {
+    const [signedUrl] = await storageFile.getSignedUrl({
+      action: "read",
+      expires: new Date("2500-01-01T00:00:00.000Z"),
+    });
+    url = signedUrl;
+  } catch {
+    await storageFile.makePublic();
+    url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+  }
 
   return { url, storagePath };
+};
+
+const uploadPhoto = async (file, userId, date, type) => {
+  if (!file?.buffer?.length) {
+    throw new Error("Photo file is missing or empty");
+  }
+
+  try {
+    return await withStorageBucket((bucket) =>
+      uploadPhotoToBucket(bucket, file, userId, date, type)
+    );
+  } catch (storageErr) {
+    console.error(
+      "Firebase Storage upload failed, using inline fallback:",
+      storageErr?.message || storageErr
+    );
+    try {
+      return toInlinePhoto(file);
+    } catch (inlineErr) {
+      throw new Error(
+        `Photo upload failed: ${storageErr.message || "storage error"}. ${inlineErr.message}`
+      );
+    }
+  }
 };
 
 const upsertCheckIn = async ({
   userId,
   name,
+  email = null,
   centre,
   centreId = null,
   date,
@@ -81,6 +130,7 @@ const upsertCheckIn = async ({
         id: docId,
         userId: Number(userId) || userId,
         name: name || null,
+        email: email || null,
         centre: centre || null,
         centreId: centreId || null,
         date,
@@ -100,6 +150,7 @@ const upsertCheckIn = async ({
           arrivalPhotoPath: storagePath,
           arrivalTime: now,
           name: name || base.name || null,
+          email: email || base.email || null,
           centre: centre || base.centre || null,
         }
       : {
@@ -107,6 +158,7 @@ const upsertCheckIn = async ({
           departurePhotoPath: storagePath,
           departureTime: now,
           name: name || base.name || null,
+          email: email || base.email || null,
           centre: centre || base.centre || null,
         };
 

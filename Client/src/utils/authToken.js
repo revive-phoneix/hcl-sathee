@@ -26,6 +26,27 @@ export const setAuthToken = (token) => {
 
 export const clearAuthToken = () => setAuthToken("");
 
+/** Decode JWT payload (already issued at login). Used when /users/me is unavailable. */
+export const getAuthPayload = () => {
+  const token = getAuthToken();
+  if (!token) return null;
+  try {
+    const part = token.split(".")[1];
+    if (!part) return null;
+    const json = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    const payload = JSON.parse(json);
+    if (!payload || typeof payload !== "object") return null;
+    return {
+      id: payload.id ?? null,
+      email: payload.email || "",
+      role: payload.role || "",
+      centre: payload.centre ?? null,
+    };
+  } catch {
+    return null;
+  }
+};
+
 export const authHeaders = () => {
   const token = getAuthToken();
   return token ? { Authorization: `Bearer ${token}` } : {};

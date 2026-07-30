@@ -17,9 +17,11 @@ import SatheeMitraDashboard from "./Pages/Dashboard/SatheeMitraDashboard";
 import SatheeMitraPlaceholder from "./Pages/Dashboard/SatheeMitraPlaceholder";
 import AdminAttendance from "./Pages/Attendance/AdminAttendance";
 import HCLPartnerAttendance from "./Pages/Attendance/HCLPartnerAttendance";
+import SM_Attendance from "./Pages/Attendance/SM_Attendance";
 import AdminUser from "./Pages/User/AdminUser";
 import Student from "./Pages/Student/Student";
 import PartnerStudents from "./Pages/Student/View";
+import SM_Student from "./Pages/Student/SM_Student";
 import AdminAnnouncements from "./Pages/Announcements/AdminAnnouncements";
 import HCLPartnerAnnouncements from "./Pages/Announcements/HCLPartnerAnnouncements";
 import SatheeMitraAnnouncements from "./Pages/Announcements/SatheeMitraAnnouncements";
@@ -32,7 +34,7 @@ import {
   canEnterSatheeMitraDashboard,
 } from "./utils/portalMapping";
 import { clearSession, getSession, setSession, updateSession } from "./utils/authSession";
-import { getAuthToken } from "./utils/authToken";
+import { getAuthPayload, getAuthToken } from "./utils/authToken";
 
 const ADMIN_PATH_TO_NAV = {
   "/dashboard": 0,
@@ -90,7 +92,22 @@ const MITRA_PATHS = new Set(MITRA_NAV_PATHS);
 
 const readInitialSession = () => {
   if (!getAuthToken()) return null;
-  return getSession();
+  const session = getSession();
+  if (!session) return null;
+  const tokenUser = getAuthPayload();
+  // Backfill id/email from JWT when older sessions omitted them.
+  if (tokenUser && (!session.email || session.id == null)) {
+    const patched = {
+      ...session,
+      id: session.id ?? tokenUser.id,
+      email: session.email || tokenUser.email || "",
+      role: session.role || tokenUser.role || "",
+      centre: session.centre ?? tokenUser.centre ?? null,
+    };
+    setSession(patched);
+    return patched;
+  }
+  return session;
 };
 
 const AppContent = () => {
@@ -100,6 +117,8 @@ const AppContent = () => {
 
   const [isLoggedIn, setIsLoggedIn] = useState(Boolean(initialSession));
   const [userName, setUserName] = useState(initialSession?.name || "");
+  const [userEmail, setUserEmail] = useState(initialSession?.email || "");
+  const [userId, setUserId] = useState(initialSession?.id ?? null);
   const [userCentre, setUserCentre] = useState(initialSession?.centre ?? null);
   const [userRole, setUserRole] = useState(initialSession?.role || "");
   const [selectedPortal, setSelectedPortal] = useState(initialSession?.portal || "");
@@ -108,7 +127,27 @@ const AppContent = () => {
     if (!getAuthToken()) {
       clearSession();
       setIsLoggedIn(false);
+      return;
     }
+    const tokenUser = getAuthPayload();
+    if (!tokenUser) return;
+
+    setUserEmail((prev) => {
+      if (prev) return prev;
+      if (tokenUser.email) {
+        updateSession({ email: tokenUser.email });
+        return tokenUser.email;
+      }
+      return prev;
+    });
+    setUserId((prev) => {
+      if (prev != null) return prev;
+      if (tokenUser.id != null) {
+        updateSession({ id: tokenUser.id });
+        return tokenUser.id;
+      }
+      return prev;
+    });
   }, []);
 
   const isAdmin = canEnterAdminDashboard(userRole);
@@ -150,6 +189,8 @@ const AppContent = () => {
     clearSession();
     setIsLoggedIn(false);
     setUserName("");
+    setUserEmail("");
+    setUserId(null);
     setUserCentre(null);
     setUserRole("");
     setSelectedPortal("");
@@ -215,12 +256,18 @@ const AppContent = () => {
           const name = typeof user === "string" ? user : user?.name;
           const role = typeof user === "object" ? user?.role || "" : "";
           const centre = typeof user === "object" ? user?.centre ?? null : null;
+          const email = typeof user === "object" ? user?.email || "" : "";
+          const id = typeof user === "object" ? user?.id ?? null : null;
           setUserName(name || "Administrator");
+          setUserEmail(email);
+          setUserId(id);
           setUserCentre(centre);
           setUserRole(role);
           setSelectedPortal("");
           setSession({
+            id,
             name: name || "Administrator",
+            email,
             role,
             centre,
             portal: "",
@@ -311,9 +358,20 @@ const AppContent = () => {
 
       {/* Sathee Mitra routes (no Users; schedule/timetable on dashboard; rest placeholders) */}
       <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
-      <Route path="/mitra/attendance" element={<SatheeMitraPlaceholder {...mitraLayout} title="Attendance Record" />} />
+      <Route
+        path="/mitra/attendance"
+        element={
+          <SM_Attendance
+            {...mitraLayout}
+            userName={userName}
+            userEmail={userEmail}
+            userId={userId}
+            userCentre={userCentre}
+          />
+        }
+      />
       <Route path="/mitra/analytics" element={<SatheeMitraPlaceholder {...mitraLayout} title="Progress and Analytics" />} />
-      <Route path="/mitra/students" element={<SatheeMitraPlaceholder {...mitraLayout} title="Students" />} />
+      <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
       <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
 
       <Route path="*" element={<Navigate to="/" replace />} />

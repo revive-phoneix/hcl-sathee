@@ -4,10 +4,10 @@ const { getStudents, addStudent } = require("../Controllers/StudentController");
 const {
   authenticate,
   requireAdminOrPartner,
-  requireAdmin,
+  requireAdminOrMitra,
 } = require("../Middleware/auth");
 
 router.get("/", authenticate, requireAdminOrPartner, getStudents);
-router.post("/", authenticate, requireAdmin, addStudent);
+router.post("/", authenticate, requireAdminOrMitra, addStudent);
 
 module.exports = router;

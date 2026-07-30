@@ -20,13 +20,15 @@ const pillClass = (active) =>
       : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
   }`;
 
-/** Shared attendance filters. Centre dropdown is admin-only. */
+/** Shared attendance filters. Centre dropdown / Mitra tab are optional. */
 export default function TabSelector({
   activeTab,
   setActiveTab,
   selectedCentre = "",
   setSelectedCentre,
   showCentreFilter = false,
+  showMitraTab = true,
+  mitraTabLabel = "Sathee Mitra",
 }) {
   const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
     ? activeTab
@@ -64,13 +66,15 @@ export default function TabSelector({
         </select>
       ) : null}
 
-      <button
-        type="button"
-        onClick={() => setActiveTab("sathee-mitra")}
-        className={pillClass(activeTab === "sathee-mitra")}
-      >
-        Sathee Mitra
-      </button>
+      {showMitraTab ? (
+        <button
+          type="button"
+          onClick={() => setActiveTab("sathee-mitra")}
+          className={pillClass(activeTab === "sathee-mitra")}
+        >
+          {mitraTabLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

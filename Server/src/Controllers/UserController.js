@@ -49,6 +49,18 @@ exports.getUsers = wrap(
   { label: "Get Users Error", message: "Failed to fetch users" }
 );
 
+/** Current logged-in user from DB (admin-created email/name). */
+exports.getMe = wrap(
+  async (req, res) => {
+    const user = await User.findById(req.user?.id);
+    if (!user) {
+      return fail(res, 404, "User not found");
+    }
+    return ok(res, { user: toPublicUser(user) });
+  },
+  { label: "Get Me Error", message: "Failed to fetch current user" }
+);
+
 exports.addUser = wrap(
   async (req, res) => {
     const { name, email, phone, role, centre, availableDays, isVishist } =

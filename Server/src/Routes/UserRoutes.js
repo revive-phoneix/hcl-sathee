@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getUsers,
+  getMe,
   addUser,
   updateUser,
   deleteUser,
@@ -14,6 +15,8 @@ const {
 const router = express.Router();
 
 router.use(authenticate);
+
+router.get("/me", getMe);
 
 // Partners may list Sathee Mitra in their centre (for attendance view).
 // Create/update/delete remain admin-only.

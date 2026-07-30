@@ -1,4 +1,5 @@
 const MitraAttendance = require("../Models/MitraAttendance");
+const User = require("../Models/User");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 
@@ -22,7 +23,7 @@ exports.getMitraAttendance = wrap(
 
 exports.uploadMitraPhoto = wrap(
   async (req, res) => {
-    const { name, centre, centreId, date, type } = req.body;
+    const { name, email, centre, centreId, date, type } = req.body;
     const userId = req.user?.id;
 
     if (!userId || !date || !type) {
@@ -35,10 +36,12 @@ exports.uploadMitraPhoto = wrap(
       return fail(res, 400, "Photo file is required");
     }
 
+    const dbUser = await User.findById(userId);
     const record = await MitraAttendance.upsertCheckIn({
       userId,
-      name: name || req.user?.email || null,
-      centre: centre || req.user?.centre || null,
+      name: dbUser?.name || name || null,
+      email: dbUser?.email || req.user?.email || email || null,
+      centre: dbUser?.centre || centre || req.user?.centre || null,
       centreId: centreId || null,
       date,
       type,

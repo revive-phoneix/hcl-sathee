@@ -18,6 +18,8 @@ export const getSession = () => {
     if (!session || typeof session !== "object") return null;
     return {
       name: session.name || "",
+      email: session.email || "",
+      id: session.id ?? null,
       role: session.role || "",
       centre: session.centre ?? null,
       portal: session.portal || "",
@@ -37,6 +39,8 @@ export const setSession = (session) => {
       SESSION_KEY,
       JSON.stringify({
         name: session.name || "",
+        email: session.email || "",
+        id: session.id ?? null,
         role: session.role || "",
         centre: session.centre ?? null,
         portal: session.portal || "",
@@ -50,6 +54,8 @@ export const setSession = (session) => {
 export const updateSession = (patch) => {
   const current = getSession() || {
     name: "",
+    email: "",
+    id: null,
     role: "",
     centre: null,
     portal: "",

@@ -159,7 +159,9 @@ export default function AdminLoginCard({ onLoginSuccess }) {
       if (response.data?.token) setAuthToken(response.data.token);
 
       const sessionUser = {
+        id: user.id ?? null,
         name: user.name || name,
+        email: user.email || email,
         role: user.role || "",
         centre: user.centre || null,
       };

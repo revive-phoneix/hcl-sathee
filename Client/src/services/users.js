@@ -5,6 +5,11 @@ export const fetchUsers = async () => {
   return response.data.users ?? [];
 };
 
+export const fetchCurrentUser = async () => {
+  const response = await api.get("/api/users/me");
+  return response.data.user;
+};
+
 export const createUser = async (payload) => {
   const response = await api.post("/api/users", payload);
   return {
