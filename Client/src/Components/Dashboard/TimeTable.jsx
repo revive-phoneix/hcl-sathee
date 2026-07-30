@@ -210,7 +210,7 @@ function EmptyTimetable({ readOnly, onUploadClick }) {
         <p className="text-sm text-gray-500 mt-1 max-w-sm leading-relaxed">
           {readOnly
             ? "No timetable has been uploaded for this centre yet."
-            : "Upload an Excel (.xlsx) or SVG weekly timetable to view it as a table."}
+            : "Upload an Excel (.xlsx) or SVG weekly timetable. It saves to the cloud so phones can see it."}
         </p>
       </div>
       {!readOnly ? (
@@ -299,6 +299,7 @@ export default function TimeTable({
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -321,21 +322,63 @@ export default function TimeTable({
 
     const load = async () => {
       setError("");
-      // Show last known local copy immediately so reopen isn't blank while API wakes.
+      setIsDirty(false);
+
       const local = readLocalTimetable(portalName);
       if (local?.kind) setData(local);
 
       setLoading(true);
       try {
-        const stored = await loadTimetableForPortal(portalName, {
-          canMigrate: !readOnly,
-        });
-        if (!cancelled) setData(stored || null);
+        const { timetable: stored, synced, error: syncError } =
+          await loadTimetableForPortal(portalName, {
+            canMigrate: !readOnly,
+          });
+        if (cancelled) return;
+
+        if (!stored?.kind) {
+          if (!local?.kind) setData(null);
+          setIsDirty(false);
+          return;
+        }
+
+        setData(stored);
+        setIsDirty(!synced);
+        if (!synced && syncError) {
+          setError(
+            `${syncError}. Tap Save to sync so your phone can see this timetable.`
+          );
+        }
+
+        if (!synced && !readOnly) {
+          try {
+            setSaving(true);
+            const saved = await saveTimetable(portalName, stored);
+            if (!cancelled) {
+              setData(saved || stored);
+              setIsDirty(false);
+              setError("");
+            }
+          } catch (err) {
+            console.error(err);
+            if (!cancelled) {
+              setIsDirty(true);
+              setError(
+                getApiErrorMessage(
+                  err,
+                  "Timetable is only on this device. Tap Save to sync to the cloud."
+                )
+              );
+            }
+          } finally {
+            if (!cancelled) setSaving(false);
+          }
+        }
       } catch (err) {
         console.error(err);
         if (!cancelled) {
           setError(getApiErrorMessage(err, "Unable to load timetable"));
           setData((prev) => prev || local || null);
+          if (local?.kind) setIsDirty(true);
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -407,10 +450,38 @@ export default function TimeTable({
         };
       }
 
+      setData(payload);
       const saved = await saveTimetable(portalName, payload);
       setData(saved || payload);
+      setIsDirty(false);
     } catch (err) {
       console.error(err);
+      setIsDirty(true);
+      setError(
+        getApiErrorMessage(
+          err,
+          "Timetable was read but could not sync. Tap Save to retry."
+        )
+      );
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!data?.kind) {
+      setError("Nothing to save. Upload a timetable first.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const saved = await saveTimetable(portalName, data);
+      setData(saved || data);
+      setIsDirty(false);
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setIsDirty(true);
       setError(getApiErrorMessage(err, "Unable to save timetable"));
     } finally {
       setSaving(false);
@@ -422,6 +493,7 @@ export default function TimeTable({
     try {
       await deleteTimetable(portalName);
       setData(null);
+      setIsDirty(false);
       setError("");
     } catch (err) {
       console.error(err);
@@ -464,7 +536,7 @@ export default function TimeTable({
             </div>
           ) : null}
 
-          {loading ? (
+          {loading && !hasUpload ? (
             <p className="py-16 text-center text-sm text-slate-500">Loading timetable…</p>
           ) : !hasUpload ? (
             <EmptyTimetable
@@ -473,20 +545,27 @@ export default function TimeTable({
             />
           ) : (
             <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm">
-                <p className="font-medium text-violet-800 truncate min-w-0">
-                  {data.name}
+              <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-2.5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="font-medium text-violet-800 truncate min-w-0">
+                    {data.name || "Timetable"}
+                  </p>
+                  {!readOnly ? (
+                    <button
+                      type="button"
+                      onClick={handleRemove}
+                      disabled={saving}
+                      className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold disabled:opacity-50"
+                    >
+                      {saving ? "Removing…" : "Remove"}
+                    </button>
+                  ) : null}
+                </div>
+                <p className="mt-0.5 text-xs text-violet-600">
+                  {isDirty
+                    ? "Not synced — tap Save so phone & laptop stay in sync"
+                    : "Saved to cloud (phone & laptop)"}
                 </p>
-                {!readOnly ? (
-                  <button
-                    type="button"
-                    onClick={handleRemove}
-                    disabled={saving}
-                    className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold disabled:opacity-50"
-                  >
-                    {saving ? "Removing…" : "Remove"}
-                  </button>
-                ) : null}
               </div>
 
               {data.kind === "grid" ? (
@@ -525,11 +604,15 @@ export default function TimeTable({
                 className="px-5 py-2.5 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2 disabled:opacity-50"
               >
                 <Upload size={18} />
-                {saving
-                  ? "Saving…"
-                  : hasUpload
-                    ? "Replace Upload"
-                    : "Upload"}
+                {hasUpload ? "Replace Upload" : "Upload"}
+              </button>
+              <button
+                type="button"
+                disabled={!hasUpload || saving}
+                onClick={handleSave}
+                className="px-5 py-2.5 rounded-2xl bg-violet-600 text-white font-medium hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {saving ? "Syncing…" : isDirty ? "Sync to phone" : "Save"}
               </button>
             </>
           ) : null}

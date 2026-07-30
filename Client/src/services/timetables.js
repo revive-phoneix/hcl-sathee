@@ -10,7 +10,11 @@ const storageKey = (portalName = "") => {
 const legacyTimetableKeys = (portalName = "") => {
   const centreLabel = getCentreValueFromPortal(portalName) || "";
   const rawPortal = String(portalName || "");
-  const candidates = [rawPortal, centreLabel, getCanonicalCentreKey(centreLabel || rawPortal)];
+  const candidates = [
+    rawPortal,
+    centreLabel,
+    getCanonicalCentreKey(centreLabel || rawPortal),
+  ];
   const keys = new Set([storageKey(portalName)]);
   for (const value of candidates) {
     if (!value) continue;
@@ -103,7 +107,6 @@ export const fetchTimetable = async (portalName) => {
     ...requestConfig,
   });
   const timetable = response.data.timetable ?? null;
-  // Keep a device cache so reopen still works if Render is cold/slow.
   if (timetable?.kind) writeLocalTimetable(portalName, timetable);
   return timetable;
 };
@@ -139,35 +142,65 @@ export const deleteTimetable = async (portalName) => {
 };
 
 /**
- * Prefer server. On network/API failure, use local cache.
- * If server empty but this device has older local data, migrate once (editors only).
+ * @returns {{ timetable: object|null, synced: boolean, error?: string }}
  */
 export const loadTimetableForPortal = async (
   portalName,
   { canMigrate = true } = {}
 ) => {
+  const local = readLocalTimetable(portalName);
+
   try {
     const timetable = await fetchTimetable(portalName);
-    if (timetable?.kind) return timetable;
+    const serverHas = Boolean(timetable?.kind);
+    const localHas = Boolean(local?.kind);
 
-    const local = readLocalTimetable(portalName);
-    if (canMigrate && local?.kind) {
+    // Push richer/legacy local copy when server is empty.
+    if (canMigrate && localHas && !serverHas) {
       try {
-        return await saveTimetable(portalName, local);
+        const saved = await saveTimetable(portalName, local);
+        return { timetable: saved, synced: true };
       } catch (err) {
         console.warn("Timetable migrate to server failed:", err?.message || err);
-        return local;
+        return {
+          timetable: local,
+          synced: false,
+          error: err?.response?.data?.message || err?.message || "Sync failed",
+        };
       }
     }
-    return timetable;
+
+    if (serverHas) {
+      return { timetable, synced: true };
+    }
+
+    return { timetable: timetable || null, synced: true };
   } catch (err) {
-    const local = readLocalTimetable(portalName);
     if (local?.kind) {
       console.warn(
         "Timetable fetch failed, using local cache:",
         err?.message || err
       );
-      return local;
+      if (canMigrate) {
+        try {
+          const saved = await saveTimetable(portalName, local);
+          return { timetable: saved, synced: true };
+        } catch (saveErr) {
+          return {
+            timetable: local,
+            synced: false,
+            error:
+              saveErr?.response?.data?.message ||
+              saveErr?.message ||
+              "Offline — showing local copy only",
+          };
+        }
+      }
+      return {
+        timetable: local,
+        synced: false,
+        error: "Offline — showing local copy only",
+      };
     }
     throw err;
   }
