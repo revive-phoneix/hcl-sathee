@@ -1,4 +1,8 @@
 import * as XLSX from "xlsx";
+import {
+  getCanonicalCentreKey,
+  getCentreValueFromPortal,
+} from "../../utils/portalMapping";
 
 export const DEFAULT_SUBJECTS = [
   "Mathematics",
@@ -33,18 +37,31 @@ const MONTH_NAMES = [
 const MONTH_WORD =
   "jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t(?:ember)?)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?";
 
-const storageKey = (portalName = "") =>
-  `hcl_sathee_schedule_data_${String(portalName || "default")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")}`;
+const storageKey = (portalName = "") => {
+  const centre = getCentreValueFromPortal(portalName) || portalName || "default";
+  const key = getCanonicalCentreKey(centre) || "DEFAULT";
+  return `hcl_sathee_schedule_${key}`;
+};
 
-/** Legacy local-only read (used for one-time migrate to server). */
+/** Legacy local-only read (used for cache + one-time migrate to server). */
 export const readLocalSchedule = (portalName) => {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(portalName)) || "null");
     return Array.isArray(parsed?.rows) ? parsed : null;
   } catch {
     return null;
+  }
+};
+
+export const writeLocalSchedule = (portalName, payload) => {
+  try {
+    if (!payload?.rows?.length) {
+      localStorage.removeItem(storageKey(portalName));
+      return;
+    }
+    localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
+  } catch (err) {
+    console.warn("Unable to cache schedule locally:", err?.message || err);
   }
 };
 
@@ -59,15 +76,7 @@ export const clearLocalSchedule = (portalName) => {
 /** @deprecated Prefer loadScheduleForPortal from services. */
 export const readStoredSchedule = readLocalSchedule;
 
-export const writeStoredSchedule = (portalName, payload) => {
-  try {
-    if (!payload) localStorage.removeItem(storageKey(portalName));
-    else localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
-  } catch (err) {
-    console.error("Unable to save schedule data", err);
-    throw err;
-  }
-};
+export const writeStoredSchedule = writeLocalSchedule;
 
 const parseMonthLabel = (value) => {
   const match = String(value ?? "").trim().match(/^([a-zA-Z]+)\s+(\d{4})$/);

@@ -5,6 +5,7 @@ import { getApiErrorMessage } from "../../utils/apiRequest";
 import {
   deleteTimetable,
   loadTimetableForPortal,
+  readLocalTimetable,
   saveTimetable,
 } from "../../services/timetables";
 
@@ -320,6 +321,10 @@ export default function TimeTable({
 
     const load = async () => {
       setError("");
+      // Show last known local copy immediately so reopen isn't blank while API wakes.
+      const local = readLocalTimetable(portalName);
+      if (local?.kind) setData(local);
+
       setLoading(true);
       try {
         const stored = await loadTimetableForPortal(portalName, {
@@ -329,8 +334,8 @@ export default function TimeTable({
       } catch (err) {
         console.error(err);
         if (!cancelled) {
-          setData(null);
           setError(getApiErrorMessage(err, "Unable to load timetable"));
+          setData((prev) => prev || local || null);
         }
       } finally {
         if (!cancelled) setLoading(false);
