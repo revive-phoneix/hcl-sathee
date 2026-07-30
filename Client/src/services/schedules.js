@@ -54,24 +54,35 @@ export const deleteSchedule = async (portalName) => {
 };
 
 /**
- * Prefer server. Fall back to local cache if API fails.
- * Migrate older local-only data to server when empty (editors only).
+ * @returns {{ schedule: object|null, synced: boolean, error?: string }}
+ * synced=true means data is confirmed on the server (or intentionally empty).
  */
-export const loadScheduleForPortal = async (portalName, { canMigrate = true } = {}) => {
+export const loadScheduleForPortal = async (
+  portalName,
+  { canMigrate = true } = {}
+) => {
   try {
     const schedule = await fetchSchedule(portalName);
-    if (schedule?.rows?.length) return schedule;
+    if (schedule?.rows?.length) {
+      return { schedule, synced: true };
+    }
 
     const local = readLocalSchedule(portalName);
     if (canMigrate && local?.rows?.length) {
       try {
-        return await saveSchedule(portalName, local);
+        const saved = await saveSchedule(portalName, local);
+        return { schedule: saved, synced: true };
       } catch (err) {
         console.warn("Schedule migrate to server failed:", err?.message || err);
-        return local;
+        return {
+          schedule: local,
+          synced: false,
+          error: err?.response?.data?.message || err?.message || "Sync failed",
+        };
       }
     }
-    return schedule;
+
+    return { schedule: schedule || null, synced: true };
   } catch (err) {
     const local = readLocalSchedule(portalName);
     if (local?.rows?.length) {
@@ -79,7 +90,27 @@ export const loadScheduleForPortal = async (portalName, { canMigrate = true } = 
         "Schedule fetch failed, using local cache:",
         err?.message || err
       );
-      return local;
+      // Try one push so phone can see it once network recovers.
+      if (canMigrate) {
+        try {
+          const saved = await saveSchedule(portalName, local);
+          return { schedule: saved, synced: true };
+        } catch (saveErr) {
+          return {
+            schedule: local,
+            synced: false,
+            error:
+              saveErr?.response?.data?.message ||
+              saveErr?.message ||
+              "Offline — showing local copy only",
+          };
+        }
+      }
+      return {
+        schedule: local,
+        synced: false,
+        error: "Offline — showing local copy only",
+      };
     }
     throw err;
   }

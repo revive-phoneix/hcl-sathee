@@ -101,9 +101,10 @@ export default function Schedule({
 
       setLoading(true);
       try {
-        const stored = await loadScheduleForPortal(portalName, {
-          canMigrate: !readOnly,
-        });
+        const { schedule: stored, synced, error: syncError } =
+          await loadScheduleForPortal(portalName, {
+            canMigrate: !readOnly,
+          });
         if (cancelled) return;
 
         if (!stored?.rows?.length) {
@@ -112,6 +113,7 @@ export default function Schedule({
             setScheduleMeta(null);
             setMonth(DEFAULT_MONTHS[0]);
           }
+          setIsDirty(false);
           return;
         }
 
@@ -122,9 +124,17 @@ export default function Schedule({
           ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
           updatedAt: stored.updatedAt || null,
         });
+        setIsDirty(!synced);
+        setBannerVisible(true);
+        if (!synced && syncError) {
+          setError(
+            `${syncError}. Tap Save to sync so your phone can see this schedule.`
+          );
+        }
 
         // Persist repaired rows to server if they changed (admin/mitra only).
         if (
+          synced &&
           !readOnly &&
           JSON.stringify(repaired) !== JSON.stringify(stored.rows)
         ) {
@@ -136,6 +146,39 @@ export default function Schedule({
             });
           } catch (err) {
             console.error(err);
+            setIsDirty(true);
+          }
+        }
+
+        // Local-only copy: force sync now so mobile can load it.
+        if (!synced && !readOnly) {
+          try {
+            setSaving(true);
+            const meta = scheduleMetaLabel(
+              repaired,
+              stored.lastFile || stored.name
+            );
+            const saved = await saveSchedule(portalName, {
+              ...meta,
+              rows: repaired,
+            });
+            setScheduleMeta({
+              ...meta,
+              updatedAt: saved?.updatedAt || new Date().toISOString(),
+            });
+            setIsDirty(false);
+            setError("");
+          } catch (err) {
+            console.error(err);
+            setIsDirty(true);
+            setError(
+              getApiErrorMessage(
+                err,
+                "Schedule is only on this device. Tap Save to sync to the cloud."
+              )
+            );
+          } finally {
+            setSaving(false);
           }
         }
 
@@ -147,6 +190,9 @@ export default function Schedule({
           if (!local?.rows?.length) {
             setAllRows([]);
             setScheduleMeta(null);
+          } else {
+            setIsDirty(true);
+            setBannerVisible(true);
           }
           setError(getApiErrorMessage(err, "Unable to load schedule"));
         }
@@ -419,7 +465,7 @@ export default function Schedule({
             />
           ) : (
             <>
-              {bannerVisible ? (
+              {hasUpload ? (
                 <StatusBanner
                   meta={scheduleMeta}
                   topicCount={allRows.length}
