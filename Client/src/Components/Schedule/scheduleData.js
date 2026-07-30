@@ -38,7 +38,8 @@ const storageKey = (portalName = "") =>
     .toUpperCase()
     .replace(/[^A-Z0-9]+/g, "_")}`;
 
-export const readStoredSchedule = (portalName) => {
+/** Legacy local-only read (used for one-time migrate to server). */
+export const readLocalSchedule = (portalName) => {
   try {
     const parsed = JSON.parse(localStorage.getItem(storageKey(portalName)) || "null");
     return Array.isArray(parsed?.rows) ? parsed : null;
@@ -46,6 +47,17 @@ export const readStoredSchedule = (portalName) => {
     return null;
   }
 };
+
+export const clearLocalSchedule = (portalName) => {
+  try {
+    localStorage.removeItem(storageKey(portalName));
+  } catch {
+    // ignore
+  }
+};
+
+/** @deprecated Prefer loadScheduleForPortal from services. */
+export const readStoredSchedule = readLocalSchedule;
 
 export const writeStoredSchedule = (portalName, payload) => {
   try {

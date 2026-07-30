@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
 import { Calendar, Upload, X } from "lucide-react";
+import { getApiErrorMessage } from "../../utils/apiRequest";
+import {
+  deleteTimetable,
+  loadTimetableForPortal,
+  saveTimetable,
+} from "../../services/timetables";
 
 const ACCEPT =
   ".xls,.xlsx,.csv,.svg,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv,image/svg+xml";
@@ -14,34 +20,6 @@ const DAY_ORDER = [
   "Saturday",
   "Sunday",
 ];
-
-const storageKey = (portalName = "") =>
-  `hcl_sathee_timetable_grid_${String(portalName || "default")
-    .toUpperCase()
-    .replace(/[^A-Z0-9]+/g, "_")}`;
-
-const readStored = (portalName) => {
-  try {
-    const raw = localStorage.getItem(storageKey(portalName));
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.kind === "svg" && parsed?.dataUrl) return parsed;
-    if (parsed?.kind === "grid" && Array.isArray(parsed?.slots)) return parsed;
-    return null;
-  } catch {
-    return null;
-  }
-};
-
-const writeStored = (portalName, payload) => {
-  try {
-    if (!payload) localStorage.removeItem(storageKey(portalName));
-    else localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
-  } catch (err) {
-    console.error("Unable to save timetable", err);
-    throw err;
-  }
-};
 
 const fileToDataUrl = (file) =>
   new Promise((resolve, reject) => {
@@ -318,6 +296,8 @@ export default function TimeTable({
   const fileInputRef = useRef(null);
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     const onKeyDown = (event) => {
@@ -336,9 +316,32 @@ export default function TimeTable({
 
   useEffect(() => {
     if (!isOpen) return;
-    setError("");
-    setData(readStored(portalName));
-  }, [isOpen, portalName]);
+    let cancelled = false;
+
+    const load = async () => {
+      setError("");
+      setLoading(true);
+      try {
+        const stored = await loadTimetableForPortal(portalName, {
+          canMigrate: !readOnly,
+        });
+        if (!cancelled) setData(stored || null);
+      } catch (err) {
+        console.error(err);
+        if (!cancelled) {
+          setData(null);
+          setError(getApiErrorMessage(err, "Unable to load timetable"));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, portalName, readOnly]);
 
   const hasUpload = Boolean(data);
   const subtitle = useMemo(() => {
@@ -364,53 +367,63 @@ export default function TimeTable({
       return;
     }
 
+    setSaving(true);
     try {
       setError("");
 
+      let payload;
       if (isSvg(file)) {
         const dataUrl = await fileToDataUrl(file);
-        const payload = {
+        payload = {
           kind: "svg",
           name: file.name,
           dataUrl,
           updatedAt: new Date().toISOString(),
         };
-        writeStored(portalName, payload);
-        setData(payload);
-        return;
+      } else {
+        const buffer = await file.arrayBuffer();
+        const workbook = XLSX.read(buffer, { type: "array" });
+        const grid = parseWorkbookToGrid(workbook);
+
+        if (!grid) {
+          setError(
+            "Could not read the timetable. Use a weekly sheet: Time | Monday | Tuesday | …"
+          );
+          return;
+        }
+
+        payload = {
+          kind: "grid",
+          name: file.name,
+          title: titleFromGrid(grid),
+          days: grid.days,
+          slots: grid.slots,
+          updatedAt: new Date().toISOString(),
+        };
       }
 
-      const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: "array" });
-      const grid = parseWorkbookToGrid(workbook);
-
-      if (!grid) {
-        setError(
-          "Could not read the timetable. Use a weekly sheet: Time | Monday | Tuesday | …"
-        );
-        return;
-      }
-
-      const payload = {
-        kind: "grid",
-        name: file.name,
-        title: titleFromGrid(grid),
-        days: grid.days,
-        slots: grid.slots,
-        updatedAt: new Date().toISOString(),
-      };
-      writeStored(portalName, payload);
-      setData(payload);
+      const saved = await saveTimetable(portalName, payload);
+      setData(saved || payload);
     } catch (err) {
       console.error(err);
-      setError("Unable to read that file. Check the format and try again.");
+      setError(getApiErrorMessage(err, "Unable to save timetable"));
+    } finally {
+      setSaving(false);
     }
   };
 
-  const handleRemove = () => {
-    writeStored(portalName, null);
-    setData(null);
-    setError("");
+  const handleRemove = async () => {
+    setSaving(true);
+    try {
+      await deleteTimetable(portalName);
+      setData(null);
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError(getApiErrorMessage(err, "Unable to remove timetable"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -446,7 +459,9 @@ export default function TimeTable({
             </div>
           ) : null}
 
-          {!hasUpload ? (
+          {loading ? (
+            <p className="py-16 text-center text-sm text-slate-500">Loading timetable…</p>
+          ) : !hasUpload ? (
             <EmptyTimetable
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
@@ -461,9 +476,10 @@ export default function TimeTable({
                   <button
                     type="button"
                     onClick={handleRemove}
-                    className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold"
+                    disabled={saving}
+                    className="shrink-0 text-violet-600 hover:text-violet-800 text-xs font-semibold disabled:opacity-50"
                   >
-                    Remove
+                    {saving ? "Removing…" : "Remove"}
                   </button>
                 ) : null}
               </div>
@@ -499,11 +515,16 @@ export default function TimeTable({
               />
               <button
                 type="button"
+                disabled={saving || loading}
                 onClick={() => fileInputRef.current?.click()}
-                className="px-5 py-2.5 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2"
+                className="px-5 py-2.5 border border-violet-300 text-violet-700 rounded-2xl hover:bg-violet-50 transition-colors font-medium inline-flex items-center gap-2 disabled:opacity-50"
               >
                 <Upload size={18} />
-                {hasUpload ? "Replace Upload" : "Upload"}
+                {saving
+                  ? "Saving…"
+                  : hasUpload
+                    ? "Replace Upload"
+                    : "Upload"}
               </button>
             </>
           ) : null}

@@ -11,6 +11,8 @@ const announcementRoutes = require("./Routes/AnnouncementRoutes");
 const mitraAttendanceRoutes = require("./Routes/MitraAttendanceRoutes");
 const studentAttendanceRoutes = require("./Routes/StudentAttendanceRoutes");
 const equipmentRoutes = require("./Routes/EquipmentRoutes");
+const scheduleRoutes = require("./Routes/ScheduleRoutes");
+const timetableRoutes = require("./Routes/TimetableRoutes");
 
 const app = express();
 
@@ -25,7 +27,8 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
+// Allow SVG timetable dataUrls / large schedule payloads
+app.use(express.json({ limit: "3mb" }));
 
 app.get("/", (_req, res) => {
   res.json({
@@ -42,6 +45,8 @@ app.use("/api/announcements", announcementRoutes);
 app.use("/api/mitra-attendance", mitraAttendanceRoutes);
 app.use("/api/student-attendance", studentAttendanceRoutes);
 app.use("/api/equipments", equipmentRoutes);
+app.use("/api/schedules", scheduleRoutes);
+app.use("/api/timetables", timetableRoutes);
 
 try {
   initFirebase();

@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import ExportDropdown from "../../Components/common/ExportDropdown";
 import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
+import { getApiErrorMessage } from "../../utils/apiRequest";
+import {
+  deleteSchedule,
+  loadScheduleForPortal,
+  saveSchedule,
+} from "../../services/schedules";
 import {
   DEFAULT_MONTHS,
   DEFAULT_SUBJECTS,
@@ -14,10 +20,8 @@ import {
   mergeScheduleRows,
   monthsFromRows,
   parseScheduleFile,
-  readStoredSchedule,
   repairScheduleRows,
   scheduleMetaLabel,
-  writeStoredSchedule,
 } from "../../Components/Schedule";
 
 export default function Schedule({
@@ -36,6 +40,8 @@ export default function Schedule({
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteMonth, setDeleteMonth] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [exporting, setExporting] = useState(false);
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -71,40 +77,70 @@ export default function Schedule({
 
   useEffect(() => {
     if (!isOpen) return;
-    setError("");
-    setIsDirty(false);
-    setBannerVisible(false);
-    setDeleteOpen(false);
+    let cancelled = false;
 
-    const stored = readStoredSchedule(portalName);
-    if (!stored) {
-      setAllRows([]);
-      setScheduleMeta(null);
-      setMonth(DEFAULT_MONTHS[0]);
-      return;
-    }
-
-    const repaired = repairScheduleRows(stored.rows);
-    const monthLabels = monthsFromRows(repaired);
-    setAllRows(repaired);
-    setScheduleMeta({
-      ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
-      updatedAt: stored.updatedAt || null,
-    });
-    if (JSON.stringify(repaired) !== JSON.stringify(stored.rows)) {
+    const load = async () => {
+      setError("");
+      setIsDirty(false);
+      setBannerVisible(false);
+      setDeleteOpen(false);
+      setLoading(true);
       try {
-        writeStoredSchedule(portalName, {
-          ...stored,
-          ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
-          rows: repaired,
+        const stored = await loadScheduleForPortal(portalName, {
+          canMigrate: !readOnly,
         });
+        if (cancelled) return;
+
+        if (!stored?.rows?.length) {
+          setAllRows([]);
+          setScheduleMeta(null);
+          setMonth(DEFAULT_MONTHS[0]);
+          return;
+        }
+
+        const repaired = repairScheduleRows(stored.rows);
+        const monthLabels = monthsFromRows(repaired);
+        setAllRows(repaired);
+        setScheduleMeta({
+          ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
+          updatedAt: stored.updatedAt || null,
+        });
+
+        // Persist repaired rows to server if they changed (admin/mitra only).
+        if (
+          !readOnly &&
+          JSON.stringify(repaired) !== JSON.stringify(stored.rows)
+        ) {
+          try {
+            await saveSchedule(portalName, {
+              ...stored,
+              ...scheduleMetaLabel(repaired, stored.lastFile || stored.name),
+              rows: repaired,
+            });
+          } catch (err) {
+            console.error(err);
+          }
+        }
+
+        if (repaired[0]?.subject) setSubject(repaired[0].subject);
+        setMonth(firstMonth(monthLabels));
       } catch (err) {
         console.error(err);
+        if (!cancelled) {
+          setAllRows([]);
+          setScheduleMeta(null);
+          setError(getApiErrorMessage(err, "Unable to load schedule"));
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    }
-    if (repaired[0]?.subject) setSubject(repaired[0].subject);
-    setMonth(firstMonth(monthLabels));
-  }, [isOpen, portalName]);
+    };
+
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [isOpen, portalName, readOnly]);
 
   const subjects = useMemo(() => {
     const fromData = [...new Set(allRows.map((r) => r.subject).filter(Boolean))];
@@ -181,21 +217,27 @@ export default function Schedule({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!allRows.length) {
       setError("Nothing to save. Upload a schedule first.");
       return;
     }
+    setSaving(true);
     try {
       const meta = scheduleMetaLabel(allRows, scheduleMeta?.lastFile);
-      writeStoredSchedule(portalName, { ...meta, rows: allRows });
-      setScheduleMeta(meta);
+      const saved = await saveSchedule(portalName, { ...meta, rows: allRows });
+      setScheduleMeta({
+        ...meta,
+        updatedAt: saved?.updatedAt || new Date().toISOString(),
+      });
       setIsDirty(false);
       setError("");
       flashStatusBanner();
     } catch (err) {
       console.error(err);
-      setError("Unable to save schedule. Storage may be full.");
+      setError(getApiErrorMessage(err, "Unable to save schedule"));
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -209,34 +251,48 @@ export default function Schedule({
     setDeleteOpen(true);
   };
 
-  const handleDeleteMonth = () => {
+  const handleDeleteMonth = async () => {
     if (!deleteMonth) return;
     const remaining = allRows.filter((row) => row.month !== deleteMonth);
     const monthLabels = monthsFromRows(remaining);
 
-    if (!remaining.length) {
-      writeStoredSchedule(portalName, null);
-      setAllRows([]);
-      setScheduleMeta(null);
-      setIsDirty(false);
-      setMonth(DEFAULT_MONTHS[0]);
-      setSubject("Mathematics");
-    } else {
-      const meta = scheduleMetaLabel(remaining, scheduleMeta?.lastFile);
-      writeStoredSchedule(portalName, { ...meta, rows: remaining });
-      setAllRows(remaining);
-      setScheduleMeta(meta);
-      setIsDirty(false);
-      setMonth(firstMonth(monthLabels));
-      if (!remaining.some((row) => row.subject === subject)) {
-        setSubject(remaining[0].subject);
+    setSaving(true);
+    try {
+      if (!remaining.length) {
+        await deleteSchedule(portalName);
+        setAllRows([]);
+        setScheduleMeta(null);
+        setIsDirty(false);
+        setMonth(DEFAULT_MONTHS[0]);
+        setSubject("Mathematics");
+      } else {
+        const meta = scheduleMetaLabel(remaining, scheduleMeta?.lastFile);
+        const saved = await saveSchedule(portalName, {
+          ...meta,
+          rows: remaining,
+        });
+        setAllRows(remaining);
+        setScheduleMeta({
+          ...meta,
+          updatedAt: saved?.updatedAt || new Date().toISOString(),
+        });
+        setIsDirty(false);
+        setMonth(firstMonth(monthLabels));
+        if (!remaining.some((row) => row.subject === subject)) {
+          setSubject(remaining[0].subject);
+        }
+        flashStatusBanner();
       }
-      flashStatusBanner();
-    }
 
-    setDeleteOpen(false);
-    setSearch("");
-    setError("");
+      setDeleteOpen(false);
+      setSearch("");
+      setError("");
+    } catch (err) {
+      console.error(err);
+      setError(getApiErrorMessage(err, "Unable to update schedule"));
+    } finally {
+      setSaving(false);
+    }
   };
 
   const runScheduleExport = (format) => {
@@ -317,7 +373,9 @@ export default function Schedule({
             </div>
           ) : null}
 
-          {!hasUpload ? (
+          {loading ? (
+            <p className="py-16 text-center text-sm text-slate-500">Loading schedule…</p>
+          ) : !hasUpload ? (
             <EmptyState
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
@@ -395,15 +453,15 @@ export default function Schedule({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!hasUpload || !isDirty}
+                disabled={!hasUpload || !isDirty || saving}
                 className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Save
+                {saving ? "Saving…" : "Save"}
               </button>
               <button
                 type="button"
                 onClick={openDeleteMonth}
-                disabled={!hasUpload}
+                disabled={!hasUpload || saving}
                 className="px-5 py-2.5 rounded-xl border border-red-200 text-sm font-semibold text-red-600 hover:bg-red-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Delete
