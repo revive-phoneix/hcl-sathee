@@ -6,7 +6,10 @@ import AttendanceToolbar from "../../Components/Attendance/AttendanceToolbar";
 import AttendanceTable from "../../Components/Attendance/AttendanceTable";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import MyMitraAttendance from "../../Components/Attendance/MyMitraAttendance";
+import ApplyLeaveModal from "../../Components/Attendance/ApplyLeaveModal";
 import { fetchUsers } from "../../services/users";
+import { applyLeaveRequest } from "../../services/leaveRequests";
+import { getApiErrorMessage } from "../../utils/apiRequest";
 import { fetchStudents } from "../../services/students";
 import { fetchStudentAttendanceRange } from "../../services/studentAttendance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
@@ -230,6 +233,10 @@ export default function AdminAttendance({
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [error, setError] = useState("");
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [submittingLeave, setSubmittingLeave] = useState(false);
+  const [leaveMessage, setLeaveMessage] = useState("");
+  const [leaveError, setLeaveError] = useState("");
 
   const isMitraTab = mitraTabEnabled && activeTab === "sathee-mitra";
   const filtersReady =
@@ -406,6 +413,24 @@ export default function AdminAttendance({
     loadAttendance();
   }, [loadAttendance]);
 
+  const handleApplyLeave = async (payload) => {
+    setSubmittingLeave(true);
+    setLeaveError("");
+    setLeaveMessage("");
+    try {
+      await applyLeaveRequest(payload);
+      setShowLeaveModal(false);
+      setLeaveMessage(
+        "Leave request submitted. Admins for your centre will be notified once push alerts are enabled."
+      );
+    } catch (err) {
+      console.error("Apply leave error:", err);
+      setLeaveError(getApiErrorMessage(err, "Unable to submit leave request"));
+    } finally {
+      setSubmittingLeave(false);
+    }
+  };
+
   const runAttendanceExport = (format) => {
     if (isMitraTab) {
       alert("Export for Sathee Mitra attendance is not available yet");
@@ -455,16 +480,42 @@ export default function AdminAttendance({
       roleLabel={roleLabel}
     >
       <div className="grid-cols-4 gap-6 w-full mx-auto px-6 space-y-8">
-        <div className="mb-6">
-          <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            {isMitraTab
-              ? mitraSelfUpload
-                ? "Upload your arrival and departure photos. Time is saved automatically."
-                : "Track Sathee Mitra presence with arrival and departure photo proof."
-              : "Combined centre attendance by day, week, and month."}
-          </p>
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {isMitraTab
+                ? mitraSelfUpload
+                  ? "Upload your arrival and departure photos. Time is saved automatically."
+                  : "Track Sathee Mitra presence with arrival and departure photo proof."
+                : "Combined centre attendance by day, week, and month."}
+            </p>
+          </div>
+          {mitraSelfUpload ? (
+            <button
+              type="button"
+              onClick={() => {
+                setLeaveError("");
+                setLeaveMessage("");
+                setShowLeaveModal(true);
+              }}
+              className="shrink-0 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+            >
+              Apply Leave
+            </button>
+          ) : null}
         </div>
+
+        {leaveMessage ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+            {leaveMessage}
+          </div>
+        ) : null}
+        {leaveError ? (
+          <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            {leaveError}
+          </div>
+        ) : null}
 
         <TabSelector
           activeTab={activeTab}
@@ -537,6 +588,17 @@ export default function AdminAttendance({
           )}
         </div>
       </div>
+
+      {showLeaveModal && mitraSelfUpload ? (
+        <ApplyLeaveModal
+          userName={userName}
+          submitting={submittingLeave}
+          onClose={() => {
+            if (!submittingLeave) setShowLeaveModal(false);
+          }}
+          onSubmit={handleApplyLeave}
+        />
+      ) : null}
     </MainLayout>
   );
 }
