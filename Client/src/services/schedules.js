@@ -61,14 +61,15 @@ export const loadScheduleForPortal = async (
   portalName,
   { canMigrate = true } = {}
 ) => {
+  const local = readLocalSchedule(portalName);
+
   try {
     const schedule = await fetchSchedule(portalName);
-    if (schedule?.rows?.length) {
-      return { schedule, synced: true };
-    }
+    const serverRows = schedule?.rows?.length || 0;
+    const localRows = local?.rows?.length || 0;
 
-    const local = readLocalSchedule(portalName);
-    if (canMigrate && local?.rows?.length) {
+    // Prefer richer local copy left over from pre-cloud days and push it up.
+    if (canMigrate && localRows > serverRows) {
       try {
         const saved = await saveSchedule(portalName, local);
         return { schedule: saved, synced: true };
@@ -82,15 +83,17 @@ export const loadScheduleForPortal = async (
       }
     }
 
+    if (serverRows) {
+      return { schedule, synced: true };
+    }
+
     return { schedule: schedule || null, synced: true };
   } catch (err) {
-    const local = readLocalSchedule(portalName);
     if (local?.rows?.length) {
       console.warn(
         "Schedule fetch failed, using local cache:",
         err?.message || err
       );
-      // Try one push so phone can see it once network recovers.
       if (canMigrate) {
         try {
           const saved = await saveSchedule(portalName, local);

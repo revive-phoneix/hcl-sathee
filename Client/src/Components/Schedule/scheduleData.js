@@ -43,11 +43,64 @@ const storageKey = (portalName = "") => {
   return `hcl_sathee_schedule_${key}`;
 };
 
-/** Legacy local-only read (used for cache + one-time migrate to server). */
+const legacyStorageKeys = (portalName = "") => {
+  const centreLabel = getCentreValueFromPortal(portalName) || "";
+  const rawPortal = String(portalName || "");
+  const candidates = [rawPortal, centreLabel, getCanonicalCentreKey(centreLabel || rawPortal)];
+  const keys = new Set();
+  keys.add(storageKey(portalName));
+  for (const value of candidates) {
+    if (!value) continue;
+    const slug = String(value)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (!slug) continue;
+    keys.add(`hcl_sathee_schedule_data_${slug}`);
+    keys.add(`hcl_sathee_schedule_${slug}`);
+  }
+  return [...keys];
+};
+
+const parseStoredSchedule = (raw) => {
+  try {
+    const parsed = JSON.parse(raw || "null");
+    return Array.isArray(parsed?.rows) && parsed.rows.length ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Read cached schedule. Also recovers older localStorage keys from before
+ * cloud sync (those were never uploaded, which is why phones saw nothing).
+ */
 export const readLocalSchedule = (portalName) => {
   try {
-    const parsed = JSON.parse(localStorage.getItem(storageKey(portalName)) || "null");
-    return Array.isArray(parsed?.rows) ? parsed : null;
+    for (const key of legacyStorageKeys(portalName)) {
+      const parsed = parseStoredSchedule(localStorage.getItem(key));
+      if (parsed) return parsed;
+    }
+
+    // Last resort: any schedule blob left on this browser for this centre.
+    const centreKey = getCanonicalCentreKey(
+      getCentreValueFromPortal(portalName) || portalName || ""
+    );
+    let best = null;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("hcl_sathee_schedule")) continue;
+      if (centreKey && !key.toUpperCase().includes(centreKey.replace(/^HCL/, ""))) {
+        // e.g. key contains RAJASTHAN while centreKey is HCLRAJASTHAN
+        const loose = centreKey.replace(/^HCL/, "");
+        if (!key.toUpperCase().includes(loose)) continue;
+      }
+      const parsed = parseStoredSchedule(localStorage.getItem(key));
+      if (parsed && (!best || parsed.rows.length > best.rows.length)) {
+        best = parsed;
+      }
+    }
+    return best;
   } catch {
     return null;
   }
@@ -55,11 +108,18 @@ export const readLocalSchedule = (portalName) => {
 
 export const writeLocalSchedule = (portalName, payload) => {
   try {
+    const primary = storageKey(portalName);
     if (!payload?.rows?.length) {
-      localStorage.removeItem(storageKey(portalName));
+      for (const key of legacyStorageKeys(portalName)) {
+        localStorage.removeItem(key);
+      }
       return;
     }
-    localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
+    localStorage.setItem(primary, JSON.stringify(payload));
+    // Drop legacy duplicates so we don't keep two sources of truth.
+    for (const key of legacyStorageKeys(portalName)) {
+      if (key !== primary) localStorage.removeItem(key);
+    }
   } catch (err) {
     console.warn("Unable to cache schedule locally:", err?.message || err);
   }
@@ -67,7 +127,9 @@ export const writeLocalSchedule = (portalName, payload) => {
 
 export const clearLocalSchedule = (portalName) => {
   try {
-    localStorage.removeItem(storageKey(portalName));
+    for (const key of legacyStorageKeys(portalName)) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // ignore
   }

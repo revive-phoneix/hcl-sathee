@@ -1,19 +1,27 @@
 import axios from "axios";
 import { API_URL } from "../config/api";
-import { authHeaders } from "../utils/authToken";
+import { getAuthToken } from "../utils/authToken";
 import { clearSession } from "../utils/authSession";
 
 /** Shared axios instance — attaches JWT and clears it on 401. */
 const api = axios.create({
   baseURL: API_URL,
+  timeout: 60000,
 });
 
 api.interceptors.request.use((config) => {
-  const headers = authHeaders();
-  config.headers = {
-    ...config.headers,
-    ...headers,
-  };
+  const token = getAuthToken();
+  // Axios v1 uses AxiosHeaders — set() is reliable; object spread is not.
+  if (token) {
+    if (config.headers && typeof config.headers.set === "function") {
+      config.headers.set("Authorization", `Bearer ${token}`);
+    } else {
+      config.headers = {
+        ...(config.headers || {}),
+        Authorization: `Bearer ${token}`,
+      };
+    }
+  }
   return config;
 });
 

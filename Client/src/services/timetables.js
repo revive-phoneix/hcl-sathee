@@ -7,9 +7,26 @@ const storageKey = (portalName = "") => {
   return `hcl_sathee_timetable_${key}`;
 };
 
-export const readLocalTimetable = (portalName) => {
+const legacyTimetableKeys = (portalName = "") => {
+  const centreLabel = getCentreValueFromPortal(portalName) || "";
+  const rawPortal = String(portalName || "");
+  const candidates = [rawPortal, centreLabel, getCanonicalCentreKey(centreLabel || rawPortal)];
+  const keys = new Set([storageKey(portalName)]);
+  for (const value of candidates) {
+    if (!value) continue;
+    const slug = String(value)
+      .toUpperCase()
+      .replace(/[^A-Z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+    if (!slug) continue;
+    keys.add(`hcl_sathee_timetable_grid_${slug}`);
+    keys.add(`hcl_sathee_timetable_${slug}`);
+  }
+  return [...keys];
+};
+
+const parseStoredTimetable = (raw) => {
   try {
-    const raw = localStorage.getItem(storageKey(portalName));
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (parsed?.kind === "svg" && parsed?.dataUrl) return parsed;
@@ -20,13 +37,43 @@ export const readLocalTimetable = (portalName) => {
   }
 };
 
+export const readLocalTimetable = (portalName) => {
+  try {
+    for (const key of legacyTimetableKeys(portalName)) {
+      const parsed = parseStoredTimetable(localStorage.getItem(key));
+      if (parsed) return parsed;
+    }
+
+    const centreKey = getCanonicalCentreKey(
+      getCentreValueFromPortal(portalName) || portalName || ""
+    );
+    const loose = centreKey.replace(/^HCL/, "");
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith("hcl_sathee_timetable")) continue;
+      if (loose && !key.toUpperCase().includes(loose)) continue;
+      const parsed = parseStoredTimetable(localStorage.getItem(key));
+      if (parsed) return parsed;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+};
+
 export const writeLocalTimetable = (portalName, payload) => {
   try {
+    const primary = storageKey(portalName);
     if (!payload?.kind) {
-      localStorage.removeItem(storageKey(portalName));
+      for (const key of legacyTimetableKeys(portalName)) {
+        localStorage.removeItem(key);
+      }
       return;
     }
-    localStorage.setItem(storageKey(portalName), JSON.stringify(payload));
+    localStorage.setItem(primary, JSON.stringify(payload));
+    for (const key of legacyTimetableKeys(portalName)) {
+      if (key !== primary) localStorage.removeItem(key);
+    }
   } catch (err) {
     console.warn("Unable to cache timetable locally:", err?.message || err);
   }
@@ -34,7 +81,9 @@ export const writeLocalTimetable = (portalName, payload) => {
 
 export const clearLocalTimetable = (portalName) => {
   try {
-    localStorage.removeItem(storageKey(portalName));
+    for (const key of legacyTimetableKeys(portalName)) {
+      localStorage.removeItem(key);
+    }
   } catch {
     // ignore
   }

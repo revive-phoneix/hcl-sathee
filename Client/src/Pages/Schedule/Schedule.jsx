@@ -536,10 +536,10 @@ export default function Schedule({
               <button
                 type="button"
                 onClick={handleSave}
-                disabled={!hasUpload || !isDirty || saving}
+                disabled={!hasUpload || saving}
                 className="px-5 py-2.5 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {saving ? "Saving…" : "Save"}
+                {saving ? "Syncing…" : isDirty ? "Sync to phone" : "Save"}
               </button>
               <button
                 type="button"
