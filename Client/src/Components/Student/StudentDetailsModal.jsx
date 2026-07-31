@@ -6,6 +6,7 @@ import {
   sanitizePhoneInput,
 } from "../../utils/phone";
 import { average, parsePercentValue } from "../../utils/studentMetrics";
+import { resolveEnrolledSubjects } from "../../utils/courseSubjects";
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -15,11 +16,19 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
 
   useEffect(() => {
     if (student) {
+      const subjects = resolveEnrolledSubjects(student.course, student.subjects);
+      const marks = {};
+      const attendance = {};
+      for (const subject of subjects) {
+        marks[subject] = Number(student.marks?.[subject]) || 0;
+        attendance[subject] = Number(student.attendance?.[subject]) || 0;
+      }
       setFormData({
         ...student,
+        subjects,
         parents: { ...(student.parents || {}) },
-        marks: { ...(student.marks || {}) },
-        attendance: { ...(student.attendance || {}) },
+        marks,
+        attendance,
         qualifications: { ...(student.qualifications || {}) },
       });
       setIsEditing(false);
@@ -27,19 +36,23 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
     }
   }, [student]);
 
+  const enrolledSubjects = useMemo(
+    () =>
+      formData
+        ? resolveEnrolledSubjects(formData.course, formData.subjects)
+        : [],
+    [formData]
+  );
+
   const overallAttendance = useMemo(() => {
     if (!formData) return null;
     const map = formData.attendance || {};
-    const subjects =
-      Array.isArray(formData.subjects) && formData.subjects.length
-        ? formData.subjects
-        : Object.keys(map);
-    const rates = subjects
+    const rates = enrolledSubjects
       .map((subject) => parsePercentValue(map[subject]))
       .filter((rate) => rate != null);
     const avg = average(rates);
     return avg == null ? null : Math.round(avg * 10) / 10;
-  }, [formData]);
+  }, [formData, enrolledSubjects]);
 
   if (!open || !student || !formData) return null;
 
@@ -224,13 +237,13 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               Auto-updated from tests/exams — not editable.
             </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {Object.entries(formData.marks || {}).length === 0 ? (
+              {enrolledSubjects.length === 0 ? (
                 <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
               ) : (
-                Object.entries(formData.marks || {}).map(([subject, score]) => (
+                enrolledSubjects.map((subject) => (
                   <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
                     <strong>{subject}</strong>
-                    <div style={{ marginTop: 6 }}>{score}</div>
+                    <div style={{ marginTop: 6 }}>{formData.marks?.[subject] ?? 0}</div>
                   </div>
                 ))
               )}
@@ -269,15 +282,18 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               </div>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {Object.entries(formData.attendance || {}).length === 0 ? (
+              {enrolledSubjects.length === 0 ? (
                 <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
               ) : (
-                Object.entries(formData.attendance || {}).map(([cls, rate]) => (
-                  <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                    <strong>{cls}</strong>
-                    <div style={{ marginTop: 6 }}>{typeof rate === "number" ? `${rate}%` : rate}</div>
-                  </div>
-                ))
+                enrolledSubjects.map((cls) => {
+                  const rate = formData.attendance?.[cls];
+                  return (
+                    <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+                      <strong>{cls}</strong>
+                      <div style={{ marginTop: 6 }}>{typeof rate === "number" ? `${rate}%` : rate ?? "0%"}</div>
+                    </div>
+                  );
+                })
               )}
             </div>
           </div>

@@ -10,11 +10,15 @@ const {
 } = require("../Utils/centreMatch");
 const { toDateOnly } = require("../Utils/firestoreHelpers");
 const { recomputeSubjectAttendance } = require("../Utils/recomputeSubjectAttendance");
+const {
+  normalizeCourseCode,
+  resolveEnrolledSubjects,
+} = require("../Utils/courseSubjects");
 
 const groupByStudentId = (rows) => {
   const map = new Map();
   for (const row of rows) {
-    const key = row.studentId;
+    const key = Number(row.studentId) || row.studentId;
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(row);
   }
@@ -36,7 +40,7 @@ const subjectPct = (row) => {
 };
 
 const enrichWithSubjectMaps = (student, performances = [], attendances = []) => {
-  const subjects =
+  const listedSubjects =
     Array.isArray(student.subjects) && student.subjects.length
       ? student.subjects
       : [
@@ -48,23 +52,29 @@ const enrichWithSubjectMaps = (student, performances = [], attendances = []) => 
           ]),
         ].filter(Boolean);
 
-  const marks = { ...(student.marks || {}) };
-  const attendance = { ...(student.attendance || {}) };
+  const subjects = resolveEnrolledSubjects(student.course, listedSubjects);
+  const marks = {};
+  const attendance = {};
 
   for (const subject of subjects) {
-    if (marks[subject] === undefined) marks[subject] = 0;
-    if (attendance[subject] === undefined) attendance[subject] = 0;
+    marks[subject] = Number(student.marks?.[subject]) || 0;
+    attendance[subject] = Number(student.attendance?.[subject]) || 0;
   }
 
   for (const perf of performances) {
-    marks[perf.subject] = Number(perf.marks) || 0;
+    if (Object.prototype.hasOwnProperty.call(marks, perf.subject)) {
+      marks[perf.subject] = Number(perf.marks) || 0;
+    }
   }
   for (const att of attendances) {
-    attendance[att.subject] = subjectPct(att);
+    if (Object.prototype.hasOwnProperty.call(attendance, att.subject)) {
+      attendance[att.subject] = subjectPct(att);
+    }
   }
 
   return {
     ...student,
+    course: normalizeCourseCode(student.course) || student.course,
     subjects,
     marks,
     attendance,
@@ -103,8 +113,8 @@ exports.getStudentsWithPerformance = wrap(
       students: students.map((student) =>
         enrichWithSubjectMaps(
           student,
-          performancesByStudent.get(student.id) || [],
-          attendancesByStudent.get(student.id) || []
+          performancesByStudent.get(Number(student.id) || student.id) || [],
+          attendancesByStudent.get(Number(student.id) || student.id) || []
         )
       ),
     });

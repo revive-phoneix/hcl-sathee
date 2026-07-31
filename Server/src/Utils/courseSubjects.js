@@ -62,11 +62,30 @@ const OPTIONAL_COURSE_SUBJECTS = {
   },
 };
 
-function getCourseSubjectConfig(course) {
-  if (!course) return null;
+function normalizeCourseCode(course = "") {
+  const key = String(course || "")
+    .trim()
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "");
 
-  if (COMPULSORY_COURSE_SUBJECTS[course]) {
-    const subjects = COMPULSORY_COURSE_SUBJECTS[course];
+  if (!key) return "";
+  if (key.includes("JEE")) return "JEE";
+  if (key.includes("NEET")) return "NEET";
+  if (key.includes("SSC")) return "SSC";
+  if (key.includes("CLAT")) return "CLAT";
+  if (key.includes("IBPS") || key.includes("IPBS")) return "IBPS";
+  if (key.includes("ICAR")) return "ICAR";
+  if (key.includes("CUET")) return "CUET";
+  if (key.includes("RRB")) return "RRB";
+  return key;
+}
+
+function getCourseSubjectConfig(course) {
+  const courseKey = normalizeCourseCode(course);
+  if (!courseKey) return null;
+
+  if (COMPULSORY_COURSE_SUBJECTS[courseKey]) {
+    const subjects = COMPULSORY_COURSE_SUBJECTS[courseKey];
     return {
       type: "fixed",
       compulsory: subjects,
@@ -77,7 +96,7 @@ function getCourseSubjectConfig(course) {
     };
   }
 
-  const optional = OPTIONAL_COURSE_SUBJECTS[course];
+  const optional = OPTIONAL_COURSE_SUBJECTS[courseKey];
   if (!optional) return null;
 
   if (optional.chooseAnyOne) {
@@ -131,6 +150,23 @@ function normalizeSubjects(value) {
   return [];
 }
 
+function resolveEnrolledSubjects(course, subjects = []) {
+  const config = getCourseSubjectConfig(course);
+  const listed = normalizeSubjects(subjects);
+
+  if (!config) return listed;
+
+  if (config.type === "fixed") {
+    return [...config.compulsory];
+  }
+
+  const allowed = new Set([...config.compulsory, ...config.choice]);
+  const choices = listed.filter(
+    (subject) => allowed.has(subject) && !config.compulsory.includes(subject)
+  );
+  return [...config.compulsory, ...choices];
+}
+
 function validateSubjectSelection(course, selectedSubjects) {
   const config = getCourseSubjectConfig(course);
   if (!config) {
@@ -173,19 +209,14 @@ function validateSubjectSelection(course, selectedSubjects) {
     return { ok: false, message: "This course does not allow optional subjects." };
   }
 
-  // Keep compulsory first, then choices in selected order
-  const ordered = [
-    ...config.compulsory,
-    ...choices.filter((s) => selected.includes(s)),
-  ];
-
-  return { ok: true, subjects: ordered };
+  return { ok: true, subjects: resolveEnrolledSubjects(course, selected) };
 }
 
 function resolveSubjectsForCourse(course, subjects, marks, attendance) {
+  const courseKey = normalizeCourseCode(course);
   const fromBody = normalizeSubjects(subjects);
   if (fromBody.length) {
-    return validateSubjectSelection(course, fromBody);
+    return validateSubjectSelection(courseKey, fromBody);
   }
 
   const fromMaps = normalizeSubjects({
@@ -194,10 +225,10 @@ function resolveSubjectsForCourse(course, subjects, marks, attendance) {
   });
 
   if (fromMaps.length) {
-    return validateSubjectSelection(course, fromMaps);
+    return validateSubjectSelection(courseKey, fromMaps);
   }
 
-  const config = getCourseSubjectConfig(course);
+  const config = getCourseSubjectConfig(courseKey);
   if (config?.type === "fixed") {
     return { ok: true, subjects: [...config.compulsory] };
   }
@@ -211,8 +242,10 @@ function resolveSubjectsForCourse(course, subjects, marks, attendance) {
 module.exports = {
   COMPULSORY_COURSE_SUBJECTS,
   OPTIONAL_COURSE_SUBJECTS,
+  normalizeCourseCode,
   getCourseSubjectConfig,
   normalizeSubjects,
+  resolveEnrolledSubjects,
   validateSubjectSelection,
   resolveSubjectsForCourse,
 };

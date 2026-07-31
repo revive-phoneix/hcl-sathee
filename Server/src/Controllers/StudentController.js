@@ -3,7 +3,11 @@ const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
-const { resolveSubjectsForCourse } = require("../Utils/courseSubjects");
+const {
+  normalizeCourseCode,
+  resolveEnrolledSubjects,
+  resolveSubjectsForCourse,
+} = require("../Utils/courseSubjects");
 const {
   isOptionalPhone10,
   normalizePhone10,
@@ -12,7 +16,7 @@ const {
 const groupByStudentId = (rows) => {
   const map = new Map();
   for (const row of rows) {
-    const key = row.studentId;
+    const key = Number(row.studentId) || row.studentId;
     if (!map.has(key)) map.set(key, []);
     map.get(key).push(row);
   }
@@ -33,7 +37,13 @@ const subjectPct = (row) => {
   );
 };
 
-const buildMapsFromRecords = (subjects, performances = [], attendances = []) => {
+const buildMapsFromRecords = (
+  subjects,
+  performances = [],
+  attendances = [],
+  fallbackMarks = {},
+  fallbackAttendance = {}
+) => {
   const marks = {};
   const attendance = {};
   const perfBySubject = new Map(performances.map((row) => [row.subject, row]));
@@ -41,27 +51,19 @@ const buildMapsFromRecords = (subjects, performances = [], attendances = []) => 
 
   for (const subject of subjects || []) {
     const perf = perfBySubject.get(subject);
-    marks[subject] = perf ? Number(perf.marks) || 0 : 0;
-    attendance[subject] = subjectPct(attBySubject.get(subject));
-  }
-
-  // Include any leftover records not listed in subjects
-  for (const perf of performances) {
-    if (marks[perf.subject] === undefined) {
-      marks[perf.subject] = Number(perf.marks) || 0;
-    }
-  }
-  for (const att of attendances) {
-    if (attendance[att.subject] === undefined) {
-      attendance[att.subject] = subjectPct(att);
-    }
+    marks[subject] = perf
+      ? Number(perf.marks) || 0
+      : Number(fallbackMarks?.[subject]) || 0;
+    attendance[subject] = attBySubject.has(subject)
+      ? subjectPct(attBySubject.get(subject))
+      : Number(fallbackAttendance?.[subject]) || 0;
   }
 
   return { marks, attendance };
 };
 
 const enrichStudent = (student, performances = [], attendances = []) => {
-  const subjects =
+  const listedSubjects =
     Array.isArray(student.subjects) && student.subjects.length
       ? student.subjects
       : [
@@ -73,16 +75,18 @@ const enrichStudent = (student, performances = [], attendances = []) => {
           ]),
         ].filter(Boolean);
 
-  const hasSubjectRecords = performances.length > 0 || attendances.length > 0;
-  const maps = hasSubjectRecords
-    ? buildMapsFromRecords(subjects, performances, attendances)
-    : {
-        marks: student.marks || {},
-        attendance: student.attendance || {},
-      };
+  const subjects = resolveEnrolledSubjects(student.course, listedSubjects);
+  const maps = buildMapsFromRecords(
+    subjects,
+    performances,
+    attendances,
+    student.marks || {},
+    student.attendance || {}
+  );
 
   return {
     ...student,
+    course: normalizeCourseCode(student.course) || student.course,
     subjects,
     marks: maps.marks,
     attendance: maps.attendance,
@@ -139,8 +143,8 @@ exports.getStudents = wrap(
       students: students.map((student) =>
         enrichStudent(
           student,
-          performancesByStudent.get(student.id) || [],
-          attendancesByStudent.get(student.id) || []
+          performancesByStudent.get(Number(student.id) || student.id) || [],
+          attendancesByStudent.get(Number(student.id) || student.id) || []
         )
       ),
     });
@@ -191,7 +195,7 @@ exports.addStudent = wrap(
       motherPhone: motherPhone?.trim() ? normalizePhone10(motherPhone) : motherPhone || "",
     };
 
-    const normalizedCourse = course?.trim() || null;
+    const normalizedCourse = normalizeCourseCode(course) || course?.trim() || null;
     const resolved = resolveSubjectsForCourse(
       normalizedCourse,
       subjects,
