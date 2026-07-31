@@ -51,7 +51,7 @@ export default function Student({
         centre: student.centreName || "Unknown Centre",
         course: student.course || "JEE",
         category: student.category || "General",
-        address: "Added from admin portal",
+        address: student.address?.trim() || "",
         parents: {
           father: student.fatherName?.trim() || "",
           fatherPhone: student.fatherPhone?.trim() || "",

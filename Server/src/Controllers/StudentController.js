@@ -4,6 +4,10 @@ const SubjectAttendance = require("../Models/SubjectAttendance");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 const { resolveSubjectsForCourse } = require("../Utils/courseSubjects");
+const {
+  isOptionalPhone10,
+  normalizePhone10,
+} = require("../Utils/phone");
 
 const groupByStudentId = (rows) => {
   const map = new Map();
@@ -170,6 +174,23 @@ exports.addStudent = wrap(
       return fail(res, 400, "Name, gender, and email are required");
     }
 
+    const normalizedPhone = normalizePhone10(phone);
+    if (!normalizedPhone) {
+      return fail(res, 400, "Phone number must be exactly 10 digits");
+    }
+
+    const fatherPhone = parents?.fatherPhone;
+    const motherPhone = parents?.motherPhone;
+    if (!isOptionalPhone10(fatherPhone) || !isOptionalPhone10(motherPhone)) {
+      return fail(res, 400, "Parent phone numbers must be exactly 10 digits");
+    }
+
+    const normalizedParents = {
+      ...(parents || {}),
+      fatherPhone: fatherPhone?.trim() ? normalizePhone10(fatherPhone) : fatherPhone || "",
+      motherPhone: motherPhone?.trim() ? normalizePhone10(motherPhone) : motherPhone || "",
+    };
+
     const normalizedCourse = course?.trim() || null;
     const resolved = resolveSubjectsForCourse(
       normalizedCourse,
@@ -195,12 +216,12 @@ exports.addStudent = wrap(
       name: name.trim(),
       gender: gender.trim(),
       email: normalizedEmail,
-      phone: phone?.trim() || null,
+      phone: normalizedPhone,
       centre: centre?.trim() || null,
       course: normalizedCourse,
       category: category?.trim() || null,
       address: address || null,
-      parents: parents || {},
+      parents: normalizedParents,
       subjects: resolved.subjects,
       marks: marks && typeof marks === "object" ? marks : initialMaps.marks,
       attendance:

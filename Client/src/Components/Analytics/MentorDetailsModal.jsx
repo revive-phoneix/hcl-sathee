@@ -3,6 +3,7 @@ import { updateUser } from "../../services/users";
 import { WEEKDAYS, formatAvailableDays } from "../../utils/availableDays";
 import { mentorInitial } from "./analyticsUi";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import { isValidPhone10, sanitizePhoneInput } from "../../utils/phone";
 
 const overlayStyle = {
   position: "fixed",
@@ -84,18 +85,24 @@ export default function MentorDetailsModal({
 
   const handleSave = async () => {
     const days = Array.isArray(formData.availableDays) ? formData.availableDays : [];
+    const phone = formData.phone || mentor.phone || "";
+
+    if (!isValidPhone10(phone)) {
+      setError("Phone number must be exactly 10 digits");
+      return;
+    }
 
     setSaving(true);
     setError("");
     try {
       const updated = await updateUser(mentor.id, {
         availableDays: days,
-        phone: formData.phone || mentor.phone,
+        phone,
       });
       onUpdated?.({
         ...mentor,
         availableDays: updated.availableDays || days,
-        phone: updated.phone || formData.phone,
+        phone: updated.phone || phone,
       });
       setIsEditing(false);
     } catch (err) {
@@ -107,7 +114,9 @@ export default function MentorDetailsModal({
   };
 
   const handleChange = (e, field) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    const value =
+      field === "phone" ? sanitizePhoneInput(e.target.value) : e.target.value;
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const displayDays = isEditing ? formData.availableDays : mentor.availableDays;
@@ -179,6 +188,9 @@ export default function MentorDetailsModal({
               <DetailLine label="Phone">
                 {isEditing ? (
                   <input
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
                     value={formData.phone || ""}
                     onChange={(e) => handleChange(e, "phone")}
                     style={{

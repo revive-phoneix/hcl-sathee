@@ -8,6 +8,7 @@ const {
   isAdminRole,
   isHclPartnerRole,
 } = require("../Utils/centreMatch");
+const { isValidPhone10, normalizePhone10 } = require("../Utils/phone");
 
 const VALID_ROLES = ["ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 const TEST_EMAIL_DOMAIN = "@example.com";
@@ -68,11 +69,15 @@ exports.addUser = wrap(
     if (!name || !email || !phone || !role) {
       return fail(res, 400, "Name, email, phone number and role are required");
     }
+    if (!isValidPhone10(phone)) {
+      return fail(res, 400, "Phone number must be exactly 10 digits");
+    }
     if (!VALID_ROLES.includes(role)) {
       return fail(res, 400, "Invalid role selected");
     }
 
     const normalizedEmail = email.trim().toLowerCase();
+    const normalizedPhone = normalizePhone10(phone);
     const normalizedCentre = centre?.trim() || null;
     const normalizedDays = User.normalizeAvailableDays(availableDays);
 
@@ -85,14 +90,14 @@ exports.addUser = wrap(
     if (await User.findByEmail(normalizedEmail)) {
       return fail(res, 409, "Email already exists");
     }
-    if (await User.findByPhone(phone.trim())) {
+    if (await User.findByPhone(normalizedPhone)) {
       return fail(res, 409, "Phone number already exists");
     }
 
     const createdUser = await User.create({
       name: name.trim(),
       email: normalizedEmail,
-      phone: phone.trim(),
+      phone: normalizedPhone,
       role,
       centre: normalizedCentre,
       availableDays: isMitra(role) ? normalizedDays : [],
@@ -140,7 +145,12 @@ exports.updateUser = wrap(
 
     const patch = {};
     if (name != null) patch.name = String(name).trim();
-    if (phone != null) patch.phone = String(phone).trim();
+    if (phone != null) {
+      if (!isValidPhone10(phone)) {
+        return fail(res, 400, "Phone number must be exactly 10 digits");
+      }
+      patch.phone = normalizePhone10(phone);
+    }
     if (centre != null) {
       const normalizedCentre = String(centre).trim();
       if (!VALID_CENTRES.includes(normalizedCentre)) {

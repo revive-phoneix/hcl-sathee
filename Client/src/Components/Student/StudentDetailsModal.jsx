@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import {
+  isOptionalPhone10,
+  isValidPhone10,
+  sanitizePhoneInput,
+} from "../../utils/phone";
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState(null);
+  const [error, setError] = useState("");
   useEscapeToClose(onClose, open);
 
   useEffect(() => {
@@ -16,14 +22,31 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
         qualifications: { ...(student.qualifications || {}) },
       });
       setIsEditing(false);
+      setError("");
     }
   }, [student]);
 
   if (!open || !student || !formData) return null;
 
   const handleSave = () => {
+    if (formData.phone && !isValidPhone10(formData.phone)) {
+      setError("Student phone number must be exactly 10 digits");
+      return;
+    }
+    if (
+      !isOptionalPhone10(formData.parents?.fatherPhone) ||
+      !isOptionalPhone10(formData.parents?.motherPhone)
+    ) {
+      setError("Parent phone numbers must be exactly 10 digits (or left blank)");
+      return;
+    }
+    setError("");
     if (onSave) {
-      onSave(formData);
+      onSave({
+        ...formData,
+        marks: student.marks || formData.marks,
+        attendance: student.attendance || formData.attendance,
+      });
     }
     setIsEditing(false);
   };
@@ -106,7 +129,14 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => updateForm("course", value)} />
               <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => updateForm("category", value)} />
               <Field label="Email" value={formData.email} editable={isEditing} onChange={(value) => updateForm("email", value)} type="email" />
-              <Field label="Phone" value={formData.phone} editable={isEditing} onChange={(value) => updateForm("phone", value)} type="tel" />
+              <Field
+                label="Phone"
+                value={formData.phone}
+                editable={isEditing}
+                onChange={(value) => updateForm("phone", sanitizePhoneInput(value))}
+                type="tel"
+                maxLength={10}
+              />
               <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => updateForm("centre", value)} />
               <Field label="Student ID" value={formData.Student_ID} editable={isEditing} onChange={(value) => updateForm("Student_ID", value)} />
               <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => updateForm("address", value)} />
@@ -128,7 +158,16 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <div style={{ marginTop: 10 }}>
                   <strong>Phone</strong>
                   {isEditing ? (
-                    <input type="tel" value={formData.parents?.fatherPhone || ""} onChange={(e) => updateForm("fatherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={formData.parents?.fatherPhone || ""}
+                      onChange={(e) =>
+                        updateForm("fatherPhone", sanitizePhoneInput(e.target.value), "parents")
+                      }
+                      style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
+                    />
                   ) : (
                     <div style={{ marginTop: 6 }}>{formData.parents?.fatherPhone || "—"}</div>
                   )}
@@ -144,7 +183,16 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <div style={{ marginTop: 10 }}>
                   <strong>Phone</strong>
                   {isEditing ? (
-                    <input type="tel" value={formData.parents?.motherPhone || ""} onChange={(e) => updateForm("motherPhone", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    <input
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={formData.parents?.motherPhone || ""}
+                      onChange={(e) =>
+                        updateForm("motherPhone", sanitizePhoneInput(e.target.value), "parents")
+                      }
+                      style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
+                    />
                   ) : (
                     <div style={{ marginTop: 6 }}>{formData.parents?.motherPhone || "—"}</div>
                   )}
@@ -154,42 +202,51 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
           </div>
 
           <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+            <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
               Current Performance (Marks)
             </h3>
+            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+              Auto-updated from tests/exams — not editable.
+            </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {Object.entries(formData.marks || {}).map(([subject, score]) => (
-                <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                  <strong>{subject}</strong>
-                  {isEditing ? (
-                    <input type="text" value={score} onChange={(e) => updateForm(subject, e.target.value, "marks")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
-                  ) : (
+              {Object.entries(formData.marks || {}).length === 0 ? (
+                <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
+              ) : (
+                Object.entries(formData.marks || {}).map(([subject, score]) => (
+                  <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+                    <strong>{subject}</strong>
                     <div style={{ marginTop: 6 }}>{score}</div>
-                  )}
-                </div>
-              ))}
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+            <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
               Attendance
             </h3>
+            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+              Auto-updated from daily class status — not editable.
+            </p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {Object.entries(formData.attendance || {}).map(([cls, rate]) => (
-                <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                  <strong>{cls}</strong>
-                  {isEditing ? (
-                    <input type="text" value={rate} onChange={(e) => updateForm(cls, e.target.value, "attendance")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
-                  ) : (
-                    <div style={{ marginTop: 6 }}>{rate}</div>
-                  )}
-                </div>
-              ))}
+              {Object.entries(formData.attendance || {}).length === 0 ? (
+                <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
+              ) : (
+                Object.entries(formData.attendance || {}).map(([cls, rate]) => (
+                  <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+                    <strong>{cls}</strong>
+                    <div style={{ marginTop: 6 }}>{typeof rate === "number" ? `${rate}%` : rate}</div>
+                  </div>
+                ))
+              )}
             </div>
           </div>
 
           <div style={{ textAlign: "center", marginTop: 32 }}>
+            {error ? (
+              <p style={{ color: "#b91c1c", marginBottom: 12, fontSize: 14 }}>{error}</p>
+            ) : null}
             {!readOnly ? (
               <>
                 <button
@@ -251,13 +308,15 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
   );
 }
 
-function Field({ label, value, editable, onChange, type = "text" }) {
+function Field({ label, value, editable, onChange, type = "text", maxLength }) {
   return (
     <div>
       <strong>{label}</strong>
       {editable ? (
         <input
           type={type}
+          inputMode={type === "tel" ? "numeric" : undefined}
+          maxLength={maxLength}
           value={value || ""}
           onChange={(e) => onChange(e.target.value)}
           style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}

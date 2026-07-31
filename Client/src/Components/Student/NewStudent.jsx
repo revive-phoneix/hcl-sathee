@@ -7,6 +7,11 @@ import {
   getCourseSubjectConfig,
   validateSubjectSelection,
 } from "../../utils/courseSubjects";
+import {
+  isOptionalPhone10,
+  isValidPhone10,
+  sanitizePhoneInput,
+} from "../../utils/phone";
 
 const courses = ["JEE", "NEET", "CLAT", "SSC", "IBPS", "RRB", "ICAR", "CUET"];
 const casteCategories = ["General", "OBC", "SC", "ST", "EWS"];
@@ -26,6 +31,7 @@ const createEmptyForm = (centre) => ({
   fatherPhone: "",
   motherName: "",
   motherPhone: "",
+  address: "",
 });
 
 export default function NewStudent({ open, onClose, onSubmit, error, submitting, portalName }) {
@@ -33,6 +39,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
   const [form, setForm] = useState(() => createEmptyForm(defaultCentre));
   const [choiceSubjects, setChoiceSubjects] = useState([]);
   const [subjectError, setSubjectError] = useState("");
+  const [formError, setFormError] = useState("");
   useEscapeToClose(onClose, open);
 
   const subjectConfig = useMemo(() => getCourseSubjectConfig(form.course), [form.course]);
@@ -86,6 +93,17 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFormError("");
+
+    if (!isValidPhone10(form.phone)) {
+      setFormError("Student phone number must be exactly 10 digits");
+      return;
+    }
+    if (!isOptionalPhone10(form.fatherPhone) || !isOptionalPhone10(form.motherPhone)) {
+      setFormError("Parent phone numbers must be exactly 10 digits (or left blank)");
+      return;
+    }
+
     const validation = validateSubjectSelection(form.course, selectedSubjects);
     if (!validation.ok) {
       setSubjectError(validation.message);
@@ -94,6 +112,9 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
 
     const payload = {
       ...form,
+      phone: form.phone,
+      fatherPhone: form.fatherPhone || "",
+      motherPhone: form.motherPhone || "",
       subjects: selectedSubjects,
       marks,
       attendance,
@@ -103,6 +124,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
     setForm(createEmptyForm(defaultCentre));
     setChoiceSubjects([]);
     setSubjectError("");
+    setFormError("");
     onClose();
   };
 
@@ -184,6 +206,20 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
               }}
             >
               {error}
+            </div>
+          ) : null}
+          {formError ? (
+            <div
+              style={{
+                marginBottom: 24,
+                padding: "16px 18px",
+                background: "#fff7ed",
+                color: "#9a3412",
+                borderRadius: 12,
+                border: "1px solid #fed7aa",
+              }}
+            >
+              {formError}
             </div>
           ) : null}
 
@@ -337,9 +373,12 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
           <div style={{ marginBottom: 24 }}>
             <Field
               label="Phone Number"
+              type="tel"
               value={form.phone}
-              onChange={(v) => handleChange("phone", v)}
-              placeholder="Enter phone number"
+              onChange={(v) => handleChange("phone", sanitizePhoneInput(v))}
+              placeholder="10-digit mobile number"
+              maxLength={10}
+              inputMode="numeric"
             />
           </div>
 
@@ -369,9 +408,12 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
             <Field
               label="Father's Phone"
+              type="tel"
               value={form.fatherPhone}
-              onChange={(v) => handleChange("fatherPhone", v)}
-              placeholder="Enter father's phone"
+              onChange={(v) => handleChange("fatherPhone", sanitizePhoneInput(v))}
+              placeholder="10-digit mobile number"
+              maxLength={10}
+              inputMode="numeric"
             />
           </div>
           <div
@@ -390,9 +432,12 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
             <Field
               label="Mother's Phone"
+              type="tel"
               value={form.motherPhone}
-              onChange={(v) => handleChange("motherPhone", v)}
-              placeholder="Enter mother's phone"
+              onChange={(v) => handleChange("motherPhone", sanitizePhoneInput(v))}
+              placeholder="10-digit mobile number"
+              maxLength={10}
+              inputMode="numeric"
             />
           </div>
 
@@ -406,9 +451,21 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
           </div>
 
           <div style={{ marginBottom: 28 }}>
+            <Field
+              label="Address"
+              value={form.address}
+              onChange={(v) => handleChange("address", v)}
+              placeholder="Enter address"
+            />
+          </div>
+
+          <div style={{ marginBottom: 28 }}>
             <SectionTitle>Current Performance (Marks)</SectionTitle>
+            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+              Auto-updated from tests/exams — not editable here.
+            </p>
             {selectedSubjects.length === 0 ? (
-              <EmptyHint text="Select a course (and optional subjects if required) to see marks fields." />
+              <EmptyHint text="Select a course (and optional subjects if required) to preview subjects." />
             ) : (
               <div
                 style={{
@@ -426,6 +483,9 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
 
           <div style={{ marginBottom: 36 }}>
             <SectionTitle>Attendance</SectionTitle>
+            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+              Auto-updated from daily class status — not editable here. Starts at 0%.
+            </p>
             {selectedSubjects.length === 0 ? (
               <EmptyHint text="Selected subjects will appear here with 0% attendance initially." />
             ) : (
@@ -445,9 +505,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
                 ))}
               </div>
             )}
-            <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 13 }}>
-              Attendance starts at 0% and updates each day from class status.
-            </p>
           </div>
 
           <div style={{ display: "flex", justifyContent: "flex-end", gap: 16 }}>
@@ -564,7 +621,16 @@ function FormStyles() {
   );
 }
 
-function Field({ label, value, onChange, placeholder, type = "text", readOnly = false }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+  type = "text",
+  readOnly = false,
+  maxLength,
+  inputMode,
+}) {
   return (
     <div>
       <label style={{ display: "block", marginBottom: 10, fontWeight: 600, color: "#1e3a5f" }}>
@@ -575,6 +641,8 @@ function Field({ label, value, onChange, placeholder, type = "text", readOnly = 
         readOnly={readOnly}
         value={value}
         placeholder={placeholder}
+        maxLength={maxLength}
+        inputMode={inputMode}
         onChange={(e) => onChange?.(e.target.value)}
         style={{
           width: "100%",

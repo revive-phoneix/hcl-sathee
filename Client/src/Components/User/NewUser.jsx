@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import { isValidPhone10, sanitizePhoneInput } from "../../utils/phone";
 
 export default function NewUser({ onClose, onAddUser, submittingUser, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
@@ -31,8 +32,8 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
       return;
     }
 
-    if (!/^[0-9+\-\s()]{7,20}$/.test(form.phone)) {
-      setError("Please enter a valid phone number");
+    if (!isValidPhone10(form.phone)) {
+      setError("Phone number must be exactly 10 digits");
       return;
     }
 
@@ -105,10 +106,14 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
               </label>
               <input
                 type="tel"
+                inputMode="numeric"
+                maxLength={10}
                 value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                onChange={(e) =>
+                  setForm({ ...form, phone: sanitizePhoneInput(e.target.value) })
+                }
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
-                placeholder="+91 98765 43210"
+                placeholder="10-digit mobile number"
                 required
               />
             </div>
