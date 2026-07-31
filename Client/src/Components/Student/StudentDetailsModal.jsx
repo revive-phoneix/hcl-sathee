@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 import {
   isOptionalPhone10,
   isValidPhone10,
   sanitizePhoneInput,
 } from "../../utils/phone";
+import { average, parsePercentValue } from "../../utils/studentMetrics";
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -25,6 +26,20 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
       setError("");
     }
   }, [student]);
+
+  const overallAttendance = useMemo(() => {
+    if (!formData) return null;
+    const map = formData.attendance || {};
+    const subjects =
+      Array.isArray(formData.subjects) && formData.subjects.length
+        ? formData.subjects
+        : Object.keys(map);
+    const rates = subjects
+      .map((subject) => parsePercentValue(map[subject]))
+      .filter((rate) => rate != null);
+    const avg = average(rates);
+    return avg == null ? null : Math.round(avg * 10) / 10;
+  }, [formData]);
 
   if (!open || !student || !formData) return null;
 
@@ -229,6 +244,30 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
             <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
               Auto-updated from daily class status — not editable.
             </p>
+            <div
+              style={{
+                background: "#dbeafe",
+                border: "1px solid #93c5fd",
+                borderRadius: 10,
+                padding: "14px 18px",
+                marginBottom: 14,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                color: "#0f172a",
+              }}
+            >
+              <div>
+                <strong style={{ fontSize: 15 }}>Overall Attendance</strong>
+                <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                  Average of all subject attendance
+                </div>
+              </div>
+              <div style={{ fontSize: 22, fontWeight: 700, color: "#1e40af" }}>
+                {overallAttendance == null ? "—" : `${overallAttendance}%`}
+              </div>
+            </div>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
               {Object.entries(formData.attendance || {}).length === 0 ? (
                 <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>

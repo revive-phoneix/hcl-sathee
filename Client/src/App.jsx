@@ -3,7 +3,7 @@ import {
   BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation,
 } from "react-router-dom";
 import {
-  LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone,
+  LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle,
 } from "lucide-react";
 
 import Authentication from "./Pages/Auth/Authentication";
@@ -27,6 +27,7 @@ import SatheeMitraAnnouncements from "./Pages/Announcements/SatheeMitraAnnouncem
 import AdminAnalytics from "./Pages/Analytics/AdminAnalytics";
 import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
 import SM_Analytics from "./Pages/Analytics/SM_Analytics";
+import MyProfile from "./Pages/Profile/MyProfile";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -60,6 +61,7 @@ const PARTNER_PATH_TO_NAV = {
   "/partner/analytics": 2,
   "/partner/students": 3,
   "/partner/announcements": 4,
+  "/partner/profile": 5,
 };
 
 const PARTNER_NAV_PATHS = [
@@ -68,6 +70,7 @@ const PARTNER_NAV_PATHS = [
   "/partner/analytics",
   "/partner/students",
   "/partner/announcements",
+  "/partner/profile",
 ];
 
 const MITRA_PATH_TO_NAV = {
@@ -76,6 +79,7 @@ const MITRA_PATH_TO_NAV = {
   "/mitra/analytics": 2,
   "/mitra/students": 3,
   "/mitra/announcements": 4,
+  "/mitra/profile": 5,
 };
 
 const MITRA_NAV_PATHS = [
@@ -84,6 +88,7 @@ const MITRA_NAV_PATHS = [
   "/mitra/analytics",
   "/mitra/students",
   "/mitra/announcements",
+  "/mitra/profile",
 ];
 
 const ADMIN_PATHS = new Set(ADMIN_NAV_PATHS);
@@ -169,6 +174,7 @@ const AppContent = () => {
     { icon: TrendingUp, label: "Progress and Analytics" },
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
+    { icon: UserCircle, label: "My Profile" },
   ];
 
   const mitraNavItems = [
@@ -177,6 +183,7 @@ const AppContent = () => {
     { icon: TrendingUp, label: "Progress and Analytics" },
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
+    { icon: UserCircle, label: "My Profile" },
   ];
 
   const activeNav = isMitra
@@ -353,6 +360,20 @@ const AppContent = () => {
         path="/partner/announcements"
         element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
       />
+      <Route
+        path="/partner/profile"
+        element={
+          <MyProfile
+            {...partnerLayout}
+            roleLabel="Partner Portal"
+            userName={userName}
+            userEmail={userEmail}
+            userId={userId}
+            userCentre={userCentre}
+            userRole={userRole}
+          />
+        }
+      />
 
       <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
       <Route
@@ -370,6 +391,20 @@ const AppContent = () => {
       <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
       <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
       <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
+      <Route
+        path="/mitra/profile"
+        element={
+          <MyProfile
+            {...mitraLayout}
+            roleLabel="Sathee Mitra Portal"
+            userName={userName}
+            userEmail={userEmail}
+            userId={userId}
+            userCentre={userCentre}
+            userRole={userRole}
+          />
+        }
+      />
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

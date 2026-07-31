@@ -133,7 +133,7 @@ export default function TodaysClassesCard({ portalName = "" }) {
                     <p className="mt-0.5 text-xs text-slate-500">
                       {item.course
                         ? `Course: ${item.course}`
-                        : "Course not specified in timetable cell — add e.g. “JEE - Physics”"}
+                        : "Course not specified — use e.g. “Mathematics - RRB” or “RRB - Mathematics”"}
                     </p>
                   </div>
                   {item.time ? (

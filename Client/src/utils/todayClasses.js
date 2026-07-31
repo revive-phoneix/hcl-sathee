@@ -3,6 +3,12 @@ import { WEEKDAYS } from "./availableDays";
 const COURSE_HINTS = [
   "JEE",
   "NEET",
+  "SSC",
+  "CLAT",
+  "IBPS",
+  "RRB",
+  "ICAR",
+  "CUET",
   "FOUNDATION",
   "FOUNDATION COURSE",
   "CLASS 11",
@@ -14,7 +20,33 @@ const COURSE_HINTS = [
 ];
 
 const isBreakLabel = (value) =>
-  /^(lunch|break|recess|free|—|-|–|n\/?a)$/i.test(String(value || "").trim());
+  /^(lunch(\s+break)?|break|recess|free|—|-|–|n\/?a)$/i.test(
+    String(value || "").trim()
+  );
+
+const looksLikeCourse = (value = "") => {
+  const upper = String(value).trim().toUpperCase();
+  if (!upper) return false;
+  return COURSE_HINTS.some(
+    (course) =>
+      upper === course ||
+      upper.startsWith(`${course} `) ||
+      upper.endsWith(` ${course}`) ||
+      upper.includes(` ${course} `)
+  );
+};
+
+const resolveCourseSubject = (left, right) => {
+  const a = String(left || "").trim();
+  const b = String(right || "").trim();
+  const aIsCourse = looksLikeCourse(a);
+  const bIsCourse = looksLikeCourse(b);
+
+  if (aIsCourse && !bIsCourse) return { course: a, subject: b };
+  if (bIsCourse && !aIsCourse) return { course: b, subject: a };
+  if (aIsCourse && bIsCourse) return { course: a, subject: b };
+  return { course: a, subject: b };
+};
 
 export const weekdayNameFromDate = (date = new Date()) => {
   const names = [
@@ -29,10 +61,6 @@ export const weekdayNameFromDate = (date = new Date()) => {
   return names[date.getDay()] || "Monday";
 };
 
-/**
- * Parse a timetable cell into course + subject when possible.
- * Examples: "JEE - Physics", "NEET Biology", "Physics (JEE)", "Physics"
- */
 export const parseClassLabel = (raw = "") => {
   const text = String(raw || "").trim().replace(/\s+/g, " ");
   if (!text || isBreakLabel(text)) {
@@ -41,15 +69,8 @@ export const parseClassLabel = (raw = "") => {
 
   const paren = text.match(/^(.+?)\s*\(([^)]+)\)\s*$/);
   if (paren) {
-    const left = paren[1].trim();
-    const right = paren[2].trim();
-    const rightIsCourse = COURSE_HINTS.some((c) =>
-      right.toUpperCase().includes(c)
-    );
-    if (rightIsCourse) {
-      return { course: right, subject: left, label: text, isBreak: false };
-    }
-    return { course: left, subject: right, label: text, isBreak: false };
+    const resolved = resolveCourseSubject(paren[1], paren[2]);
+    return { ...resolved, label: text, isBreak: false };
   }
 
   for (const sep of [" - ", " – ", " | ", " / ", ":"]) {
@@ -57,22 +78,26 @@ export const parseClassLabel = (raw = "") => {
       const [a, ...rest] = text.split(sep);
       const b = rest.join(sep).trim();
       if (a.trim() && b) {
-        return {
-          course: a.trim(),
-          subject: b,
-          label: text,
-          isBreak: false,
-        };
+        const resolved = resolveCourseSubject(a, b);
+        return { ...resolved, label: text, isBreak: false };
       }
     }
   }
 
   const upper = text.toUpperCase();
   for (const hint of COURSE_HINTS) {
-    if (upper.startsWith(hint + " ")) {
+    if (upper.startsWith(`${hint} `)) {
       return {
         course: text.slice(0, hint.length).trim(),
         subject: text.slice(hint.length).trim(),
+        label: text,
+        isBreak: false,
+      };
+    }
+    if (upper.endsWith(` ${hint}`)) {
+      return {
+        course: hint,
+        subject: text.slice(0, text.length - hint.length).trim(),
         label: text,
         isBreak: false,
       };
@@ -82,10 +107,6 @@ export const parseClassLabel = (raw = "") => {
   return { course: null, subject: text, label: text, isBreak: false };
 };
 
-/**
- * From a saved grid timetable, list classes for a given weekday.
- * @returns {{ day: string, classes: Array<{ time, course, subject, label }> }}
- */
 export const getClassesForDay = (timetable, dayName) => {
   const day = WEEKDAYS.includes(dayName) ? dayName : weekdayNameFromDate();
   if (!timetable || timetable.kind !== "grid") {
