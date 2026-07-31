@@ -18,6 +18,26 @@ const parseObjectField = (value) => {
   }
 };
 
+const parseSubjectsField = (value) => {
+  if (Array.isArray(value)) {
+    return [
+      ...new Set(
+        value
+          .filter((item) => typeof item === "string" && item.trim())
+          .map((item) => item.trim())
+      ),
+    ];
+  }
+  if (typeof value === "string" && value.trim()) {
+    try {
+      return parseSubjectsField(JSON.parse(value));
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
 const toApiStudent = (docId, data) => ({
   id: Number(docId) || docId,
   studentId: data.studentId,
@@ -31,6 +51,7 @@ const toApiStudent = (docId, data) => ({
   category: data.category ?? null,
   address: data.address ?? null,
   parents: parseObjectField(data.parents),
+  subjects: parseSubjectsField(data.subjects),
   marks: parseObjectField(data.marks),
   attendance: parseObjectField(data.attendance),
   qualifications: parseObjectField(data.qualifications),
@@ -76,6 +97,7 @@ const create = async (data) => {
     category: data.category ?? null,
     address: data.address ?? null,
     parents: parseObjectField(data.parents),
+    subjects: parseSubjectsField(data.subjects),
     marks: parseObjectField(data.marks),
     attendance: parseObjectField(data.attendance),
     qualifications: parseObjectField(data.qualifications),
@@ -95,6 +117,7 @@ const update = async (id, data) => {
 
   const updated = { ...data, updated_at: new Date() };
   if (data.parents !== undefined) updated.parents = parseObjectField(data.parents);
+  if (data.subjects !== undefined) updated.subjects = parseSubjectsField(data.subjects);
   if (data.marks !== undefined) updated.marks = parseObjectField(data.marks);
   if (data.attendance !== undefined) updated.attendance = parseObjectField(data.attendance);
   if (data.qualifications !== undefined) {
@@ -129,6 +152,7 @@ const importFromMysql = async (row) => {
     category: row.category ?? null,
     address: row.address ?? null,
     parents: parseObjectField(row.parents),
+    subjects: parseSubjectsField(row.subjects),
     marks: parseObjectField(row.marks),
     attendance: parseObjectField(row.attendance),
     qualifications: parseObjectField(row.qualifications),

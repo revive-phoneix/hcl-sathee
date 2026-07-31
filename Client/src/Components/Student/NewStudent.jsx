@@ -1,7 +1,12 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { UserPlus, X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import {
+  buildMarksAndAttendance,
+  getCourseSubjectConfig,
+  validateSubjectSelection,
+} from "../../utils/courseSubjects";
 
 const courses = ["JEE", "NEET", "CLAT", "SSC", "IBPS", "RRB", "ICAR", "CUET"];
 const casteCategories = ["General", "OBC", "SC", "ST", "EWS"];
@@ -26,16 +31,78 @@ const createEmptyForm = (centre) => ({
 export default function NewStudent({ open, onClose, onSubmit, error, submitting, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
   const [form, setForm] = useState(() => createEmptyForm(defaultCentre));
+  const [choiceSubjects, setChoiceSubjects] = useState([]);
+  const [subjectError, setSubjectError] = useState("");
   useEscapeToClose(onClose, open);
+
+  const subjectConfig = useMemo(() => getCourseSubjectConfig(form.course), [form.course]);
+
+  useEffect(() => {
+    setChoiceSubjects([]);
+    setSubjectError("");
+  }, [form.course]);
+
+  const selectedSubjects = useMemo(() => {
+    if (!subjectConfig) return [];
+    return [...subjectConfig.compulsory, ...choiceSubjects];
+  }, [subjectConfig, choiceSubjects]);
+
+  const { marks, attendance } = useMemo(
+    () => buildMarksAndAttendance(selectedSubjects),
+    [selectedSubjects]
+  );
 
   if (!open) return null;
 
   const handleChange = (field, value) => setForm((prev) => ({ ...prev, [field]: value }));
 
+  const toggleChoiceSubject = (subject) => {
+    if (!subjectConfig || subjectConfig.choiceMode === "none") return;
+
+    setSubjectError("");
+    setChoiceSubjects((prev) => {
+      const isSelected = prev.includes(subject);
+
+      if (subjectConfig.choiceMode === "exactlyOne") {
+        return isSelected ? [] : [subject];
+      }
+
+      if (isSelected) {
+        return prev.filter((item) => item !== subject);
+      }
+
+      if (prev.length >= subjectConfig.maxChoice) {
+        setSubjectError(
+          `You can select at most ${subjectConfig.maxChoice} optional subject${
+            subjectConfig.maxChoice === 1 ? "" : "s"
+          }.`
+        );
+        return prev;
+      }
+
+      return [...prev, subject];
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!(await onSubmit?.(form))) return;
+    const validation = validateSubjectSelection(form.course, selectedSubjects);
+    if (!validation.ok) {
+      setSubjectError(validation.message);
+      return;
+    }
+
+    const payload = {
+      ...form,
+      subjects: selectedSubjects,
+      marks,
+      attendance,
+    };
+
+    if (!(await onSubmit?.(payload))) return;
     setForm(createEmptyForm(defaultCentre));
+    setChoiceSubjects([]);
+    setSubjectError("");
     onClose();
   };
 
@@ -63,15 +130,13 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
           boxShadow: "0 25px 60px rgba(0,0,0,.25)",
         }}
       >
-        {/* Header */}
         <div
           style={{
             padding: "28px 36px",
             display: "flex",
             justifyContent: "space-between",
             alignItems: "flex-start",
-            background:
-              "linear-gradient(90deg,#eef2ff 0%,#4f6df5 100%)",
+            background: "linear-gradient(90deg,#eef2ff 0%,#4f6df5 100%)",
           }}
         >
           <div style={{ display: "flex", gap: 18 }}>
@@ -90,23 +155,8 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             </div>
 
             <div>
-              <h2
-                style={{
-                  margin: 0,
-                  fontSize: 38,
-                  fontWeight: 700,
-                }}
-              >
-                Add New Student
-              </h2>
-
-              <p
-                style={{
-                  margin: "6px 0 0",
-                  color: "#64748b",
-                  fontSize: 18,
-                }}
-              >
+              <h2 style={{ margin: 0, fontSize: 38, fontWeight: 700 }}>Add New Student</h2>
+              <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 18 }}>
                 Fill in the student details below
               </p>
             </div>
@@ -114,11 +164,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
 
           <button
             onClick={onClose}
-            style={{
-              border: "none",
-              background: "transparent",
-              cursor: "pointer",
-            }}
+            style={{ border: "none", background: "transparent", cursor: "pointer" }}
           >
             <X size={30} color="#64748b" />
           </button>
@@ -140,7 +186,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
               {error}
             </div>
           ) : null}
-          {/* First + Last */}
+
           <div
             style={{
               display: "grid",
@@ -155,7 +201,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
               onChange={(v) => handleChange("firstName", v)}
               placeholder="Enter first name"
             />
-
             <Field
               label="Last Name"
               value={form.lastName}
@@ -164,7 +209,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Gender + Course */}
           <div
             style={{
               display: "grid",
@@ -179,7 +223,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
               options={["Male", "Female", "Other"]}
               onChange={(v) => handleChange("gender", v)}
             />
-
             <SelectField
               label="Course Enrolled"
               value={form.course}
@@ -188,7 +231,90 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Category (Caste) */}
+          {subjectConfig ? (
+            <div style={{ marginBottom: 28 }}>
+              <SectionTitle>Subjects</SectionTitle>
+              <p style={{ margin: "0 0 14px", color: "#64748b", fontSize: 14 }}>
+                {subjectConfig.hint}
+              </p>
+
+              <div style={{ marginBottom: 14 }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: "#475569",
+                    marginBottom: 10,
+                    textTransform: "uppercase",
+                    letterSpacing: 0.4,
+                  }}
+                >
+                  Compulsory
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                  {subjectConfig.compulsory.map((subject) => (
+                    <SubjectChip
+                      key={subject}
+                      label={subject}
+                      checked
+                      locked
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {subjectConfig.choice.length > 0 ? (
+                <div>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: "#475569",
+                      marginBottom: 10,
+                      textTransform: "uppercase",
+                      letterSpacing: 0.4,
+                    }}
+                  >
+                    Choice{" "}
+                    <span style={{ fontWeight: 500, textTransform: "none", color: "#64748b" }}>
+                      ({choiceSubjects.length}
+                      {subjectConfig.choiceMode === "exactlyOne"
+                        ? "/1"
+                        : `/${subjectConfig.maxChoice}`}{" "}
+                      selected)
+                    </span>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 10 }}>
+                    {subjectConfig.choice.map((subject) => (
+                      <SubjectChip
+                        key={subject}
+                        label={subject}
+                        checked={choiceSubjects.includes(subject)}
+                        onToggle={() => toggleChoiceSubject(subject)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {subjectError ? (
+                <div
+                  style={{
+                    marginTop: 14,
+                    padding: "12px 14px",
+                    background: "#fff7ed",
+                    color: "#9a3412",
+                    borderRadius: 10,
+                    border: "1px solid #fed7aa",
+                    fontSize: 14,
+                  }}
+                >
+                  {subjectError}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <div style={{ marginBottom: 24 }}>
             <SelectField
               label="Category (Caste)"
@@ -198,7 +324,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Email */}
           <div style={{ marginBottom: 24 }}>
             <Field
               label="Email Address"
@@ -209,7 +334,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Phone */}
           <div style={{ marginBottom: 24 }}>
             <Field
               label="Phone Number"
@@ -219,7 +343,6 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Parents */}
           <div
             style={{
               marginBottom: 16,
@@ -273,15 +396,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Student ID */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: 24,
-              marginBottom: 36,
-            }}
-          >
+          <div style={{ marginBottom: 28 }}>
             <Field
               label="Student ID"
               value={form.studentId}
@@ -290,14 +405,52 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             />
           </div>
 
-          {/* Footer */}
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "flex-end",
-              gap: 16,
-            }}
-          >
+          <div style={{ marginBottom: 28 }}>
+            <SectionTitle>Current Performance (Marks)</SectionTitle>
+            {selectedSubjects.length === 0 ? (
+              <EmptyHint text="Select a course (and optional subjects if required) to see marks fields." />
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {selectedSubjects.map((subject) => (
+                  <MetricCard key={`marks-${subject}`} title={subject} value={`${marks[subject]}`} />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ marginBottom: 36 }}>
+            <SectionTitle>Attendance</SectionTitle>
+            {selectedSubjects.length === 0 ? (
+              <EmptyHint text="Selected subjects will appear here with 0% attendance initially." />
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
+                  gap: 12,
+                }}
+              >
+                {selectedSubjects.map((subject) => (
+                  <MetricCard
+                    key={`att-${subject}`}
+                    title={subject}
+                    value={`${attendance[subject]}%`}
+                  />
+                ))}
+              </div>
+            )}
+            <p style={{ margin: "12px 0 0", color: "#64748b", fontSize: 13 }}>
+              Attendance starts at 0% and updates each day from class status.
+            </p>
+          </div>
+
+          <div style={{ display: "flex", justifyContent: "flex-end", gap: 16 }}>
             <button
               type="button"
               onClick={onClose}
@@ -325,8 +478,7 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
                 color: "#fff",
                 fontWeight: 600,
                 opacity: submitting ? 0.7 : 1,
-                background:
-                  "linear-gradient(135deg,#1e40af,#3b82f6)",
+                background: "linear-gradient(135deg,#1e40af,#3b82f6)",
               }}
             >
               {submitting ? "Adding..." : "Add Student"}
@@ -335,6 +487,70 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
         </form>
       </div>
     </div>
+  );
+}
+
+function SectionTitle({ children }) {
+  return (
+    <h3
+      style={{
+        fontSize: 18,
+        margin: "0 0 12px",
+        color: "#1a1f2e",
+        borderBottom: "2px solid #e2e8f0",
+        paddingBottom: 8,
+        fontWeight: 700,
+      }}
+    >
+      {children}
+    </h3>
+  );
+}
+
+function EmptyHint({ text }) {
+  return <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>{text}</p>;
+}
+
+function MetricCard({ title, value }) {
+  return (
+    <div style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+      <strong style={{ color: "#0f172a" }}>{title}</strong>
+      <div style={{ marginTop: 6, color: "#0f172a" }}>{value}</div>
+    </div>
+  );
+}
+
+function SubjectChip({ label, checked, locked = false, onToggle }) {
+  return (
+    <label
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 14px",
+        borderRadius: 10,
+        border: checked ? "1px solid #93c5fd" : "1px solid #dbe3ef",
+        background: locked ? "#f1f5f9" : checked ? "#eff6ff" : "#fff",
+        color: "#0f172a",
+        cursor: locked ? "not-allowed" : "pointer",
+        opacity: locked ? 0.95 : 1,
+        userSelect: "none",
+        fontSize: 14,
+        fontWeight: 600,
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={locked}
+        onChange={() => onToggle?.()}
+        style={{ width: 16, height: 16, cursor: locked ? "not-allowed" : "pointer" }}
+      />
+      {label}
+      {locked ? (
+        <span style={{ fontSize: 11, fontWeight: 600, color: "#64748b" }}>(locked)</span>
+      ) : null}
+    </label>
   );
 }
 

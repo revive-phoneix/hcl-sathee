@@ -7,6 +7,7 @@ import AttendanceTable from "../../Components/Attendance/AttendanceTable";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import MyMitraAttendance from "../../Components/Attendance/MyMitraAttendance";
 import ApplyLeaveModal from "../../Components/Attendance/ApplyLeaveModal";
+import TodaysClassesCard from "../../Components/Attendance/TodaysClassesCard";
 import { fetchUsers } from "../../services/users";
 import { applyLeaveRequest } from "../../services/leaveRequests";
 import { getApiErrorMessage } from "../../utils/apiRequest";
@@ -480,6 +481,10 @@ export default function AdminAttendance({
       roleLabel={roleLabel}
     >
       <div className="grid-cols-4 gap-6 w-full mx-auto px-6 space-y-8">
+        {mitraSelfUpload ? (
+          <TodaysClassesCard portalName={portalName} />
+        ) : null}
+
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
