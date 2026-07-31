@@ -133,7 +133,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
             <div>
               <h2 style={{ margin: 0, fontSize: 24 }}>{student.name}</h2>
               <p style={{ margin: "4px 0 0", opacity: 0.9 }}>
-                {student.id || student.Student_ID || student.enrollmentNo} • {student.course}
+                {student.studentId || student.enrollmentNo || student.id} • {student.course}
               </p>
             </div>
           </div>
@@ -152,7 +152,12 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
             </h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, color: "black" }}>
               <Field label="Name" value={formData.name} editable={isEditing} onChange={(value) => updateForm("name", value)} />
-              <Field label="Student ID" value={formData.id || formData.Student_ID || formData.enrollmentNo} editable={isEditing} onChange={(value) => updateForm("id", value)} />
+              <Field
+                label="Student ID"
+                value={formData.studentId || formData.enrollmentNo || ""}
+                editable={isEditing}
+                onChange={(value) => updateForm("studentId", value)}
+              />
               <Field label="Gender" value={formData.gender} editable={isEditing} onChange={(value) => updateForm("gender", value)} />
               <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => updateForm("course", value)} />
               <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => updateForm("category", value)} />
@@ -166,7 +171,6 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 maxLength={10}
               />
               <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => updateForm("centre", value)} />
-              <Field label="Student ID" value={formData.Student_ID} editable={isEditing} onChange={(value) => updateForm("Student_ID", value)} />
               <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => updateForm("address", value)} />
             </div>
           </div>

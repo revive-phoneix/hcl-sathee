@@ -82,12 +82,14 @@ function ClassAttendanceTable({
   const [statusById, setStatusById] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [locked, setLocked] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
   const loadExisting = useCallback(async () => {
     if (!classItem.subject || !students.length) {
       setStatusById({});
+      setLocked(false);
       setLoading(false);
       return;
     }
@@ -109,25 +111,45 @@ function ClassAttendanceTable({
         }
       }
       setStatusById(next);
+
+      const allMarked =
+        students.length > 0 &&
+        students.every((student) => {
+          const status = next[String(student.id)];
+          return status === "present" || status === "absent";
+        });
+      setLocked((prev) => prev || allMarked);
+      if (allMarked) {
+        setMessage((prev) => prev || "Attendance already saved for this class.");
+      }
     } catch (err) {
       console.error("Load class attendance error:", err);
       setError(getApiErrorMessage(err, "Unable to load saved attendance"));
     } finally {
       setLoading(false);
     }
-  }, [classItem.subject, classItem.time, centre, date, students.length]);
+  }, [
+    classItem.subject,
+    classItem.time,
+    centre,
+    date,
+    students.length,
+    students.map((student) => student.id).join(","),
+  ]);
 
   useEffect(() => {
     loadExisting();
   }, [loadExisting]);
 
   const setStatus = (studentId, status) => {
+    if (locked) return;
     setStatusById((prev) => ({ ...prev, [String(studentId)]: status }));
     setMessage("");
     setError("");
   };
 
   const markAll = (status) => {
+    if (locked) return;
     const next = {};
     for (const student of students) {
       next[String(student.id)] = status;
@@ -138,6 +160,8 @@ function ClassAttendanceTable({
   };
 
   const handleSave = async () => {
+    if (locked || saving) return;
+
     const records = students
       .map((student) => {
         const status = statusById[String(student.id)];
@@ -152,6 +176,12 @@ function ClassAttendanceTable({
 
     if (!records.length) {
       setError("Mark at least one student Present or Absent before saving.");
+      setMessage("");
+      return;
+    }
+
+    if (records.length < students.length) {
+      setError("Mark Present or Absent for every student before saving.");
       setMessage("");
       return;
     }
@@ -174,7 +204,10 @@ function ClassAttendanceTable({
           `Saved ${result.savedCount || 0}, but ${failed} row(s) failed.`
         );
       } else {
-        setMessage(`Saved attendance for ${result.savedCount || records.length} student(s).`);
+        setLocked(true);
+        setMessage(
+          `Saved attendance for ${result.savedCount || records.length} student(s).`
+        );
       }
       await loadExisting();
     } catch (err) {
@@ -195,16 +228,19 @@ function ClassAttendanceTable({
           <p className="mt-0.5 text-xs text-slate-500">
             {classItem.time ? `${classItem.time} · ` : ""}
             {students.length} student{students.length === 1 ? "" : "s"}
+            {locked ? " · Saved" : ""}
           </p>
         </div>
         <button
           type="button"
           onClick={handleSave}
-          disabled={saving || loading || !students.length}
-          className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={locked || saving || loading || !students.length}
+          className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50 ${
+            locked ? "bg-emerald-600" : "bg-sky-600 hover:bg-sky-700"
+          }`}
         >
           <Save size={16} />
-          {saving ? "Saving…" : "Save"}
+          {locked ? "Saved" : saving ? "Saving…" : "Save"}
         </button>
       </div>
 
@@ -238,7 +274,7 @@ function ClassAttendanceTable({
                   <button
                     type="button"
                     onClick={() => markAll("present")}
-                    disabled={!students.length || loading}
+                    disabled={locked || !students.length || loading}
                     className="rounded-md border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100 disabled:opacity-40"
                     title="Mark all Present"
                   >
@@ -247,7 +283,7 @@ function ClassAttendanceTable({
                   <button
                     type="button"
                     onClick={() => markAll("absent")}
-                    disabled={!students.length || loading}
+                    disabled={locked || !students.length || loading}
                     className="rounded-md border border-red-300 bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-700 hover:bg-red-100 disabled:opacity-40"
                     title="Mark all Absent"
                   >
@@ -292,21 +328,31 @@ function ClassAttendanceTable({
                     </td>
                     <td className="px-5 py-3.5">
                       <div className="flex items-center justify-center gap-6">
-                        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-emerald-700">
+                        <label
+                          className={`inline-flex items-center gap-2 text-sm text-emerald-700 ${
+                            locked ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                          }`}
+                        >
                           <input
                             type="radio"
                             name={`status-${classKey(classItem, index)}-${id}`}
                             checked={status === "present"}
+                            disabled={locked}
                             onChange={() => setStatus(id, "present")}
                             className="h-4 w-4 accent-emerald-600"
                           />
                           P
                         </label>
-                        <label className="inline-flex cursor-pointer items-center gap-2 text-sm text-red-700">
+                        <label
+                          className={`inline-flex items-center gap-2 text-sm text-red-700 ${
+                            locked ? "cursor-not-allowed opacity-70" : "cursor-pointer"
+                          }`}
+                        >
                           <input
                             type="radio"
                             name={`status-${classKey(classItem, index)}-${id}`}
                             checked={status === "absent"}
+                            disabled={locked}
                             onChange={() => setStatus(id, "absent")}
                             className="h-4 w-4 accent-red-600"
                           />
@@ -398,7 +444,7 @@ export default function ClassSubjectAttendanceTables({
       <div>
         <h2 className="text-lg font-semibold text-slate-900">Mark Class Attendance</h2>
         <p className="mt-1 text-sm text-slate-500">
-          Mark Present / Absent for students in today&apos;s subject slots, then Save each table.
+          Mark Present / Absent for every student, then Save once. After saving, the table is locked.
         </p>
       </div>
 

@@ -19,6 +19,7 @@ export default function Student({
   onNavChange,
   onLogout,
   readOnly = false,
+  detailsReadOnly = false,
   roleLabel = "Admin Portal",
 }) {
   const [search, setSearch] = useState("");
@@ -224,8 +225,8 @@ export default function Student({
         <StudentDetailsModal
           student={selectedStudent}
           open={showStudentDetails}
-          readOnly={readOnly}
-          onSave={readOnly ? undefined : handleUpdateStudent}
+          readOnly={readOnly || detailsReadOnly}
+          onSave={readOnly || detailsReadOnly ? undefined : handleUpdateStudent}
           onClose={() => {
             setShowStudentDetails(false);
             setSelectedStudent(null);
