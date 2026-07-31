@@ -41,10 +41,6 @@ const authenticate = (req, res, next) => {
   }
 };
 
-/**
- * ADMIN, HCL PARTNER, and SATHEE MITRA may access (typically GET / view).
- * Kept name requireAdminOrPartner for existing route imports.
- */
 const requireAdminOrPartner = (req, res, next) => {
   const role = req.user?.role;
   if (isPortalViewerRole(role)) return next();
@@ -55,7 +51,6 @@ const requireAdminOrPartner = (req, res, next) => {
   });
 };
 
-/** Only ADMIN may mutate data or manage users. */
 const requireAdmin = (req, res, next) => {
   if (isAdminRole(req.user?.role)) return next();
   return res.status(403).json({
@@ -64,7 +59,6 @@ const requireAdmin = (req, res, next) => {
   });
 };
 
-/** ADMIN or SATHEE MITRA may add/edit students (not HCL Partner). */
 const requireAdminOrMitra = (req, res, next) => {
   const role = req.user?.role;
   if (isAdminRole(role) || isSatheeMitraRole(role)) return next();
@@ -74,7 +68,6 @@ const requireAdminOrMitra = (req, res, next) => {
   });
 };
 
-/** Only SATHEE MITRA may upload their own attendance photos. */
 const requireSatheeMitra = (req, res, next) => {
   if (isSatheeMitraRole(req.user?.role)) return next();
   return res.status(403).json({

@@ -135,7 +135,6 @@ export const clearLocalSchedule = (portalName) => {
   }
 };
 
-/** @deprecated Prefer loadScheduleForPortal from services. */
 export const readStoredSchedule = readLocalSchedule;
 
 export const writeStoredSchedule = writeLocalSchedule;

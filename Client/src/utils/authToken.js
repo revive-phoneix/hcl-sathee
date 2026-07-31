@@ -26,7 +26,6 @@ export const setAuthToken = (token) => {
 
 export const clearAuthToken = () => setAuthToken("");
 
-/** Decode JWT payload (already issued at login). Used when /users/me is unavailable. */
 export const getAuthPayload = () => {
   const token = getAuthToken();
   if (!token) return null;

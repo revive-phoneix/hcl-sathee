@@ -16,7 +16,6 @@ const COURSE_HINTS = [
 const isBreakLabel = (value) =>
   /^(lunch|break|recess|free|—|-|–|n\/?a)$/i.test(String(value || "").trim());
 
-/** JS getDay(): 0=Sun … 6=Sat → weekday name used in timetable. */
 export const weekdayNameFromDate = (date = new Date()) => {
   const names = [
     "Sunday",

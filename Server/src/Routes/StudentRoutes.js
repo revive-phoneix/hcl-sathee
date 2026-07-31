@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
-const { getStudents, addStudent } = require("../Controllers/StudentController");
+const {
+  getStudents,
+  addStudent,
+  deleteStudent,
+} = require("../Controllers/StudentController");
 const {
   authenticate,
   requireAdminOrPartner,
@@ -9,5 +13,6 @@ const {
 
 router.get("/", authenticate, requireAdminOrPartner, getStudents);
 router.post("/", authenticate, requireAdminOrMitra, addStudent);
+router.delete("/:id", authenticate, requireAdminOrMitra, deleteStudent);
 
 module.exports = router;

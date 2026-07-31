@@ -3,7 +3,6 @@ const path = require("path");
 const { toDate } = require("../Utils/firestoreHelpers");
 
 const COLLECTION = "mitraAttendances";
-/** Firestore docs max ~1MB; keep headroom for arrival + departure metadata. */
 const MAX_INLINE_BYTES = 700 * 1024;
 
 const attendancesRef = () => getDb().collection(COLLECTION);

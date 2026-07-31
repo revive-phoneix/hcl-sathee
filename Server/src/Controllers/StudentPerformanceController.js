@@ -161,7 +161,6 @@ exports.addSubjectAttendance = wrap(
     const weekly = weeklyAttendancePercentage ?? attendancePercentage ?? 0;
     const monthly = monthlyAttendancePercentage ?? attendancePercentage ?? 0;
 
-    // Prefer upsert so we don't create duplicate subject rows for the same pair
     const attendance = await SubjectAttendance.upsertTotals({
       studentId: student.id,
       subject,
@@ -175,7 +174,6 @@ exports.addSubjectAttendance = wrap(
         undefined,
     });
 
-    // Preserve explicit period overrides when provided without totals-driven recompute
     if (
       dailyAttendancePercentage != null ||
       weeklyAttendancePercentage != null ||
@@ -207,10 +205,6 @@ exports.addSubjectAttendance = wrap(
   { label: "Add Subject Attendance Error", message: "Failed to add attendance record" }
 );
 
-/**
- * GET /api/students/performance/daily-attendance
- * ?date=YYYY-MM-DD&subject=Physics&time=09:00-10:00&centre=...
- */
 exports.getDailySubjectAttendance = wrap(
   async (req, res) => {
     const date = toDateOnly(req.query.date);
@@ -245,10 +239,6 @@ exports.getDailySubjectAttendance = wrap(
   }
 );
 
-/**
- * POST /api/students/performance/daily-attendance
- * Body: { date, subject, time?, course?, centre?, records: [{ studentId, status, name? }] }
- */
 exports.saveDailySubjectAttendance = wrap(
   async (req, res) => {
     const {

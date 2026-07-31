@@ -88,7 +88,6 @@ export default function AdminDashboard({
     };
   }, [students, portalName]);
 
-
   return (
     <MainLayout
       portalName={portalName}

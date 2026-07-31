@@ -1,8 +1,6 @@
 import { Search, Calendar } from "lucide-react";
 import ExportDropdown from "../common/ExportDropdown";
 
-const DATE_TABS = new Set(["daily", "weekly", "monthly", "sathee-mitra"]);
-
 export default function AttendanceToolbar({
   search,
   setSearch,
@@ -31,7 +29,8 @@ export default function AttendanceToolbar({
       </div>
 
       <div className="flex items-center gap-2">
-        {DATE_TABS.has(activeTab) && (
+        {/* Date picker only for daily (and Mitra self-attendance). Weekly/monthly use current period. */}
+        {(activeTab === "daily" || activeTab === "sathee-mitra") && (
           <label className="relative inline-flex items-center cursor-pointer">
             <Calendar
               size={14}

@@ -66,7 +66,6 @@ const getBucket = () => {
   return bucket;
 };
 
-/** Prefer configured bucket, then modern / legacy Firebase Storage names. */
 const getBucketCandidates = () => {
   const names = bucketCandidateNames(projectId);
   if (!names.length) return [getBucket()];

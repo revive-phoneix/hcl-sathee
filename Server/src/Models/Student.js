@@ -136,7 +136,6 @@ const destroy = async (id) => {
   return 1;
 };
 
-/** One-time import from MySQL row shape into Firestore (preserves numeric id). */
 const importFromMysql = async (row) => {
   const id = row.id;
   const payload = {

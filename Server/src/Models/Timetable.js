@@ -3,7 +3,6 @@ const { toDate } = require("../Utils/firestoreHelpers");
 const { getCanonicalCentreKey } = require("../Utils/centreMatch");
 
 const COLLECTION = "timetables";
-/** Keep SVG dataUrls in Firestore under this size; larger → Storage. */
 const MAX_INLINE_SVG_BYTES = 700 * 1024;
 
 const timetablesRef = () => getDb().collection(COLLECTION);

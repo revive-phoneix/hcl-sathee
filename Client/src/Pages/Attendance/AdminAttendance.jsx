@@ -57,7 +57,6 @@ const formatDisplayDate = (value) => {
   });
 };
 
-/** Monday–Sunday week containing the selected date. */
 const getWeekRange = (dateStr) => {
   const d = new Date(`${dateStr}T00:00:00`);
   const day = d.getDay();
@@ -122,10 +121,6 @@ const buildRow = (label, percent) => {
   };
 };
 
-/**
- * Centre daily % = average of all centre students' daily %.
- * Students with no record for that day count as 0.
- */
 const centrePercentForDate = (date, studentIds, recordsByStudentDate) => {
   if (!studentIds.length) return null;
 
@@ -149,7 +144,6 @@ const averageOfPercents = (percents) => {
   return valid.reduce((a, b) => a + b, 0) / valid.length;
 };
 
-/** Calendar weeks (Mon–Sun) that intersect the selected month. */
 const getWeeksInMonth = (dateStr) => {
   const d = new Date(`${dateStr}T00:00:00`);
   const year = d.getFullYear();

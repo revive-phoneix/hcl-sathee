@@ -44,13 +44,10 @@ export const isHclPartnerRole = (userRole = "") =>
 export const isSatheeMitraRole = (userRole = "") =>
   String(userRole || "").trim().toUpperCase() === "SATHEE MITRA";
 
-/** Only ADMIN may enter the admin dashboard pages. */
 export const canEnterAdminDashboard = (userRole = "") => isAdminRole(userRole);
 
-/** HCL PARTNER may enter the partner (view-only) dashboard pages. */
 export const canEnterPartnerDashboard = (userRole = "") => isHclPartnerRole(userRole);
 
-/** SATHEE MITRA may enter the Mitra dashboard (schedule/timetable editable; no Users page). */
 export const canEnterSatheeMitraDashboard = (userRole = "") => isSatheeMitraRole(userRole);
 
 export const PORTAL_OPTIONS = [

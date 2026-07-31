@@ -48,11 +48,9 @@ const isSatheeMitraRole = (role = "") => {
   );
 };
 
-/** True for roles allowed to view portal data (admin / partner / mitra). */
 const isPortalViewerRole = (role = "") =>
   isAdminRole(role) || isHclPartnerRole(role) || isSatheeMitraRole(role);
 
-/** Partners and Mitras only see their centre; admins see everything. */
 const filterByUserCentre = (items, user, centreField = "centre") => {
   if (!user || isAdminRole(user.role)) return items;
   if (!isHclPartnerRole(user.role) && !isSatheeMitraRole(user.role)) return [];

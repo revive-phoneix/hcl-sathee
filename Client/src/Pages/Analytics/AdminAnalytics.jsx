@@ -75,6 +75,8 @@ export default function AdminAnalytics({
   onLogout,
   readOnly = false,
   roleLabel = "Admin Portal",
+  showMentors = true,
+  allowAddEquipment = true,
 }) {
   const [activeTab, setActiveTab] = useState("students");
   const [selectedMentor, setSelectedMentor] = useState(null);
@@ -85,6 +87,8 @@ export default function AdminAnalytics({
   const [savingMentorId, setSavingMentorId] = useState(null);
 
   useEffect(() => {
+    if (!showMentors) return undefined;
+
     let isMounted = true;
 
     const loadMentors = async () => {
@@ -112,25 +116,25 @@ export default function AdminAnalytics({
         for (const dayRecords of attendanceByDate) {
           for (const record of dayRecords) {
             const key = String(record.userId);
-            const present = Boolean(record.arrivalTime || record.arrivalPhotoUrl);
-            if (!present) continue;
+            if (!(record.arrivalTime || record.arrivalPhotoUrl)) continue;
             presentDaysByUser.set(key, (presentDaysByUser.get(key) || 0) + 1);
           }
         }
 
-        const mapped = (Array.isArray(users) ? users : [])
-          .filter(
-            (user) =>
-              String(user.role || "").toUpperCase() === "SATHEE MITRA" &&
-              matchesPortalCentre(user.centre, portalName)
-          )
-          .map((user) => {
-            const presentDays = presentDaysByUser.get(String(user.id)) || 0;
-            const attendanceRate = Math.round((presentDays / 7) * 100);
-            return mapUserToMentor(user, attendanceRate);
-          });
-
-        setMentors(mapped);
+        setMentors(
+          (Array.isArray(users) ? users : [])
+            .filter(
+              (user) =>
+                String(user.role || "").toUpperCase() === "SATHEE MITRA" &&
+                matchesPortalCentre(user.centre, portalName)
+            )
+            .map((user) =>
+              mapUserToMentor(
+                user,
+                Math.round(((presentDaysByUser.get(String(user.id)) || 0) / 7) * 100)
+              )
+            )
+        );
       } catch (error) {
         console.error("Analytics mentors error:", error);
         if (!isMounted) return;
@@ -145,29 +149,19 @@ export default function AdminAnalytics({
     return () => {
       isMounted = false;
     };
-  }, [portalName]);
+  }, [portalName, showMentors]);
 
-  const regularMentors = useMemo(
-    () => mentors.filter((m) => !m.isVishist),
-    [mentors]
-  );
-
-  const vishistMentors = useMemo(
-    () => mentors.filter((m) => Boolean(m.isVishist)),
-    [mentors]
-  );
+  const regularMentors = useMemo(() => mentors.filter((m) => !m.isVishist), [mentors]);
+  const vishistMentors = useMemo(() => mentors.filter((m) => m.isVishist), [mentors]);
 
   const handleToggleAvailableDay = async (mentor, day) => {
     if (readOnly) return;
 
-    const current = Array.isArray(mentor.availableDays)
-      ? mentor.availableDays
-      : [];
+    const current = Array.isArray(mentor.availableDays) ? mentor.availableDays : [];
     const next = current.includes(day)
       ? current.filter((d) => d !== day)
       : WEEKDAYS.filter((d) => current.includes(d) || d === day);
 
-    // Optimistic UI update
     setMentors((prev) => patchMentor(prev, mentor.id, { availableDays: next }));
     if (selectedMentor && String(selectedMentor.id) === String(mentor.id)) {
       setSelectedMentor((prev) => ({ ...prev, availableDays: next }));
@@ -179,18 +173,13 @@ export default function AdminAnalytics({
       const updated = await updateUser(mentor.id, { availableDays: next });
       setMentors((prev) =>
         patchMentor(prev, mentor.id, {
-          availableDays: Array.isArray(updated.availableDays)
-            ? updated.availableDays
-            : next,
+          availableDays: Array.isArray(updated.availableDays) ? updated.availableDays : next,
         })
       );
     } catch (error) {
       console.error("Toggle available day error:", error);
-      // Revert optimistic update
       setMentors((prev) => patchMentor(prev, mentor.id, { availableDays: current }));
-      setMentorsError(
-        error.response?.data?.message || "Unable to update available days"
-      );
+      setMentorsError(error.response?.data?.message || "Unable to update available days");
     } finally {
       setSavingMentorId(null);
     }
@@ -211,28 +200,30 @@ export default function AdminAnalytics({
       >
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Analytics & Progress</h1>
-          <p className="text-sm text-gray-500">Monitor student performance and teacher activity</p>
+          <p className="text-sm text-gray-500">Monitor student performance and centre activity</p>
         </div>
 
-        <div className="mb-8">
-          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-            {ANALYTICS_TABS.map(({ key, label }) => (
-              <button
-                key={key}
-                onClick={() => setActiveTab(key)}
-                className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
-                  activeTab === key
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {showMentors ? (
+          <div className="mb-8">
+            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+              {ANALYTICS_TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  onClick={() => setActiveTab(key)}
+                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
+                    activeTab === key
+                      ? "bg-blue-600 text-white shadow-sm"
+                      : "text-gray-600 hover:text-gray-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
 
-        {activeTab === "students" ? (
+        {activeTab === "students" || !showMentors ? (
           <StudentsTab portalName={portalName} />
         ) : (
           <TeachersTab
@@ -250,18 +241,20 @@ export default function AdminAnalytics({
           />
         )}
 
-        <UtilitiesSection portalName={portalName} readOnly={readOnly} />
+        <UtilitiesSection portalName={portalName} readOnly={readOnly || !allowAddEquipment} />
 
-        <MentorDetailsModal
-          mentor={selectedMentor}
-          open={mentorModalOpen}
-          readOnly={readOnly}
-          onClose={() => setMentorModalOpen(false)}
-          onUpdated={(updatedMentor) => {
-            setSelectedMentor(updatedMentor);
-            setMentors((prev) => replaceMentor(prev, updatedMentor));
-          }}
-        />
+        {showMentors ? (
+          <MentorDetailsModal
+            mentor={selectedMentor}
+            open={mentorModalOpen}
+            readOnly={readOnly}
+            onClose={() => setMentorModalOpen(false)}
+            onUpdated={(updatedMentor) => {
+              setSelectedMentor(updatedMentor);
+              setMentors((prev) => replaceMentor(prev, updatedMentor));
+            }}
+          />
+        ) : null}
       </main>
     </MainLayout>
   );

@@ -14,7 +14,6 @@ import CardSelector_2 from "./Pages/Selector/CardSelector_2";
 import Dashboard from "./Pages/Dashboard/AdminDashboard";
 import HCLPartnerDashboard from "./Pages/Dashboard/HCLPartnerDashboard";
 import SatheeMitraDashboard from "./Pages/Dashboard/SatheeMitraDashboard";
-import SatheeMitraPlaceholder from "./Pages/Dashboard/SatheeMitraPlaceholder";
 import AdminAttendance from "./Pages/Attendance/AdminAttendance";
 import HCLPartnerAttendance from "./Pages/Attendance/HCLPartnerAttendance";
 import SM_Attendance from "./Pages/Attendance/SM_Attendance";
@@ -27,6 +26,7 @@ import HCLPartnerAnnouncements from "./Pages/Announcements/HCLPartnerAnnouncemen
 import SatheeMitraAnnouncements from "./Pages/Announcements/SatheeMitraAnnouncements";
 import AdminAnalytics from "./Pages/Analytics/AdminAnalytics";
 import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
+import SM_Analytics from "./Pages/Analytics/SM_Analytics";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -335,7 +335,6 @@ const AppContent = () => {
         }
       />
 
-      {/* Admin routes */}
       <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
       <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
       <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
@@ -346,7 +345,6 @@ const AppContent = () => {
         element={<AdminAnnouncements {...adminLayout} userName={userName} />}
       />
 
-      {/* HCL Partner routes (no Users page) */}
       <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
       <Route path="/partner/attendance" element={<HCLPartnerAttendance {...partnerLayout} />} />
       <Route path="/partner/analytics" element={<HCLPartnerAnalytics {...partnerLayout} />} />
@@ -356,7 +354,6 @@ const AppContent = () => {
         element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
       />
 
-      {/* Sathee Mitra routes (no Users; schedule/timetable on dashboard; rest placeholders) */}
       <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
       <Route
         path="/mitra/attendance"
@@ -370,7 +367,7 @@ const AppContent = () => {
           />
         }
       />
-      <Route path="/mitra/analytics" element={<SatheeMitraPlaceholder {...mitraLayout} title="Progress and Analytics" />} />
+      <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
       <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
       <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
 

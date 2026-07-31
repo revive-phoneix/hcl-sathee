@@ -202,7 +202,6 @@ exports.addStudent = wrap(
       address: address || null,
       parents: parents || {},
       subjects: resolved.subjects,
-      // Keep lightweight mirrors for older clients; source of truth is subject* collections
       marks: marks && typeof marks === "object" ? marks : initialMaps.marks,
       attendance:
         attendance && typeof attendance === "object" ? attendance : initialMaps.attendance,
@@ -223,4 +222,25 @@ exports.addStudent = wrap(
     });
   },
   { label: "Add Student Error", message: "Failed to add student" }
+);
+
+exports.deleteStudent = wrap(
+  async (req, res) => {
+    const student = await Student.findById(req.params.id);
+    if (!student) {
+      return fail(res, 404, "Student not found");
+    }
+
+    const scoped = filterByUserCentre([student], req.user);
+    if (!scoped.length) {
+      return fail(res, 403, "You can only delete students from your centre");
+    }
+
+    if (!(await Student.destroy(req.params.id))) {
+      return fail(res, 404, "Student not found");
+    }
+
+    return ok(res, { message: "Student deleted successfully" });
+  },
+  { label: "Delete Student Error", message: "Failed to delete student" }
 );

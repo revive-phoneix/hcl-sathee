@@ -13,7 +13,6 @@ const announcementsRef = () => getDb().collection(COLLECTION);
 const findDocRefById = (id) => findRef(announcementsRef(), id);
 const getNextId = () => nextId(announcementsRef());
 
-/** Normalize other-centres to null or a non-empty string array. */
 const normalizeOtherCentres = (value) => {
   if (value == null || value === "") return null;
   let list = value;
@@ -203,7 +202,6 @@ const destroy = async (id) => {
   return 1;
 };
 
-/** One-time import from MySQL row shape into Firestore (preserves numeric id). */
 const importFromMysql = async (row) => {
   const id = row.id;
   const payload = {

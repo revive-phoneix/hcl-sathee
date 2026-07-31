@@ -326,9 +326,6 @@ export default function AdminLoginCard({ onLoginSuccess }) {
         </button>
       </form>
 
-      <p className="mt-8 text-center text-sm opacity-75">
-        Having trouble? <span className="underline cursor-pointer">Contact IT Support</span>
-      </p>
     </div>
   );
 }

@@ -106,10 +106,6 @@ function UploadCard({
   );
 }
 
-/**
- * Sathee Mitra self check-in: locked name/email from admin-created user record,
- * arrival + departure photo uploads. Times are set server-side at upload.
- */
 export default function MyMitraAttendance({
   userId: sessionUserId,
   userName: sessionUserName,

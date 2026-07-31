@@ -121,7 +121,6 @@ const normalizeCourseKey = (course = "") => {
   return normalized;
 };
 
-/** Always returns every exam batch; empty courses stay at 0% with noStudents. */
 export const getCourseExamProgress = (students = []) => {
   const byCourse = new Map(EXAM_BATCHES.map((batch) => [batch.key, []]));
 

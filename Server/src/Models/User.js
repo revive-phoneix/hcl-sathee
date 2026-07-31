@@ -40,7 +40,6 @@ const normalizeAvailableDays = (value) => {
 const isMitraRole = (role = "") =>
   String(role || "").trim().toUpperCase() === "SATHEE MITRA";
 
-/** isVishist only for Sathee Mitra (boolean). Non-Mitra → null (do not store). */
 const normalizeIsVishist = (role, value) => {
   if (!isMitraRole(role)) return null;
   return value === true || value === "true" || value === 1 || value === "1";
@@ -211,7 +210,6 @@ const destroy = async (id) => {
   return 1;
 };
 
-/** One-time import from MySQL row shape into Firestore (preserves numeric id). */
 const importFromMysql = async (row) => {
   const id = row.id;
   const payload = {

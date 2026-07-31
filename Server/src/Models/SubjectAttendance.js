@@ -80,10 +80,6 @@ const create = async (data) => {
   return toApiAttendance(String(id), payload);
 };
 
-/**
- * Create or update the running totals row for one student+subject.
- * Prefer this over create() when daily logs drive the numbers.
- */
 const upsertTotals = async ({
   studentId,
   subject,
@@ -109,7 +105,6 @@ const upsertTotals = async ({
       totalClasses: total,
       classesAttended: attended,
       percentage: pct,
-      // Keep period fields aligned with running subject % (UI shows one subject %)
       dailyAttendancePercentage: pct,
       weeklyAttendancePercentage: pct,
       monthlyAttendancePercentage: pct,

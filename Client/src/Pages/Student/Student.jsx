@@ -6,7 +6,7 @@ import StudentToolbar from "../../Components/Student/StudentToolbar";
 import StudentTable from "../../Components/Student/StudentTable";
 import NewStudent from "../../Components/Student/NewStudent";
 import StudentDetailsModal from "../../Components/Student/StudentDetailsModal";
-import { fetchStudents, createStudent } from "../../services/students";
+import { fetchStudents, createStudent, removeStudent } from "../../services/students";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { AVATAR_COLORS, getInitials } from "../../utils/studentMetrics";
 
@@ -30,6 +30,9 @@ export default function Student({
   const [students, setStudents] = useState([]);
   const [submittingStudent, setSubmittingStudent] = useState(false);
   const [createStudentError, setCreateStudentError] = useState("");
+  const [studentToDelete, setStudentToDelete] = useState(null);
+  const [deletingStudent, setDeletingStudent] = useState(false);
+  const [studentsError, setStudentsError] = useState("");
 
   const handleAddStudent = async (student) => {
     setSubmittingStudent(true);
@@ -80,6 +83,34 @@ export default function Student({
       prev.map((student) => (student.id === updatedStudent.id ? updatedStudent : student))
     );
     setSelectedStudent(updatedStudent);
+  };
+
+  const handleDeleteStudent = (student) => {
+    setStudentsError("");
+    setStudentToDelete(student);
+  };
+
+  const confirmDeleteStudent = async () => {
+    if (!studentToDelete) return;
+
+    setDeletingStudent(true);
+    setStudentsError("");
+
+    try {
+      await removeStudent(studentToDelete.id);
+      setStudents((prev) => prev.filter((s) => s.id !== studentToDelete.id));
+      if (selectedStudent?.id === studentToDelete.id) {
+        setShowStudentDetails(false);
+        setSelectedStudent(null);
+      }
+      setStudentToDelete(null);
+    } catch (error) {
+      console.error("Delete Student Error:", error);
+      setStudentsError(getApiErrorMessage(error, "Unable to delete the student right now"));
+      setStudentToDelete(null);
+    } finally {
+      setDeletingStudent(false);
+    }
   };
 
   const loadStudents = async () => {
@@ -147,10 +178,31 @@ export default function Student({
             readOnly={readOnly}
           />
 
-          <StudentTable paginated={paginated} onViewDetails={(student) => {
-            setSelectedStudent(student);
-            setShowStudentDetails(true);
-          }} />
+          {studentsError ? (
+            <div
+              style={{
+                margin: "0 20px 12px",
+                padding: "12px 14px",
+                borderRadius: 10,
+                border: "1px solid #fecaca",
+                background: "#fef2f2",
+                color: "#b91c1c",
+                fontSize: 14,
+              }}
+            >
+              {studentsError}
+            </div>
+          ) : null}
+
+          <StudentTable
+            paginated={paginated}
+            readOnly={readOnly}
+            onViewDetails={(student) => {
+              setSelectedStudent(student);
+              setShowStudentDetails(true);
+            }}
+            onDeleteStudent={readOnly ? undefined : handleDeleteStudent}
+          />
         </div>
       </div>
 
@@ -180,6 +232,87 @@ export default function Student({
           }}
         />
       )}
+
+      {studentToDelete ? (
+        <div
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 100,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            background: "rgba(0,0,0,0.4)",
+            padding: 16,
+            backdropFilter: "blur(4px)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              borderRadius: 24,
+              background: "#fff",
+              padding: 32,
+              textAlign: "center",
+              boxShadow: "0 20px 40px rgba(0,0,0,0.15)",
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: "#0f172a" }}>
+              Delete Student?
+            </h3>
+            <p style={{ margin: "12px 0 0", fontSize: 14, color: "#64748b" }}>
+              Are you sure you want to delete the student{" "}
+              <strong style={{ color: "#0f172a" }}>{studentToDelete.name}</strong>?
+            </p>
+            <div
+              style={{
+                marginTop: 28,
+                display: "flex",
+                justifyContent: "center",
+                gap: 12,
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setStudentToDelete(null)}
+                disabled={deletingStudent}
+                style={{
+                  borderRadius: 16,
+                  border: "1px solid #e2e8f0",
+                  padding: "10px 22px",
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: "#334155",
+                  background: "#fff",
+                  cursor: deletingStudent ? "not-allowed" : "pointer",
+                  opacity: deletingStudent ? 0.6 : 1,
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={confirmDeleteStudent}
+                disabled={deletingStudent}
+                style={{
+                  borderRadius: 16,
+                  border: "none",
+                  padding: "10px 22px",
+                  fontSize: 14,
+                  fontWeight: 600,
+                  color: "#fff",
+                  background: "#dc2626",
+                  cursor: deletingStudent ? "not-allowed" : "pointer",
+                  opacity: deletingStudent ? 0.6 : 1,
+                }}
+              >
+                {deletingStudent ? "Deleting…" : "Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </MainLayout>
   );
 }

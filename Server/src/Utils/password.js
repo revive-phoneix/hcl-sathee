@@ -7,7 +7,6 @@ const isBcryptHash = (value) =>
 const hashPassword = (plainPassword) =>
   bcrypt.hash(String(plainPassword), SALT_ROUNDS);
 
-/** Supports legacy plain-text passwords and marks them for rehash on login. */
 const verifyPassword = async (plainPassword, storedPassword) => {
   const stored = storedPassword == null ? "" : String(storedPassword);
   if (!stored) return { valid: false, needsRehash: false };

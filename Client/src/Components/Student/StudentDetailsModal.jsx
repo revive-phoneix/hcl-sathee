@@ -71,11 +71,11 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
           borderTopRightRadius: 12
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ 
-              width: 60, height: 60, borderRadius: "50%", 
-              background: student.avatarColor, color: "#ffffff", 
-              display: "flex", alignItems: "center", justifyContent: "center", 
-              fontWeight: 700, fontSize: 22 
+            <div style={{
+              width: 60, height: 60, borderRadius: "50%",
+              background: student.avatarColor, color: "#ffffff",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontWeight: 700, fontSize: 22
             }}>
               {student.initials}
             </div>
@@ -86,7 +86,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
               </p>
             </div>
           </div>
-          <button 
+          <button
             onClick={onClose}
             style={{ background: "none", border: "none", color: "#fff", fontSize: 28, cursor: "pointer" }}
           >
@@ -192,7 +192,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
           <div style={{ textAlign: "center", marginTop: 32 }}>
             {!readOnly ? (
               <>
-                <button 
+                <button
                   onClick={() => setIsEditing(!isEditing)}
                   style={{
                     background: isEditing ? "#ef4444" : "#1e40af",
@@ -208,9 +208,9 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 >
                   {isEditing ? "Cancel" : "Edit Details"}
                 </button>
-                
+
                 {isEditing && (
-                  <button 
+                  <button
                     onClick={handleSave}
                     style={{
                       background: "#10b981",

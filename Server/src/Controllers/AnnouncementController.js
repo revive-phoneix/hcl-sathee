@@ -38,7 +38,6 @@ const parseBody = (req) => {
   };
 };
 
-/** Visible if centre matches, or user centre is listed in other-centres. */
 const filterAnnouncementsForUser = (items, user) => {
   if (!user || isAdminRole(user.role)) return items;
   if (!isHclPartnerRole(user.role) && !isSatheeMitraRole(user.role)) return [];

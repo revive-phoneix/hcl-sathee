@@ -42,7 +42,6 @@ const EMPTY_RECORD = {
   centreId: null,
 };
 
-/** View-only Sathee Mitra attendance. Photos are uploaded from the Mitra portal. */
 export default function SatheeMitraAttendance({
   mitras = [],
   loading = false,

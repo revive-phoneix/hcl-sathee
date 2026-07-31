@@ -20,7 +20,6 @@ const pillClass = (active) =>
       : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
   }`;
 
-/** Shared attendance filters. Centre dropdown / Mitra tab are optional. */
 export default function TabSelector({
   activeTab,
   setActiveTab,

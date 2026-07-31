@@ -1,4 +1,3 @@
-/** Curriculum rules: compulsory vs choice subjects per course (server). */
 
 const COMPULSORY_COURSE_SUBJECTS = {
   JEE: ["Physics", "Chemistry", "Mathematics"],

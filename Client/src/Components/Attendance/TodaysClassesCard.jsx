@@ -12,9 +12,6 @@ const formatTodayLabel = (date = new Date()) =>
     year: "numeric",
   });
 
-/**
- * Sathee Mitra: dropdown that expands to today's classes from the weekly timetable.
- */
 export default function TodaysClassesCard({ portalName = "" }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);

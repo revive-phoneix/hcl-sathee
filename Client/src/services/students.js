@@ -34,3 +34,7 @@ export const createStudent = async (payload) => {
   const response = await api.post("/api/students", payload);
   return parseStudent(response.data.student);
 };
+
+export const removeStudent = async (id) => {
+  await api.delete(`/api/students/${id}`);
+};

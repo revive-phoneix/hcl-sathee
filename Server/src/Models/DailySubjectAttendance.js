@@ -17,7 +17,6 @@ const normalizeStatus = (status) => {
   return STATUS[key] || STATUS.absent;
 };
 
-/** Safe Firestore doc-id fragment (no slashes). */
 const slugPart = (value, fallback = "na") => {
   const cleaned = String(value || "")
     .trim()
@@ -90,9 +89,6 @@ const findByStudentId = async (studentId) => {
   return snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
 };
 
-/**
- * Idempotent upsert: same student+subject+date+time overwrites status (no double-count).
- */
 const upsert = async ({
   studentId,
   name = null,

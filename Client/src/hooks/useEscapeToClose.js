@@ -1,6 +1,5 @@
 import { useEffect } from "react";
 
-/** Close overlays/modals when Escape is pressed. */
 export function useEscapeToClose(onClose, enabled = true) {
   useEffect(() => {
     if (!enabled || typeof onClose !== "function") return undefined;

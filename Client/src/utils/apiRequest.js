@@ -1,6 +1,5 @@
 import axios from "axios";
 
-/** Render free tier cold starts often need 30–60s; keep room for that. */
 const DEFAULT_TIMEOUT_MS = 90000;
 const RETRY_DELAY_MS = 2500;
 

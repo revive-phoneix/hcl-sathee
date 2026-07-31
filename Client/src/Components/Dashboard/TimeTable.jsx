@@ -86,7 +86,6 @@ const isSvg = (file) =>
   String(file?.type || "").includes("svg") ||
   String(file?.name || "").toLowerCase().endsWith(".svg");
 
-/** Parse weekly grid sheet → { days, slots } like the PDF table */
 const parseWeeklyGrid = (matrix) => {
   const headerRowIndex = matrix.findIndex((row) => {
     const cells = row.map(normalizeHeader);
@@ -130,7 +129,6 @@ const parseWeeklyGrid = (matrix) => {
   };
 };
 
-/** Long Day/Time/Subject rows → weekly grid */
 const parseLongToGrid = (matrix) => {
   const headerRowIndex = matrix.findIndex((row) =>
     row.some((cell) => {
