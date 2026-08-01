@@ -114,7 +114,7 @@ export default function SatheeMitraAttendance({
           <thead>
             <tr className="bg-[#CCD2DD]">
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12">
-                #
+                S.No
               </th>
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Name

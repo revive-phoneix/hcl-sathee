@@ -142,7 +142,12 @@ export default function Student({
     });
   }, [search, courseFilter, students, portalName]);
 
-  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  const totalStudents = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(totalStudents / PAGE_SIZE));
+  const currentPage = Math.min(page, totalPages);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const startCount = totalStudents === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const endCount = Math.min(currentPage * PAGE_SIZE, totalStudents);
 
   return (
     <MainLayout
@@ -198,12 +203,71 @@ export default function Student({
           <StudentTable
             paginated={paginated}
             readOnly={readOnly}
+            serialOffset={(currentPage - 1) * PAGE_SIZE}
             onViewDetails={(student) => {
               setSelectedStudent(student);
               setShowStudentDetails(true);
             }}
             onDeleteStudent={readOnly ? undefined : handleDeleteStudent}
           />
+
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 12,
+              padding: "14px 20px",
+              borderTop: "1px solid #e2e8f0",
+              background: "#f8fafc",
+              flexWrap: "wrap",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 13, color: "#64748b", fontWeight: 500 }}>
+              Showing {startCount}-{endCount} of {totalStudents} students
+            </p>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage <= 1}
+                style={{
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: currentPage <= 1 ? "#94a3b8" : "#334155",
+                  background: "#fff",
+                  cursor: currentPage <= 1 ? "not-allowed" : "pointer",
+                  opacity: currentPage <= 1 ? 0.6 : 1,
+                }}
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: 13, color: "#475569", fontWeight: 600 }}>
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={currentPage >= totalPages}
+                style={{
+                  borderRadius: 8,
+                  border: "1px solid #cbd5e1",
+                  padding: "8px 14px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: currentPage >= totalPages ? "#94a3b8" : "#334155",
+                  background: "#fff",
+                  cursor: currentPage >= totalPages ? "not-allowed" : "pointer",
+                  opacity: currentPage >= totalPages ? 0.6 : 1,
+                }}
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 

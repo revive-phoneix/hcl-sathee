@@ -259,6 +259,9 @@ function ClassAttendanceTable({
         <table className="w-full min-w-[640px]">
           <thead>
             <tr className="bg-[#CCD2DD]">
+              <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700 w-12">
+                S.No
+              </th>
               <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-700">
                 Student Name
               </th>
@@ -296,13 +299,13 @@ function ClassAttendanceTable({
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
                   Loading attendance…
                 </td>
               </tr>
             ) : students.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
+                <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
                   No students enrolled for this subject
                   {classItem.course ? ` / ${classItem.course}` : ""}.
                 </td>
@@ -317,6 +320,9 @@ function ClassAttendanceTable({
                     key={`${classKey(classItem, index)}-${id}`}
                     className={isEven ? "bg-white" : "bg-[#f8f9fb]"}
                   >
+                    <td className="px-5 py-3.5 text-sm text-gray-400 tabular-nums">
+                      {String(rowIndex + 1).padStart(2, "0")}
+                    </td>
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-800">
                       {student.name || "—"}
                     </td>

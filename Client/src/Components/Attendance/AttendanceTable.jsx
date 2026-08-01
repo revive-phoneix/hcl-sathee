@@ -28,7 +28,7 @@ export default function AttendanceTable({
         <thead>
           <tr className="bg-[#CCD2DD]">
             <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider w-12">
-              #
+              S.No
             </th>
             <th className="px-6 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
               {columnLabel}

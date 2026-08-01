@@ -1,5 +1,6 @@
 import ProgressBar from "./ProgressBar";
 import StatusBadge from "./StatusBadge";
+import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 
 const COLUMNS = [
   "Topic",
@@ -26,10 +27,13 @@ export default function ScheduleTable({ rows }) {
       <table className="w-full text-sm border-collapse" style={{ minWidth: "720px" }}>
         <thead>
           <tr style={{ background: "#ccd2dd" }}>
+            <SerialNoHeader
+              className="px-4 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap rounded-tl-2xl"
+            />
             {COLUMNS.map((col, i) => (
               <th
                 key={col}
-                className={`px-4 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap ${i === 0 ? "rounded-tl-2xl" : ""} ${i === COLUMNS.length - 1 ? "rounded-tr-2xl" : ""}`}
+                className={`px-4 py-3.5 text-left text-xs font-bold text-gray-600 uppercase tracking-wide whitespace-nowrap ${i === COLUMNS.length - 1 ? "rounded-tr-2xl" : ""}`}
               >
                 {col}
               </th>
@@ -43,6 +47,10 @@ export default function ScheduleTable({ rows }) {
               className="border-t border-gray-100 hover:bg-blue-50/50"
               style={{ background: i % 2 === 0 ? "#ffffff" : "#f9fafb" }}
             >
+              <SerialNoCell
+                index={i}
+                className="px-4 py-3.5 text-gray-500 font-semibold tabular-nums whitespace-nowrap"
+              />
               <td className="px-4 py-3.5 font-semibold text-gray-800 whitespace-nowrap">{row.topic}</td>
               <td className="px-4 py-3.5 text-gray-600 whitespace-nowrap">
                 <span className="inline-flex items-center gap-1.5">

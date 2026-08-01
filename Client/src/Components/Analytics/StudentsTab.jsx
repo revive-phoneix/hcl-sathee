@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchStudentPerformance } from "../../services/studentPerformance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { average, getStudentProgressRates } from "../../utils/studentMetrics";
+import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 import { performanceBadge, tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 
 const PASS_MARK = 40;
@@ -221,6 +222,7 @@ export default function StudentsTab({ portalName }) {
           <table className="w-full text-sm">
             <thead>
               <tr style={tableHeadRowClass}>
+                <SerialNoHeader className="text-left px-6 py-3.5 text-xs font-semibold text-gray-700 uppercase" />
                 {[
                   ["Course", "text-left px-6"],
                   ["Students Count", "text-center px-4"],
@@ -242,6 +244,10 @@ export default function StudentsTab({ portalName }) {
             <tbody>
               {courseRows.map((row, i) => (
                 <tr key={row.Course} className={zebraRowClass(i)}>
+                  <SerialNoCell
+                    index={i}
+                    className="px-6 py-4 text-gray-500 font-medium tabular-nums"
+                  />
                   <td className="px-6 py-4 font-semibold text-gray-900">{row.Course}</td>
                   <td className="px-4 py-4 text-center font-semibold text-gray-800">👤 {row.students}</td>
                   <td className="px-4 py-4 text-center text-gray-700">{row.avg}</td>

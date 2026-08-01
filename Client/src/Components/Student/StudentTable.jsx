@@ -1,5 +1,6 @@
 import { Trash2 } from "lucide-react";
 import CourseBadge from "./CourseBadge";
+import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 
 const TABLE_COLUMNS = [
   "Student Full Name",
@@ -29,14 +30,22 @@ export default function StudentTable({
   onViewDetails,
   onDeleteStudent,
   readOnly = false,
+  serialOffset = 0,
 }) {
-  const colCount = readOnly ? 7 : 8;
+  const colCount = readOnly ? 8 : 9;
 
   return (
     <div style={{ overflowX: "auto" }}>
       <table style={{ width: "100%", borderCollapse: "collapse" }}>
         <thead>
           <tr style={{ background: "#f1f5f9", borderBottom: "2px solid #e2e8f0" }}>
+            <SerialNoHeader
+              style={{
+                ...headerStyle,
+                width: 56,
+                textAlign: "center",
+              }}
+            />
             {(readOnly ? TABLE_COLUMNS.slice(0, 7) : TABLE_COLUMNS).map((col) => (
               <th key={col} style={headerStyle}>
                 {col}
@@ -63,6 +72,10 @@ export default function StudentTable({
                   borderBottom: "1px solid #f1f5f9",
                 }}
               >
+                <SerialNoCell
+                  index={serialOffset + i}
+                  style={{ padding: "16px 20px", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}
+                />
                 <td style={{ padding: "16px 20px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                     <div

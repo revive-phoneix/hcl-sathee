@@ -3,6 +3,7 @@ import { Plus } from "lucide-react";
 import { createEquipment, fetchEquipments } from "../../services/equipment";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import TableStatusRow from "../common/TableStatusRow";
+import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 import { tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 import AddEquipmentModal from "./AddEquipmentModal";
 
@@ -80,6 +81,7 @@ export default function UtilitiesSection({ portalName, readOnly = false }) {
           <table className="w-full text-sm">
             <thead>
               <tr style={tableHeadRowClass}>
+                <SerialNoHeader className="text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase" />
                 {[
                   ["Equipment Name", "text-left px-5"],
                   ["Description", "text-left px-4"],
@@ -97,18 +99,22 @@ export default function UtilitiesSection({ portalName, readOnly = false }) {
             </thead>
             <tbody>
               {loading ? (
-                <TableStatusRow colSpan={4}>Loading utilities…</TableStatusRow>
+                <TableStatusRow colSpan={5}>Loading utilities…</TableStatusRow>
               ) : error ? (
-                <TableStatusRow colSpan={4} className="px-5 py-10 text-center text-sm text-red-500">
+                <TableStatusRow colSpan={5} className="px-5 py-10 text-center text-sm text-red-500">
                   {error}
                 </TableStatusRow>
               ) : rows.length === 0 ? (
-                <TableStatusRow colSpan={4}>
+                <TableStatusRow colSpan={5}>
                   No equipment added for this centre yet.
                 </TableStatusRow>
               ) : (
                 rows.map((item, i) => (
                   <tr key={item.id} className={zebraRowClass(i)}>
+                    <SerialNoCell
+                      index={i}
+                      className="px-5 py-4 text-gray-500 font-medium tabular-nums"
+                    />
                     <td className="px-5 py-4 font-semibold text-gray-900">
                       {item.name}
                     </td>

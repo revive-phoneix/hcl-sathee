@@ -1,5 +1,6 @@
 import { WEEKDAYS } from "../../utils/availableDays";
 import TableStatusRow from "../common/TableStatusRow";
+import { SerialNoCell } from "../common/tableSerial";
 import {
   attendanceBadge,
   mentorInitial,
@@ -83,6 +84,7 @@ function MentorTableSection({ title, subtitle, headers, colSpan, children }) {
 }
 
 const OVERVIEW_HEADERS = [
+  { label: "S.No", className: "text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Mentor", className: "text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Role", className: "text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Centre", className: "text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
@@ -91,6 +93,7 @@ const OVERVIEW_HEADERS = [
 ];
 
 const VISHIST_HEADERS = [
+  { label: "S.No", className: "text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Mentor", className: "text-left px-5 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Email", className: "text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
   { label: "Centre", className: "text-left px-4 py-3.5 text-xs font-semibold text-gray-700 uppercase" },
@@ -114,7 +117,7 @@ export default function TeachersTab({
         title="Mentors Overview"
         subtitle="Sathee Mitra directory with last 7 days attendance"
         headers={OVERVIEW_HEADERS}
-        colSpan={5}
+        colSpan={6}
       >
         {({ colSpan }) =>
           loading ? (
@@ -130,6 +133,10 @@ export default function TeachersTab({
           ) : (
             mentors.map((mentor, i) => (
               <tr key={mentor.id} className={zebraRowClass(i)}>
+                <SerialNoCell
+                  index={i}
+                  className="px-5 py-4 text-gray-500 font-medium tabular-nums"
+                />
                 <td className="px-5 py-4">
                   <MentorNameLink mentor={mentor} onViewMentor={onViewMentor} withAvatar />
                 </td>
@@ -151,7 +158,7 @@ export default function TeachersTab({
         title="SATHEE Vishist Schedule"
         subtitle="Toggle days when each Sathee Mitra (Vishist) is available for special lectures"
         headers={VISHIST_HEADERS}
-        colSpan={5}
+        colSpan={6}
       >
         {({ colSpan }) =>
           loading ? (
@@ -163,6 +170,10 @@ export default function TeachersTab({
           ) : (
             vishists.map((mentor, i) => (
               <tr key={mentor.id} className={zebraRowClass(i)}>
+                <SerialNoCell
+                  index={i}
+                  className="px-5 py-4 text-gray-500 font-medium tabular-nums"
+                />
                 <td className="px-5 py-4">
                   <MentorNameLink mentor={mentor} onViewMentor={onViewMentor} />
                 </td>
