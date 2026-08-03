@@ -20,6 +20,8 @@ export const requestNotificationPermission = async () => {
   if (permission !== "granted") return null;
 
   const registration = await navigator.serviceWorker.register("/firebase-messaging-sw.js");
+  await navigator.serviceWorker.ready; 
+
   const messaging = getMessaging(app);
 
   const token = await getToken(messaging, {
