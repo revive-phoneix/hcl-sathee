@@ -32,19 +32,40 @@ const findDocRefById = async (collectionRef, id) => {
   return null;
 };
 
+/**
+ * Allocate the next numeric id with a single counter doc (1 read + 1 write).
+ * Avoids scanning the whole collection on every create (that burned Spark quota).
+ */
 const getNextId = async (collectionRef) => {
-  const snap = await collectionRef.get();
-  if (snap.empty) return 1;
+  const db = collectionRef.firestore;
+  const counterRef = db.collection("_counters").doc(collectionRef.id);
 
-  let maxId = 0;
-  for (const doc of snap.docs) {
-    const docId = Number(doc.id);
-    const fieldId = Number(doc.data().id);
-    if (!Number.isNaN(docId)) maxId = Math.max(maxId, docId);
-    if (!Number.isNaN(fieldId)) maxId = Math.max(maxId, fieldId);
+  const existing = await counterRef.get();
+  if (!existing.exists) {
+    // Bootstrap without a full collection scan — use a high watermark.
+    await counterRef.set(
+      {
+        value: Date.now(),
+        bootstrappedAt: new Date(),
+      },
+      { merge: true }
+    );
   }
 
-  return maxId + 1;
+  return db.runTransaction(async (tx) => {
+    const snap = await tx.get(counterRef);
+    const current = Number(snap.data()?.value) || Date.now();
+    const value = current + 1;
+    tx.set(
+      counterRef,
+      {
+        value,
+        updated_at: new Date(),
+      },
+      { merge: true }
+    );
+    return value;
+  });
 };
 
 module.exports = { toDate, toDateOnly, findDocRefById, getNextId };

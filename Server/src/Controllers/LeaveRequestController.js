@@ -3,6 +3,7 @@ const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { isAdminRole, filterByUserCentre } = require("../Utils/centreMatch");
 
 const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
+const VALID_STATUSES = new Set(["approved", "rejected"]);
 
 exports.createLeaveRequest = wrap(
   async (req, res) => {
@@ -65,4 +66,44 @@ exports.getLeaveRequests = wrap(
     return ok(res, { leaves });
   },
   { label: "Get Leave Requests Error", message: "Failed to fetch leave requests" }
+);
+
+exports.updateLeaveRequestStatus = wrap(
+  async (req, res) => {
+    if (!isAdminRole(req.user?.role)) {
+      return fail(res, 403, "Admin access required");
+    }
+
+    const { id } = req.params;
+    const status = String(req.body?.status || "").trim().toLowerCase();
+
+    if (!VALID_STATUSES.has(status)) {
+      return fail(res, 400, "Status must be approved or rejected");
+    }
+
+    const current = await LeaveRequest.findById(id);
+    if (!current) {
+      return fail(res, 404, "Leave request not found");
+    }
+
+    if (current.status && String(current.status).toLowerCase() !== "pending") {
+      return fail(res, 409, "Leave request has already been reviewed");
+    }
+
+    const leave = await LeaveRequest.updateStatus(id, status, {
+      reviewedBy: req.user?.id ?? null,
+      reviewedByEmail: req.user?.email ?? null,
+      reviewedAt: new Date(),
+    });
+
+    return ok(res, {
+      message: `Leave request ${status}`,
+      leave,
+    });
+  },
+  {
+    label: "Update Leave Request Status Error",
+    message: "Failed to update leave request status",
+    useErrorMessage: true,
+  }
 );

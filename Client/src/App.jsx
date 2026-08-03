@@ -28,6 +28,7 @@ import AdminAnalytics from "./Pages/Analytics/AdminAnalytics";
 import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
 import SM_Analytics from "./Pages/Analytics/SM_Analytics";
 import MyProfile from "./Pages/Profile/MyProfile";
+import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -40,6 +41,7 @@ import { getAuthPayload, getAuthToken } from "./utils/authToken";
 const ADMIN_PATH_TO_NAV = {
   "/dashboard": 0,
   "/attendance": 1,
+  "/leave-requests": 1,
   "/analytics": 2,
   "/users": 3,
   "/students": 4,
@@ -49,6 +51,7 @@ const ADMIN_PATH_TO_NAV = {
 const ADMIN_NAV_PATHS = [
   "/dashboard",
   "/attendance",
+  "/leave-requests",
   "/analytics",
   "/users",
   "/students",
@@ -344,6 +347,7 @@ const AppContent = () => {
 
       <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
       <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
+      <Route path="/leave-requests" element={<AdminLeaveRequests {...adminLayout} />} />
       <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
       <Route path="/users" element={<AdminUser {...adminLayout} />} />
       <Route path="/students" element={<Student {...adminLayout} />} />

@@ -71,10 +71,38 @@ const findById = async (id) => {
   return toApi(doc.id, doc.data());
 };
 
+const updateStatus = async (id, status, meta = {}) => {
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+
+  const doc = await ref.get();
+  if (!doc.exists) return null;
+
+  const current = doc.data() || {};
+  if (String(current.status || "pending").toLowerCase() !== "pending") {
+    return toApi(doc.id, current);
+  }
+
+  const nextStatus = String(status || "").trim().toLowerCase();
+  const patch = {
+    status: nextStatus,
+    updated_at: new Date(),
+  };
+
+  if (meta.reviewedBy != null) patch.reviewedBy = meta.reviewedBy;
+  if (meta.reviewedByEmail != null) patch.reviewedByEmail = meta.reviewedByEmail;
+  if (meta.reviewedAt != null) patch.reviewedAt = meta.reviewedAt;
+
+  await ref.set(patch, { merge: true });
+  const updated = await ref.get();
+  return toApi(updated.id, updated.data());
+};
+
 module.exports = {
   create,
   findByUser,
   findByCentre,
   findAll,
   findById,
+  updateStatus,
 };

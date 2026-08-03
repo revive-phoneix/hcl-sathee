@@ -15,16 +15,6 @@ const {
   resolveEnrolledSubjects,
 } = require("../Utils/courseSubjects");
 
-const groupByStudentId = (rows) => {
-  const map = new Map();
-  for (const row of rows) {
-    const key = Number(row.studentId) || row.studentId;
-    if (!map.has(key)) map.set(key, []);
-    map.get(key).push(row);
-  }
-  return map;
-};
-
 const subjectPct = (row) => {
   if (!row) return 0;
   if (row.percentage != null && Number.isFinite(Number(row.percentage))) {
@@ -101,23 +91,19 @@ const assertCentreAccess = (req, centre) => {
 exports.getStudentsWithPerformance = wrap(
   async (req, res) => {
     const students = filterByUserCentre(await Student.findAll(), req.user);
-    const [performances, attendances] = await Promise.all([
-      SubjectPerformance.findAll(),
-      SubjectAttendance.findAll(),
-    ]);
 
-    const performancesByStudent = groupByStudentId(performances);
-    const attendancesByStudent = groupByStudentId(attendances);
+    const enriched = await Promise.all(
+      students.map(async (student) => {
+        const studentKey = Number(student.id) || student.id;
+        const [performances, attendances] = await Promise.all([
+          SubjectPerformance.findByStudentId(studentKey),
+          SubjectAttendance.findByStudentId(studentKey),
+        ]);
+        return enrichWithSubjectMaps(student, performances, attendances);
+      })
+    );
 
-    return ok(res, {
-      students: students.map((student) =>
-        enrichWithSubjectMaps(
-          student,
-          performancesByStudent.get(Number(student.id) || student.id) || [],
-          attendancesByStudent.get(Number(student.id) || student.id) || []
-        )
-      ),
-    });
+    return ok(res, { students: enriched });
   },
   { label: "Get Students with Performance Error", message: "Failed to fetch performance details" }
 );

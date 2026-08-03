@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { MainLayout } from "../../Components/MainLayout";
 import TabSelector from "../../Components/Attendance/TabSelector";
@@ -10,7 +11,7 @@ import ApplyLeaveModal from "../../Components/Attendance/ApplyLeaveModal";
 import TodaysClassesCard from "../../Components/Attendance/TodaysClassesCard";
 import ClassSubjectAttendanceTables from "../../Components/Attendance/ClassSubjectAttendanceTables";
 import { fetchUsers } from "../../services/users";
-import { applyLeaveRequest } from "../../services/leaveRequests";
+import { applyLeaveRequest, fetchMyLeaveRequests } from "../../services/leaveRequests";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { fetchStudents } from "../../services/students";
 import { fetchStudentAttendanceRange } from "../../services/studentAttendance";
@@ -195,6 +196,37 @@ const fetchList = async (fetcher, onSuccess, onLoading, errorLabel) => {
   }
 };
 
+const formatLeaveDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
+const leaveStatusMeta = (status) => {
+  const value = String(status || "pending").toLowerCase();
+  if (value === "approved") {
+    return {
+      label: "Approved",
+      className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    };
+  }
+  if (value === "rejected") {
+    return {
+      label: "Rejected",
+      className: "border-rose-200 bg-rose-50 text-rose-700",
+    };
+  }
+  return {
+    label: "Pending",
+    className: "border-amber-200 bg-amber-50 text-amber-700",
+  };
+};
+
 export default function AdminAttendance({
   portalName = "HCL SATHEE",
   navItems,
@@ -212,6 +244,7 @@ export default function AdminAttendance({
   userId = null,
   userCentre = null,
 }) {
+  const navigate = useNavigate();
   const isAdminView = !readOnly;
   const centreFilterEnabled =
     typeof showCentreFilter === "boolean" ? showCentreFilter : isAdminView;
@@ -233,6 +266,10 @@ export default function AdminAttendance({
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const [leaveMessage, setLeaveMessage] = useState("");
   const [leaveError, setLeaveError] = useState("");
+  const [mitraPanel, setMitraPanel] = useState("attendance");
+  const [myRequests, setMyRequests] = useState([]);
+  const [loadingMyRequests, setLoadingMyRequests] = useState(false);
+  const [myRequestsError, setMyRequestsError] = useState("");
 
   const isMitraTab = mitraTabEnabled && activeTab === "sathee-mitra";
   const filtersReady =
@@ -409,6 +446,33 @@ export default function AdminAttendance({
     loadAttendance();
   }, [loadAttendance]);
 
+  useEffect(() => {
+    if (!mitraSelfUpload || mitraPanel !== "requests") return;
+
+    let isMounted = true;
+    setLoadingMyRequests(true);
+    setMyRequestsError("");
+
+    fetchMyLeaveRequests()
+      .then((leaves) => {
+        if (!isMounted) return;
+        setMyRequests(leaves);
+      })
+      .catch((err) => {
+        console.error("Load my leave requests error:", err);
+        if (!isMounted) return;
+        setMyRequests([]);
+        setMyRequestsError(getApiErrorMessage(err, "Unable to load your requests"));
+      })
+      .finally(() => {
+        if (isMounted) setLoadingMyRequests(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [mitraSelfUpload, mitraPanel]);
+
   const handleApplyLeave = async (payload) => {
     setSubmittingLeave(true);
     setLeaveError("");
@@ -477,16 +541,118 @@ export default function AdminAttendance({
     >
       <div className="grid-cols-4 gap-6 w-full mx-auto px-6 space-y-8">
         {mitraSelfUpload ? (
-          <TodaysClassesCard portalName={portalName} />
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-900">My Attendance</h2>
+                <p className="text-sm text-slate-500">
+                  Switch to MyRequests to review your leave submission history.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setLeaveError("");
+                    setLeaveMessage("");
+                    setShowLeaveModal(true);
+                  }}
+                  className="shrink-0 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+                >
+                  Apply Leave
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMitraPanel((current) => (current === "requests" ? "attendance" : "requests"))}
+                  className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    mitraPanel === "requests"
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
+                  }`}
+                >
+                  MyRequests
+                </button>
+              </div>
+            </div>
+
+            {mitraPanel === "attendance" ? <TodaysClassesCard portalName={portalName} /> : null}
+          </div>
         ) : null}
 
         {mitraSelfUpload ? (
-          <ClassSubjectAttendanceTables
-            portalName={portalName}
-            userCentre={userCentre}
-            students={centreStudents}
-            studentsLoading={loadingStudents}
-          />
+          mitraPanel === "attendance" ? (
+            <ClassSubjectAttendanceTables
+              portalName={portalName}
+              userCentre={userCentre}
+              students={centreStudents}
+              studentsLoading={loadingStudents}
+            />
+          ) : (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">MyRequests</h3>
+                  <p className="text-sm text-slate-500">
+                    Track the status of leave requests you have submitted.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMitraPanel("attendance")}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Back to Attendance
+                </button>
+              </div>
+
+              {myRequestsError ? (
+                <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                  {myRequestsError}
+                </div>
+              ) : null}
+
+              {loadingMyRequests ? (
+                <p className="py-10 text-center text-sm text-slate-500">Loading your requests…</p>
+              ) : myRequests.length === 0 ? (
+                <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-10 text-center">
+                  <p className="text-sm font-medium text-slate-800">No leave requests submitted yet.</p>
+                  <p className="mt-1 text-sm text-slate-500">Use Apply Leave to send a request to the admin.</p>
+                </div>
+              ) : (
+                <div className="grid gap-4">
+                  {myRequests.map((leave) => {
+                    const statusMeta = leaveStatusMeta(leave.status);
+
+                    return (
+                      <div
+                        key={leave.id}
+                        className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
+                      >
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h4 className="text-base font-semibold text-slate-900">
+                                {formatLeaveDate(leave.fromDate)} - {formatLeaveDate(leave.toDate)}
+                              </h4>
+                              <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${statusMeta.className}`}>
+                                {statusMeta.label}
+                              </span>
+                            </div>
+                            <p className="mt-2 text-sm text-slate-700 leading-relaxed">
+                              {leave.reason || "No reason provided"}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )
         ) : null}
 
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
@@ -501,16 +667,14 @@ export default function AdminAttendance({
             </p>
           </div>
           {mitraSelfUpload ? (
+            null
+          ) : isAdminView ? (
             <button
               type="button"
-              onClick={() => {
-                setLeaveError("");
-                setLeaveMessage("");
-                setShowLeaveModal(true);
-              }}
-              className="shrink-0 rounded-xl bg-sky-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-sky-700"
+              onClick={() => navigate("/leave-requests")}
+              className="shrink-0 rounded-xl border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-700 hover:bg-sky-50"
             >
-              Apply Leave
+              Leave Requests
             </button>
           ) : null}
         </div>
