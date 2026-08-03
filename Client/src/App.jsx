@@ -52,7 +52,6 @@ const ADMIN_PATH_TO_NAV = {
 const ADMIN_NAV_PATHS = [
   "/dashboard",
   "/attendance",
-  "/leave-requests",
   "/analytics",
   "/users",
   "/students",
