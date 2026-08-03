@@ -99,6 +99,7 @@ exports.addAnnouncement = wrap(
       otherCentres,
       ...attachment,
     });
+    const allUsers = await User.findAll();
     const tokens = allUsers
       .filter((u) => isSatheeMitraRole(u.role))
       .filter((u) => {
