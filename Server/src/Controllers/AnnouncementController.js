@@ -6,6 +6,8 @@ const {
   isSatheeMitraRole,
   matchesCentre,
 } = require("../Utils/centreMatch");
+const User = require("../Models/User");
+const { sendToTokens } = require("../Utils/pushNotifications");
 
 const parseOtherCentres = (raw) => {
   if (raw == null || raw === "") return null;
@@ -97,6 +99,20 @@ exports.addAnnouncement = wrap(
       otherCentres,
       ...attachment,
     });
+    const tokens = allUsers
+      .filter((u) => isSatheeMitraRole(u.role))
+      .filter((u) => {
+        if (matchesCentre(announcement.centre, u.centre)) return true;
+        const others = Array.isArray(announcement.otherCentres) ? announcement.otherCentres : [];
+        return others.some((c) => matchesCentre(c, u.centre));
+      })
+      .flatMap((u) => u.fcmTokens || []);
+
+    sendToTokens(tokens, {
+      title: "New Announcement",
+      body: String(title).trim(),
+      data: { type: "announcement", id: String(announcement.id) },
+    });
 
     return ok(res, 201, { announcement });
   },
@@ -132,7 +148,7 @@ exports.updateAnnouncement = wrap(
           : String(centre).trim() || null,
       otherCentres:
         req.body.otherCentres !== undefined ||
-        req.body["other-centres"] !== undefined
+          req.body["other-centres"] !== undefined
           ? otherCentres
           : existing.otherCentres,
     };

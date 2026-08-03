@@ -61,6 +61,16 @@ exports.getMe = wrap(
   { label: "Get Me Error", message: "Failed to fetch current user" }
 );
 
+exports.saveFcmToken = wrap(
+  async (req, res) => {
+    const token = String(req.body?.token || "").trim();
+    if (!token) return fail(res, 400, "Token is required");
+    await User.addFcmToken(req.user?.id, token);
+    return ok(res, { message: "Device registered for notifications" });
+  },
+  { label: "Save FCM Token Error", message: "Failed to save device token" }
+);
+
 exports.addUser = wrap(
   async (req, res) => {
     const { name, email, phone, role, centre, availableDays, isVishist } =

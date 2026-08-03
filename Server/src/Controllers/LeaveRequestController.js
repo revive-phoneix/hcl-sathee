@@ -1,6 +1,8 @@
 const LeaveRequest = require("../Models/LeaveRequest");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { isAdminRole, filterByUserCentre } = require("../Utils/centreMatch");
+const User = require("../Models/User");
+const { sendToTokens } = require("../Utils/pushNotifications");
 
 const isValidDate = (value) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 const VALID_STATUSES = new Set(["approved", "rejected"]);
@@ -33,6 +35,16 @@ exports.createLeaveRequest = wrap(
       fromDate,
       toDate,
       reason,
+    });
+
+    const allUsers = await User.findAll();
+    const admins = allUsers.filter((u) => isAdminRole(u.role));
+    const tokens = admins.flatMap((u) => u.fcmTokens || []);
+
+    sendToTokens(tokens, {
+      title: "New Leave Request",
+      body: `${name || "A Sathee Mitra"} applied for leave (${fromDate} → ${toDate})`,
+      data: { type: "leave-request", id: String(leave.id) },
     });
 
     return ok(res, 201, {

@@ -54,6 +54,7 @@ const toApiUser = (docId, data) => {
     phone: data.phone ?? null,
     role: data.role,
     centre: data.centre ?? null,
+    fcmTokens: Array.isArray(data.fcmTokens) ? data.fcmTokens : [],
     availableDays: normalizeAvailableDays(data.availableDays),
     created_at: toDate(data.created_at),
     updated_at: toDate(data.updated_at),
@@ -233,6 +234,26 @@ const importFromMysql = async (row) => {
   return toApiUser(String(id), payload);
 };
 
+const addFcmToken = async (id, token) => {
+  const ref = await findDocRefById(id);
+  if (!ref || !token) return null;
+  await ref.update({
+    fcmTokens: FieldValue.arrayUnion(token),
+    updated_at: new Date(),
+  });
+  const doc = await ref.get();
+  return toApiUser(doc.id, doc.data());
+};
+
+const removeFcmToken = async (id, token) => {
+  const ref = await findDocRefById(id);
+  if (!ref || !token) return null;
+  await ref.update({
+    fcmTokens: FieldValue.arrayRemove(token),
+    updated_at: new Date(),
+  });
+};
+
 module.exports = {
   WEEKDAYS,
   normalizeAvailableDays,
@@ -245,5 +266,7 @@ module.exports = {
   update,
   destroy,
   importFromMysql,
+  addFcmToken,
+  removeFcmToken,
   backfillMissingIsVishist,
 };

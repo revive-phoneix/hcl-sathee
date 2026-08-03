@@ -29,6 +29,7 @@ import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
 import SM_Analytics from "./Pages/Analytics/SM_Analytics";
 import MyProfile from "./Pages/Profile/MyProfile";
 import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
+import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -312,106 +313,111 @@ const AppContent = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} />} />
+    <>
+      <div className="px-4 pt-4 md:px-8">
+        <NotificationPermissionBanner />
+      </div>
+      <Routes>
+        <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} />} />
 
-      <Route
-        path="/portals"
-        element={
-          <CardSelector_2
-            userCentre={userCentre}
-            userRole={userRole}
-            openDashboard={(name) => {
-              if (!canAccessPortal(userCentre, name, userRole)) return;
+        <Route
+          path="/portals"
+          element={
+            <CardSelector_2
+              userCentre={userCentre}
+              userRole={userRole}
+              openDashboard={(name) => {
+                if (!canAccessPortal(userCentre, name, userRole)) return;
 
-              if (canEnterAdminDashboard(userRole)) {
-                selectPortal(name);
-                navigate("/dashboard");
-                return;
-              }
+                if (canEnterAdminDashboard(userRole)) {
+                  selectPortal(name);
+                  navigate("/dashboard");
+                  return;
+                }
 
-              if (canEnterPartnerDashboard(userRole)) {
-                selectPortal(name);
-                navigate("/partner/dashboard");
-                return;
-              }
+                if (canEnterPartnerDashboard(userRole)) {
+                  selectPortal(name);
+                  navigate("/partner/dashboard");
+                  return;
+                }
 
-              if (canEnterSatheeMitraDashboard(userRole)) {
-                selectPortal(name);
-                navigate("/mitra/dashboard");
-              }
-            }}
-          />
-        }
-      />
+                if (canEnterSatheeMitraDashboard(userRole)) {
+                  selectPortal(name);
+                  navigate("/mitra/dashboard");
+                }
+              }}
+            />
+          }
+        />
 
-      <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
-      <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
-      <Route path="/leave-requests" element={<AdminLeaveRequests {...adminLayout} />} />
-      <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
-      <Route path="/users" element={<AdminUser {...adminLayout} />} />
-      <Route path="/students" element={<Student {...adminLayout} />} />
-      <Route
-        path="/announcements"
-        element={<AdminAnnouncements {...adminLayout} userName={userName} />}
-      />
+        <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
+        <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
+        <Route path="/leave-requests" element={<AdminLeaveRequests {...adminLayout} />} />
+        <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
+        <Route path="/users" element={<AdminUser {...adminLayout} />} />
+        <Route path="/students" element={<Student {...adminLayout} />} />
+        <Route
+          path="/announcements"
+          element={<AdminAnnouncements {...adminLayout} userName={userName} />}
+        />
 
-      <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
-      <Route path="/partner/attendance" element={<HCLPartnerAttendance {...partnerLayout} />} />
-      <Route path="/partner/analytics" element={<HCLPartnerAnalytics {...partnerLayout} />} />
-      <Route path="/partner/students" element={<PartnerStudents {...partnerLayout} />} />
-      <Route
-        path="/partner/announcements"
-        element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
-      />
-      <Route
-        path="/partner/profile"
-        element={
-          <MyProfile
-            {...partnerLayout}
-            roleLabel="Partner Portal"
-            userName={userName}
-            userEmail={userEmail}
-            userId={userId}
-            userCentre={userCentre}
-            userRole={userRole}
-          />
-        }
-      />
+        <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
+        <Route path="/partner/attendance" element={<HCLPartnerAttendance {...partnerLayout} />} />
+        <Route path="/partner/analytics" element={<HCLPartnerAnalytics {...partnerLayout} />} />
+        <Route path="/partner/students" element={<PartnerStudents {...partnerLayout} />} />
+        <Route
+          path="/partner/announcements"
+          element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
+        />
+        <Route
+          path="/partner/profile"
+          element={
+            <MyProfile
+              {...partnerLayout}
+              roleLabel="Partner Portal"
+              userName={userName}
+              userEmail={userEmail}
+              userId={userId}
+              userCentre={userCentre}
+              userRole={userRole}
+            />
+          }
+        />
 
-      <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
-      <Route
-        path="/mitra/attendance"
-        element={
-          <SM_Attendance
-            {...mitraLayout}
-            userName={userName}
-            userEmail={userEmail}
-            userId={userId}
-            userCentre={userCentre}
-          />
-        }
-      />
-      <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
-      <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
-      <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
-      <Route
-        path="/mitra/profile"
-        element={
-          <MyProfile
-            {...mitraLayout}
-            roleLabel="Sathee Mitra Portal"
-            userName={userName}
-            userEmail={userEmail}
-            userId={userId}
-            userCentre={userCentre}
-            userRole={userRole}
-          />
-        }
-      />
+        <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
+        <Route
+          path="/mitra/attendance"
+          element={
+            <SM_Attendance
+              {...mitraLayout}
+              userName={userName}
+              userEmail={userEmail}
+              userId={userId}
+              userCentre={userCentre}
+            />
+          }
+        />
+        <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
+        <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
+        <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
+        <Route
+          path="/mitra/profile"
+          element={
+            <MyProfile
+              {...mitraLayout}
+              roleLabel="Sathee Mitra Portal"
+              userName={userName}
+              userEmail={userEmail}
+              userId={userId}
+              userCentre={userCentre}
+              userRole={userRole}
+            />
+          }
+        />
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 };
 

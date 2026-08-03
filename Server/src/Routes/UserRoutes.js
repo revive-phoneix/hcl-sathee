@@ -5,6 +5,7 @@ const {
   addUser,
   updateUser,
   deleteUser,
+  saveFcmToken,
 } = require("../Controllers/UserController");
 const {
   authenticate,
@@ -17,6 +18,7 @@ const router = express.Router();
 router.use(authenticate);
 
 router.get("/me", getMe);
+router.patch("/me/fcm-token", saveFcmToken);
 
 // Partners may list Sathee Mitra in their centre (for attendance view).
 // Create/update/delete remain admin-only.
