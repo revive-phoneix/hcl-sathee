@@ -28,15 +28,27 @@ const initFirebase = () => {
   const defaultPath = path.join(__dirname, "../../firebase-service-account.json");
   const credentialPath = explicitPath || defaultPath;
 
-  if (!fs.existsSync(credentialPath)) {
-    throw new Error(
-      `Firebase service account not found at: ${credentialPath}\n` +
-        "Save your JSON key as Server/firebase-service-account.json " +
-        "or set FIREBASE_SERVICE_ACCOUNT_PATH in .env."
-    );
+  let serviceAccount;
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_JSON) {
+    try {
+      serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_JSON);
+    } catch (err) {
+      throw new Error(
+        `Invalid FIREBASE_SERVICE_ACCOUNT_JSON: ${err.message}`
+      );
+    }
+  } else {
+    if (!fs.existsSync(credentialPath)) {
+      throw new Error(
+        `Firebase service account not found at: ${credentialPath}\n` +
+          "Save your JSON key as Server/firebase-service-account.json " +
+          "or set FIREBASE_SERVICE_ACCOUNT_PATH in .env."
+      );
+    }
+
+    serviceAccount = require(credentialPath);
   }
 
-  const serviceAccount = require(credentialPath);
   projectId = serviceAccount.project_id;
   const storageBucket = bucketCandidateNames(projectId)[0];
 
