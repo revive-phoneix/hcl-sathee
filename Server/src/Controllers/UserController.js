@@ -142,6 +142,35 @@ exports.addUser = wrap(
   },
   { label: "Add User Error", message: "Failed to create user" }
 );
+exports.resendInvite = wrap(
+  async (req, res) => {
+    const user = await User.findById(req.params.id);
+    if (!user) return fail(res, 404, "User not found");
+    if (user.password) {
+      return fail(res, 400, "This user has already set their password");
+    }
+
+    const passwordSetupLink = createPasswordLink(user.name, user.email, user.role);
+
+    if (user.email.endsWith(TEST_EMAIL_DOMAIN)) {
+      return ok(res, {
+        message: "Skipped resend for @example.com address",
+        emailSent: false,
+        passwordSetupLink,
+      });
+    }
+
+    try {
+      await sendWelcomeEmail(user.email, user.name, user.role);
+      return ok(res, { message: "Invite resent successfully", emailSent: true });
+    } catch (err) {
+      const emailError = formatEmailError(err);
+      console.error("Resend invite failed:", emailError, err);
+      return fail(res, 502, emailError);
+    }
+  },
+  { label: "Resend Invite Error", message: "Failed to resend invite" }
+);
 
 exports.updateUser = wrap(
   async (req, res) => {
