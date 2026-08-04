@@ -7,9 +7,11 @@ import {
 } from "../../utils/phone";
 import { average, parsePercentValue } from "../../utils/studentMetrics";
 import { resolveEnrolledSubjects } from "../../utils/courseSubjects";
+import StudentAnalyticsPanel from "./StudentAnalyticsPanel";
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
   const [formData, setFormData] = useState(null);
   const [error, setError] = useState("");
   useEscapeToClose(onClose, open);
@@ -32,6 +34,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
         qualifications: { ...(student.qualifications || {}) },
       });
       setIsEditing(false);
+      setShowAnalytics(false);
       setError("");
     }
   }, [student]);
@@ -146,167 +149,228 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
         </div>
 
         <div style={{ padding: "28px" }}>
-          <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
-              Basic Information
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, color: "black" }}>
-              <Field label="Name" value={formData.name} editable={isEditing} onChange={(value) => updateForm("name", value)} />
-              <Field
-                label="Student ID"
-                value={formData.studentId || formData.enrollmentNo || ""}
-                editable={isEditing}
-                onChange={(value) => updateForm("studentId", value)}
-              />
-              <Field label="Gender" value={formData.gender} editable={isEditing} onChange={(value) => updateForm("gender", value)} />
-              <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => updateForm("course", value)} />
-              <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => updateForm("category", value)} />
-              <Field label="Email" value={formData.email} editable={isEditing} onChange={(value) => updateForm("email", value)} type="email" />
-              <Field
-                label="Phone"
-                value={formData.phone}
-                editable={isEditing}
-                onChange={(value) => updateForm("phone", sanitizePhoneInput(value))}
-                type="tel"
-                maxLength={10}
-              />
-              <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => updateForm("centre", value)} />
-              <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => updateForm("address", value)} />
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
-              Parents Information
-            </h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, color: "black" }}>
-              <div>
-                <strong>Father</strong>
-                {isEditing ? (
-                  <input type="text" value={formData.parents?.father || ""} onChange={(e) => updateForm("father", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
-                ) : (
-                  <div style={{ marginTop: 6 }}>{formData.parents?.father || "—"}</div>
-                )}
-                <div style={{ marginTop: 10 }}>
-                  <strong>Phone</strong>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={formData.parents?.fatherPhone || ""}
-                      onChange={(e) =>
-                        updateForm("fatherPhone", sanitizePhoneInput(e.target.value), "parents")
-                      }
-                      style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
-                    />
-                  ) : (
-                    <div style={{ marginTop: 6 }}>{formData.parents?.fatherPhone || "—"}</div>
-                  )}
-                </div>
-              </div>
-              <div>
-                <strong>Mother</strong>
-                {isEditing ? (
-                  <input type="text" value={formData.parents?.mother || ""} onChange={(e) => updateForm("mother", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
-                ) : (
-                  <div style={{ marginTop: 6 }}>{formData.parents?.mother || "—"}</div>
-                )}
-                <div style={{ marginTop: 10 }}>
-                  <strong>Phone</strong>
-                  {isEditing ? (
-                    <input
-                      type="tel"
-                      inputMode="numeric"
-                      maxLength={10}
-                      value={formData.parents?.motherPhone || ""}
-                      onChange={(e) =>
-                        updateForm("motherPhone", sanitizePhoneInput(e.target.value), "parents")
-                      }
-                      style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
-                    />
-                  ) : (
-                    <div style={{ marginTop: 6 }}>{formData.parents?.motherPhone || "—"}</div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
-              Current Performance (Marks)
-            </h3>
-            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
-              Auto-updated from tests/exams — not editable.
-            </p>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {enrolledSubjects.length === 0 ? (
-                <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
-              ) : (
-                enrolledSubjects.map((subject) => (
-                  <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                    <strong>{subject}</strong>
-                    <div style={{ marginTop: 6 }}>{formData.marks?.[subject] ?? 0}</div>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          <div style={{ marginBottom: 32 }}>
-            <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
-              Attendance
-            </h3>
-            <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
-              Auto-updated from daily class status — not editable.
-            </p>
-            <div
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 24 }}>
+            <button
+              type="button"
+              onClick={() => setShowAnalytics(false)}
               style={{
-                background: "#dbeafe",
-                border: "1px solid #93c5fd",
-                borderRadius: 10,
-                padding: "14px 18px",
-                marginBottom: 14,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: 12,
-                color: "#0f172a",
+                background: showAnalytics ? "#e2e8f0" : "#1e40af",
+                color: showAnalytics ? "#0f172a" : "#fff",
+                border: "none",
+                padding: "10px 18px",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
               }}
             >
-              <div>
-                <strong style={{ fontSize: 15 }}>Overall Attendance</strong>
-                <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
-                  Average of all subject attendance
+              Student Details
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAnalytics(true)}
+              style={{
+                background: showAnalytics ? "#1e40af" : "#e2e8f0",
+                color: showAnalytics ? "#fff" : "#0f172a",
+                border: "none",
+                padding: "10px 18px",
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: "pointer",
+              }}
+            >
+              View Analytics
+            </button>
+          </div>
+
+          {showAnalytics ? (
+            <div style={{ marginBottom: 32 }}>
+              <StudentAnalyticsPanel student={formData} />
+            </div>
+          ) : (
+            <>
+              <div style={{ marginBottom: 32 }}>
+                <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+                  Basic Information
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, color: "black" }}>
+                  <Field label="Name" value={formData.name} editable={isEditing} onChange={(value) => updateForm("name", value)} />
+                  <Field
+                    label="Student ID"
+                    value={formData.studentId || formData.enrollmentNo || ""}
+                    editable={isEditing}
+                    onChange={(value) => updateForm("studentId", value)}
+                  />
+                  <Field label="Gender" value={formData.gender} editable={isEditing} onChange={(value) => updateForm("gender", value)} />
+                  <Field label="Course" value={formData.course} editable={isEditing} onChange={(value) => updateForm("course", value)} />
+                  <Field label="Category (Caste)" value={formData.category} editable={isEditing} onChange={(value) => updateForm("category", value)} />
+                  <Field label="Email" value={formData.email} editable={isEditing} onChange={(value) => updateForm("email", value)} type="email" />
+                  <Field
+                    label="Phone"
+                    value={formData.phone}
+                    editable={isEditing}
+                    onChange={(value) => updateForm("phone", sanitizePhoneInput(value))}
+                    type="tel"
+                    maxLength={10}
+                  />
+                  <Field label="Centre" value={formData.centre} editable={isEditing} onChange={(value) => updateForm("centre", value)} />
+                  <Field label="Address" value={formData.address} editable={isEditing} onChange={(value) => updateForm("address", value)} />
                 </div>
               </div>
-              <div style={{ fontSize: 22, fontWeight: 700, color: "#1e40af" }}>
-                {overallAttendance == null ? "—" : `${overallAttendance}%`}
-              </div>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
-              {enrolledSubjects.length === 0 ? (
-                <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
-              ) : (
-                enrolledSubjects.map((cls) => {
-                  const rate = formData.attendance?.[cls];
-                  return (
-                    <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                      <strong>{cls}</strong>
-                      <div style={{ marginTop: 6 }}>{typeof rate === "number" ? `${rate}%` : rate ?? "0%"}</div>
+
+              <div style={{ marginBottom: 32 }}>
+                <h3 style={{ fontSize: 18, marginBottom: 16, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+                  Parents Information
+                </h3>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20, color: "black" }}>
+                  <div>
+                    <strong>Father</strong>
+                    {isEditing ? (
+                      <input type="text" value={formData.parents?.father || ""} onChange={(e) => updateForm("father", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    ) : (
+                      <div style={{ marginTop: 6 }}>{formData.parents?.father || "—"}</div>
+                    )}
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Phone</strong>
+                      {isEditing ? (
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          value={formData.parents?.fatherPhone || ""}
+                          onChange={(e) =>
+                            updateForm("fatherPhone", sanitizePhoneInput(e.target.value), "parents")
+                          }
+                          style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
+                        />
+                      ) : (
+                        <div style={{ marginTop: 6 }}>{formData.parents?.fatherPhone || "—"}</div>
+                      )}
                     </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
+                  </div>
+                  <div>
+                    <strong>Mother</strong>
+                    {isEditing ? (
+                      <input type="text" value={formData.parents?.mother || ""} onChange={(e) => updateForm("mother", e.target.value, "parents")} style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }} />
+                    ) : (
+                      <div style={{ marginTop: 6 }}>{formData.parents?.mother || "—"}</div>
+                    )}
+                    <div style={{ marginTop: 10 }}>
+                      <strong>Phone</strong>
+                      {isEditing ? (
+                        <input
+                          type="tel"
+                          inputMode="numeric"
+                          maxLength={10}
+                          value={formData.parents?.motherPhone || ""}
+                          onChange={(e) =>
+                            updateForm("motherPhone", sanitizePhoneInput(e.target.value), "parents")
+                          }
+                          style={{ width: "100%", padding: "8px", marginTop: 6, borderRadius: 6, border: "1px solid #cbd5e1" }}
+                        />
+                      ) : (
+                        <div style={{ marginTop: 6 }}>{formData.parents?.motherPhone || "—"}</div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 32 }}>
+                <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+                  Current Performance (Marks)
+                </h3>
+                <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+                  Auto-updated from tests/exams — not editable.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
+                  {enrolledSubjects.length === 0 ? (
+                    <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
+                  ) : (
+                    enrolledSubjects.map((subject) => (
+                      <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+                        <strong>{subject}</strong>
+                        <div style={{ marginTop: 6 }}>{formData.marks?.[subject] ?? 0}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginBottom: 32 }}>
+                <h3 style={{ fontSize: 18, marginBottom: 8, color: "#1a1f2e", borderBottom: "2px solid #e2e8f0", paddingBottom: 8 }}>
+                  Attendance
+                </h3>
+                <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
+                  Auto-updated from daily class status — not editable.
+                </p>
+                <div
+                  style={{
+                    background: "#dbeafe",
+                    border: "1px solid #93c5fd",
+                    borderRadius: 10,
+                    padding: "14px 18px",
+                    marginBottom: 14,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: 12,
+                    color: "#0f172a",
+                  }}
+                >
+                  <div>
+                    <strong style={{ fontSize: 15 }}>Overall Attendance</strong>
+                    <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                      Average of all subject attendance
+                    </div>
+                  </div>
+                  <div style={{ fontSize: 22, fontWeight: 700, color: "#1e40af" }}>
+                    {overallAttendance == null ? "—" : `${overallAttendance}%`}
+                  </div>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
+                  {enrolledSubjects.length === 0 ? (
+                    <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
+                  ) : (
+                    enrolledSubjects.map((cls) => {
+                      const rate = formData.attendance?.[cls];
+                      return (
+                        <div key={cls} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
+                          <strong>{cls}</strong>
+                          <div style={{ marginTop: 6 }}>{typeof rate === "number" ? `${rate}%` : rate ?? "0%"}</div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            </>
+          )}
 
           <div style={{ textAlign: "center", marginTop: 32 }}>
             {error ? (
               <p style={{ color: "#b91c1c", marginBottom: 12, fontSize: 14 }}>{error}</p>
             ) : null}
-            {!readOnly ? (
+            {showAnalytics ? (
+              <button
+                type="button"
+                onClick={() => setShowAnalytics(false)}
+                style={{
+                  background: "#64748b",
+                  color: "#fff",
+                  border: "none",
+                  padding: "12px 28px",
+                  borderRadius: 8,
+                  fontSize: 16,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  marginRight: 12,
+                }}
+              >
+                Back to Details
+              </button>
+            ) : !readOnly ? (
               <>
                 <button
                   onClick={() => setIsEditing(!isEditing)}

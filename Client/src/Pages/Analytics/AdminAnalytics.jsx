@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import StudentsTab from "../../Components/Analytics/StudentsTab";
-import { matchesPortalCentre } from "../../utils/portalMapping";
 import TeachersTab from "../../Components/Analytics/TeachersTab";
 import MentorDetailsModal from "../../Components/Analytics/MentorDetailsModal";
 import UtilitiesSection from "../../Components/Analytics/UtilitiesSection";
+import PortalAnalyticsGraphs from "../../Components/Analytics/PortalAnalyticsGraphs";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchUsers, updateUser } from "../../services/users";
 import { fetchMitraAttendance } from "../../services/mitraAttendance";
+import { matchesPortalCentre } from "../../utils/portalMapping";
 import { WEEKDAYS } from "../../utils/availableDays";
 
 const toInputDate = (date = new Date()) => {
@@ -20,9 +21,9 @@ const lastNDates = (n = 7) => {
   const dates = [];
   const today = new Date();
   for (let i = 0; i < n; i += 1) {
-    const d = new Date(today);
-    d.setDate(today.getDate() - i);
-    dates.push(toInputDate(d));
+    const date = new Date(today);
+    date.setDate(today.getDate() - i);
+    dates.push(toInputDate(date));
   }
   return dates;
 };
@@ -57,13 +58,16 @@ const mapUserToMentor = (user, attendanceRate) => ({
 });
 
 const patchMentor = (list, id, patch) =>
-  list.map((m) => (String(m.id) === String(id) ? { ...m, ...patch } : m));
+  list.map((mentor) => (String(mentor.id) === String(id) ? { ...mentor, ...patch } : mentor));
 
 const replaceMentor = (list, replacement) =>
-  list.map((m) => (String(m.id) === String(replacement.id) ? replacement : m));
+  list.map((mentor) =>
+    String(mentor.id) === String(replacement.id) ? replacement : mentor
+  );
 
 const ANALYTICS_TABS = [
   { key: "students", label: "Students" },
+  { key: "graphs", label: "Graphs" },
   { key: "teachers", label: "Mentors" },
 ];
 
@@ -115,8 +119,8 @@ export default function AdminAnalytics({
         const presentDaysByUser = new Map();
         for (const dayRecords of attendanceByDate) {
           for (const record of dayRecords) {
-            const key = String(record.userId);
             if (!(record.arrivalTime || record.arrivalPhotoUrl)) continue;
+            const key = String(record.userId);
             presentDaysByUser.set(key, (presentDaysByUser.get(key) || 0) + 1);
           }
         }
@@ -151,16 +155,16 @@ export default function AdminAnalytics({
     };
   }, [portalName, showMentors]);
 
-  const regularMentors = useMemo(() => mentors.filter((m) => !m.isVishist), [mentors]);
-  const vishistMentors = useMemo(() => mentors.filter((m) => m.isVishist), [mentors]);
+  const regularMentors = useMemo(() => mentors.filter((mentor) => !mentor.isVishist), [mentors]);
+  const vishistMentors = useMemo(() => mentors.filter((mentor) => mentor.isVishist), [mentors]);
 
   const handleToggleAvailableDay = async (mentor, day) => {
     if (readOnly) return;
 
     const current = Array.isArray(mentor.availableDays) ? mentor.availableDays : [];
     const next = current.includes(day)
-      ? current.filter((d) => d !== day)
-      : WEEKDAYS.filter((d) => current.includes(d) || d === day);
+      ? current.filter((currentDay) => currentDay !== day)
+      : WEEKDAYS.filter((weekday) => current.includes(weekday) || weekday === day);
 
     setMentors((prev) => patchMentor(prev, mentor.id, { availableDays: next }));
     if (selectedMentor && String(selectedMentor.id) === String(mentor.id)) {
@@ -169,6 +173,7 @@ export default function AdminAnalytics({
 
     setSavingMentorId(mentor.id);
     setMentorsError("");
+
     try {
       const updated = await updateUser(mentor.id, { availableDays: next });
       setMentors((prev) =>
@@ -194,37 +199,33 @@ export default function AdminAnalytics({
       onLogout={onLogout}
       roleLabel={roleLabel}
     >
-      <main
-        className="min-h-screen overflow-y-auto p-8 bg-gray-50"
-        style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}
-      >
+      <main className="min-h-screen overflow-y-auto p-8 bg-gray-50" style={{ fontFamily: "'Inter', 'Segoe UI', system-ui, sans-serif" }}>
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Analytics & Progress</h1>
+          <h1 className="text-2xl font-bold text-gray-900 mb-1">Analytics &amp; Progress</h1>
           <p className="text-sm text-gray-500">Monitor student performance and centre activity</p>
         </div>
 
-        {showMentors ? (
-          <div className="mb-8">
-            <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
-              {ANALYTICS_TABS.map(({ key, label }) => (
-                <button
-                  key={key}
-                  onClick={() => setActiveTab(key)}
-                  className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
-                    activeTab === key
-                      ? "bg-blue-600 text-white shadow-sm"
-                      : "text-gray-600 hover:text-gray-800"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
+        <div className="mb-8">
+          <div className="inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm">
+            {ANALYTICS_TABS.filter(({ key }) => key !== "teachers" || showMentors).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setActiveTab(key)}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 cursor-pointer ${
+                  activeTab === key ? "bg-blue-600 text-white shadow-sm" : "text-gray-600 hover:text-gray-800"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
-        ) : null}
+        </div>
 
-        {activeTab === "students" || !showMentors ? (
+        {activeTab === "students" ? (
           <StudentsTab portalName={portalName} />
+        ) : activeTab === "graphs" ? (
+          <PortalAnalyticsGraphs portalName={portalName} />
         ) : (
           <TeachersTab
             mentors={regularMentors}

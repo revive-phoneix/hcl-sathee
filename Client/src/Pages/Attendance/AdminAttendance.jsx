@@ -252,6 +252,10 @@ export default function AdminAttendance({
     typeof showMitraTab === "boolean" ? showMitraTab : true;
   const [activeTab, setActiveTab] = useState("");
   const [selectedCentre, setSelectedCentre] = useState("");
+  const [selectedRole, setSelectedRole] = useState("");
+  const [appliedType, setAppliedType] = useState("");
+  const [appliedCentre, setAppliedCentre] = useState("");
+  const [appliedRole, setAppliedRole] = useState("");
   const [search, setSearch] = useState("");
   const [selectedDate, setSelectedDate] = useState(() => toInputDate());
   const [mitras, setMitras] = useState([]);
@@ -271,11 +275,14 @@ export default function AdminAttendance({
   const [loadingMyRequests, setLoadingMyRequests] = useState(false);
   const [myRequestsError, setMyRequestsError] = useState("");
 
-  const isMitraTab = mitraTabEnabled && activeTab === "sathee-mitra";
-  const filtersReady =
-    isMitraTab ||
-    (PERIOD_TABS.has(activeTab) &&
-      (!centreFilterEnabled || Boolean(selectedCentre)));
+  const hasCompleteSelection = Boolean(activeTab && selectedCentre && selectedRole);
+  const viewReady =
+    Boolean(appliedType && appliedCentre && appliedRole) &&
+    appliedType === activeTab &&
+    appliedCentre === selectedCentre &&
+    appliedRole === selectedRole;
+  const isMitraView = viewReady && appliedRole === "sathee-mitra";
+  const filtersReady = viewReady;
 
   const centreScope = centreFilterEnabled ? selectedCentre : portalName;
 
@@ -297,9 +304,9 @@ export default function AdminAttendance({
       mitras.filter(
         (user) =>
           String(user.role || "").toUpperCase() === "SATHEE MITRA" &&
-          matchesPortalCentre(user.centre, portalName)
+          matchesPortalCentre(user.centre, centreScope)
       ),
-    [mitras, portalName]
+    [mitras, centreScope]
   );
 
   const recordsByStudentDate = useMemo(() => {
@@ -311,14 +318,14 @@ export default function AdminAttendance({
   }, [attendanceRecords]);
 
   const periodMeta = useMemo(() => {
-    if (activeTab === "daily") {
+    if (appliedType === "daily") {
       const range = getWeekRange(selectedDate);
       return {
         ...range,
         label: `${formatDisplayDate(range.from)} – ${formatDisplayDate(range.to)}`,
       };
     }
-    if (activeTab === "weekly") {
+    if (appliedType === "weekly") {
       const range = getMonthRange(selectedDate);
       const d = new Date(`${selectedDate}T00:00:00`);
       return {
@@ -326,17 +333,19 @@ export default function AdminAttendance({
         label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
       };
     }
-    if (activeTab === "monthly") {
+    if (appliedType === "monthly") {
       const range = getYearRange(selectedDate);
       return { ...range, label: String(range.year) };
     }
     return { from: selectedDate, to: selectedDate, label: formatDisplayDate(selectedDate) };
-  }, [activeTab, selectedDate]);
+  }, [appliedType, selectedDate]);
 
   const tableRows = useMemo(() => {
-    if (isMitraTab || !filtersReady) return [];
+    if (isMitraView || !filtersReady) return [];
 
-    if (activeTab === "daily") {
+    const activeType = appliedType || activeTab;
+
+    if (activeType === "daily") {
       const { from } = getWeekRange(selectedDate);
       const monday = new Date(`${from}T00:00:00`);
       return WEEKDAYS.map((label, index) => {
@@ -352,7 +361,7 @@ export default function AdminAttendance({
       });
     }
 
-    if (activeTab === "weekly") {
+    if (activeType === "weekly") {
       return getWeeksInMonth(selectedDate).map((week) => {
         const dayPercents = week.dates.map((date) =>
           centrePercentForDate(date, centreStudentIds, recordsByStudentDate)
@@ -361,7 +370,7 @@ export default function AdminAttendance({
       });
     }
 
-    if (activeTab === "monthly") {
+    if (activeType === "monthly") {
       const year = new Date(`${selectedDate}T00:00:00`).getFullYear();
       return MONTH_LABELS.map((label, monthIndex) => {
         const from = toInputDate(new Date(year, monthIndex, 1));
@@ -376,8 +385,9 @@ export default function AdminAttendance({
 
     return [];
   }, [
-    isMitraTab,
+    isMitraView,
     filtersReady,
+    appliedType,
     activeTab,
     selectedDate,
     centreStudentIds,
@@ -401,11 +411,11 @@ export default function AdminAttendance({
   );
 
   const loadAttendance = useCallback(async () => {
-    if (isMitraTab || !selectedDate) return;
-    if (
-      centreFilterEnabled &&
-      (!selectedCentre || !PERIOD_TABS.has(activeTab))
-    ) {
+    if (!viewReady || appliedRole !== "student" || !selectedDate) {
+      setAttendanceRecords([]);
+      return;
+    }
+    if (centreFilterEnabled && (!appliedCentre || !PERIOD_TABS.has(appliedType))) {
       setAttendanceRecords([]);
       return;
     }
@@ -414,8 +424,8 @@ export default function AdminAttendance({
     setError("");
     try {
       let range;
-      if (activeTab === "daily") range = getWeekRange(selectedDate);
-      else if (activeTab === "weekly") range = getMonthRange(selectedDate);
+      if (appliedType === "daily") range = getWeekRange(selectedDate);
+      else if (appliedType === "weekly") range = getMonthRange(selectedDate);
       else range = getYearRange(selectedDate);
 
       const records = await fetchStudentAttendanceRange(range.from, range.to);
@@ -429,18 +439,12 @@ export default function AdminAttendance({
     } finally {
       setLoadingAttendance(false);
     }
-  }, [isMitraTab, selectedDate, activeTab, centreFilterEnabled, selectedCentre]);
+  }, [viewReady, appliedRole, appliedType, appliedCentre, selectedDate, centreFilterEnabled]);
 
   useEffect(() => {
     if (mitraTabEnabled && !mitraSelfUpload) loadMitras();
     loadStudents();
   }, [mitraTabEnabled, mitraSelfUpload, loadMitras, loadStudents]);
-
-  useEffect(() => {
-    if (!mitraTabEnabled && activeTab === "sathee-mitra") {
-      setActiveTab("");
-    }
-  }, [mitraTabEnabled, activeTab]);
 
   useEffect(() => {
     loadAttendance();
@@ -492,17 +496,13 @@ export default function AdminAttendance({
   };
 
   const runAttendanceExport = (format) => {
-    if (isMitraTab) {
+    if (isMitraView) {
       alert("Export for Sathee Mitra attendance is not available yet");
       return;
     }
 
     if (!filtersReady) {
-      alert(
-        centreFilterEnabled
-          ? "Please select both Type and Centre before exporting"
-          : "Please select Type before exporting"
-      );
+      alert("Please select Type, Centre, Role and click Go before exporting");
       return;
     }
 
@@ -510,8 +510,8 @@ export default function AdminAttendance({
       setExporting(true);
       const payload = {
         records: filtered,
-        columnLabel: COLUMN_LABEL[activeTab],
-        activeTab,
+        columnLabel: COLUMN_LABEL[appliedType],
+        activeTab: appliedType,
         portalName: centreFilterEnabled
           ? selectedCentre || portalName
           : portalName,
@@ -528,7 +528,7 @@ export default function AdminAttendance({
     }
   };
 
-  const busy = loadingStudents || loadingAttendance;
+  const busy = loadingStudents || (viewReady && appliedRole === "student" ? loadingAttendance : false);
 
   return (
     <MainLayout
@@ -659,7 +659,7 @@ export default function AdminAttendance({
           <div className="min-w-0">
             <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
             <p className="mt-1 text-sm text-gray-500">
-              {isMitraTab
+              {viewReady && appliedRole === "sathee-mitra"
                 ? mitraSelfUpload
                   ? "Upload your arrival and departure photos. Time is saved automatically."
                   : "Track Sathee Mitra presence with arrival and departure photo proof."
@@ -695,9 +695,17 @@ export default function AdminAttendance({
           setActiveTab={setActiveTab}
           selectedCentre={selectedCentre}
           setSelectedCentre={setSelectedCentre}
+          selectedRole={selectedRole}
+          setSelectedRole={setSelectedRole}
           showCentreFilter={centreFilterEnabled}
-          showMitraTab={mitraTabEnabled}
+          showMitraTab={false}
           mitraTabLabel={mitraTabLabel}
+          onGo={() => {
+            setAppliedType(activeTab);
+            setAppliedCentre(selectedCentre);
+            setAppliedRole(selectedRole);
+          }}
+          canGo={hasCompleteSelection}
         />
 
         <div className="bg-white rounded-2xl shadow-sm border border-[rgba(0,0,0,0.06)] overflow-hidden">
@@ -705,8 +713,8 @@ export default function AdminAttendance({
             search={search}
             setSearch={setSearch}
             activeTab={
-              filtersReady || isMitraTab
-                ? activeTab || "daily"
+              filtersReady || isMitraView
+                ? appliedType || activeTab || "daily"
                 : "daily"
             }
             selectedDate={selectedDate}
@@ -717,26 +725,22 @@ export default function AdminAttendance({
             showExport={!readOnly}
           />
 
-          {error && !isMitraTab ? (
+          {error && !isMitraView ? (
             <div className="mx-5 mt-4 mb-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </div>
           ) : null}
 
-          {!isMitraTab && !filtersReady ? (
+          {!viewReady ? (
             <div className="px-6 py-16 text-center">
               <p className="text-sm font-medium text-gray-700">
-                {centreFilterEnabled
-                  ? "Select Type and Centre to view attendance"
-                  : "Select Type to view attendance"}
+                Select Type, Centre, and Role to view attendance
               </p>
               <p className="mt-1 text-xs text-gray-400">
-                {centreFilterEnabled
-                  ? "Both dropdowns are required before records are shown."
-                  : "Choose Daily, Weekly, or Monthly to continue."}
+                Choose all three filters and click Go to load the records.
               </p>
             </div>
-          ) : isMitraTab && mitraSelfUpload ? (
+          ) : isMitraView && mitraSelfUpload ? (
             <MyMitraAttendance
               userId={userId}
               userName={userName}
@@ -745,7 +749,7 @@ export default function AdminAttendance({
               portalName={portalName}
               selectedDate={selectedDate}
             />
-          ) : isMitraTab ? (
+          ) : isMitraView ? (
             <SatheeMitraAttendance
               mitras={centreMitras}
               loading={loadingMitras}

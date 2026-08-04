@@ -23,7 +23,17 @@ exports.getMitraAttendance = wrap(
 
 exports.uploadMitraPhoto = wrap(
   async (req, res) => {
-    const { name, email, centre, centreId, date, type } = req.body;
+    const {
+      name,
+      email,
+      centre,
+      centreId,
+      date,
+      type,
+      dailyAttendancePercentage,
+      weeklyAttendancePercentage,
+      monthlyAttendancePercentage,
+    } = req.body;
     const userId = req.user?.id;
 
     if (!userId || !date || !type) {
@@ -46,6 +56,9 @@ exports.uploadMitraPhoto = wrap(
       date,
       type,
       file: req.file,
+      dailyAttendancePercentage,
+      weeklyAttendancePercentage,
+      monthlyAttendancePercentage,
     });
 
     return ok(res, {

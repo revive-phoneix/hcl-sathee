@@ -10,6 +10,11 @@ const TYPE_OPTIONS = [
   { value: "monthly", label: "Monthly" },
 ];
 
+const ROLE_OPTIONS = [
+  { value: "student", label: "Student" },
+  { value: "sathee-mitra", label: "Sathee Mitra" },
+];
+
 const selectClass =
   "min-w-[160px] px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors";
 
@@ -25,9 +30,13 @@ export default function TabSelector({
   setActiveTab,
   selectedCentre = "",
   setSelectedCentre,
+  selectedRole = "",
+  setSelectedRole,
   showCentreFilter = false,
   showMitraTab = true,
   mitraTabLabel = "Sathee Mitra",
+  onGo,
+  canGo = false,
 }) {
   const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
     ? activeTab
@@ -65,6 +74,20 @@ export default function TabSelector({
         </select>
       ) : null}
 
+      <select
+        value={selectedRole}
+        onChange={(e) => setSelectedRole?.(e.target.value || "")}
+        className={selectClass}
+        aria-label="Select role"
+      >
+        <option value="">Select Role</option>
+        {ROLE_OPTIONS.map((role) => (
+          <option key={role.value} value={role.value}>
+            {role.label}
+          </option>
+        ))}
+      </select>
+
       {showMitraTab ? (
         <button
           type="button"
@@ -74,6 +97,15 @@ export default function TabSelector({
           {mitraTabLabel}
         </button>
       ) : null}
+
+      <button
+        type="button"
+        onClick={onGo}
+        disabled={!canGo}
+        className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+      >
+        Go
+      </button>
     </div>
   );
 }

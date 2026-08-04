@@ -7,21 +7,70 @@ const MAX_INLINE_BYTES = 700 * 1024;
 
 const attendancesRef = () => getDb().collection(COLLECTION);
 
-const toApiRecord = (docId, data) => ({
-  id: docId,
-  userId: data.userId,
-  name: data.name ?? null,
-  email: data.email ?? null,
-  centre: data.centre ?? null,
-  centreId: data.centreId ?? null,
-  date: data.date,
-  arrivalPhotoUrl: data.arrivalPhotoUrl ?? null,
-  arrivalTime: toDate(data.arrivalTime),
-  departurePhotoUrl: data.departurePhotoUrl ?? null,
-  departureTime: toDate(data.departureTime),
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
+const resolvePercentage = (value, fallback = 0) => {
+  if (
+    value != null &&
+    value !== "" &&
+    Number.isFinite(Number(value))
+  ) {
+    return Math.max(0, Math.min(100, Number(value)));
+  }
+  return fallback;
+};
+
+const resolveAttendancePercentages = (data = {}, fallback = {}) => {
+  const dailyFallback = resolvePercentage(fallback.dailyAttendancePercentage, 100);
+  const weeklyFallback = resolvePercentage(
+    fallback.weeklyAttendancePercentage,
+    dailyFallback
+  );
+  const monthlyFallback = resolvePercentage(
+    fallback.monthlyAttendancePercentage,
+    weeklyFallback
+  );
+
+  return {
+    dailyAttendancePercentage: resolvePercentage(
+      data.dailyAttendancePercentage,
+      dailyFallback
+    ),
+    weeklyAttendancePercentage: resolvePercentage(
+      data.weeklyAttendancePercentage,
+      weeklyFallback
+    ),
+    monthlyAttendancePercentage: resolvePercentage(
+      data.monthlyAttendancePercentage,
+      monthlyFallback
+    ),
+  };
+};
+
+const toApiRecord = (docId, data) => {
+  const percentages = resolveAttendancePercentages(data, {
+    dailyAttendancePercentage: data.dailyAttendancePercentage,
+    weeklyAttendancePercentage: data.weeklyAttendancePercentage,
+    monthlyAttendancePercentage: data.monthlyAttendancePercentage,
+  });
+
+  return {
+    id: docId,
+    userId: data.userId,
+    name: data.name ?? null,
+    email: data.email ?? null,
+    centre: data.centre ?? null,
+    centreId: data.centreId ?? null,
+    date: data.date,
+    arrivalPhotoUrl: data.arrivalPhotoUrl ?? null,
+    arrivalTime: toDate(data.arrivalTime),
+    departurePhotoUrl: data.departurePhotoUrl ?? null,
+    departureTime: toDate(data.departureTime),
+    dailyAttendancePercentage: percentages.dailyAttendancePercentage,
+    weeklyAttendancePercentage: percentages.weeklyAttendancePercentage,
+    monthlyAttendancePercentage: percentages.monthlyAttendancePercentage,
+    created_at: toDate(data.created_at),
+    updated_at: toDate(data.updated_at),
+  };
+};
 
 const buildDocId = (userId, date) => `${userId}_${date}`;
 
@@ -115,6 +164,9 @@ const upsertCheckIn = async ({
   date,
   type,
   file,
+  dailyAttendancePercentage = null,
+  weeklyAttendancePercentage = null,
+  monthlyAttendancePercentage = null,
 }) => {
   const docId = buildDocId(userId, date);
   const ref = attendancesRef().doc(docId);
@@ -142,6 +194,19 @@ const upsertCheckIn = async ({
         created_at: now,
       };
 
+  const percentages = resolveAttendancePercentages(
+    {
+      dailyAttendancePercentage,
+      weeklyAttendancePercentage,
+      monthlyAttendancePercentage,
+    },
+    {
+      dailyAttendancePercentage: base.dailyAttendancePercentage,
+      weeklyAttendancePercentage: base.weeklyAttendancePercentage,
+      monthlyAttendancePercentage: base.monthlyAttendancePercentage,
+    }
+  );
+
   const patch =
     type === "arrival"
       ? {
@@ -164,6 +229,9 @@ const upsertCheckIn = async ({
   const payload = {
     ...base,
     ...patch,
+    dailyAttendancePercentage: percentages.dailyAttendancePercentage,
+    weeklyAttendancePercentage: percentages.weeklyAttendancePercentage,
+    monthlyAttendancePercentage: percentages.monthlyAttendancePercentage,
     updated_at: now,
   };
 
@@ -175,4 +243,6 @@ module.exports = {
   findByDate,
   findByUserAndDate,
   upsertCheckIn,
+  resolvePercentage,
+  resolveAttendancePercentages,
 };

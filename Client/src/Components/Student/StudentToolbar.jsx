@@ -1,6 +1,6 @@
 import { Search, UserPlus, ChevronDown } from "lucide-react";
 
-const COURSE_OPTIONS = ["JEE-Exams", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
+const COURSE_OPTIONS = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
 
 export default function StudentToolbar({
   search,
