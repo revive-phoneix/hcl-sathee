@@ -79,6 +79,14 @@ const findByDate = async (date) => {
   return snap.docs.map((doc) => toApiRecord(doc.id, doc.data()));
 };
 
+const findByDateRange = async (fromDate, toDate) => {
+  const snap = await attendancesRef()
+    .where("date", ">=", fromDate)
+    .where("date", "<=", toDate)
+    .get();
+  return snap.docs.map((doc) => toApiRecord(doc.id, doc.data()));
+};
+
 const findByUserAndDate = async (userId, date) => {
   const docId = buildDocId(userId, date);
   const doc = await attendancesRef().doc(docId).get();
@@ -241,6 +249,7 @@ const upsertCheckIn = async ({
 
 module.exports = {
   findByDate,
+  findByDateRange,
   findByUserAndDate,
   upsertCheckIn,
   resolvePercentage,

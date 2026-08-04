@@ -21,6 +21,15 @@ export const createUser = async (payload) => {
   };
 };
 
+export const resendInvite = async (id) => {
+  const response = await api.post(`/api/users/${id}/resend-invite`);
+  return {
+    message: response.data.message || null,
+    emailSent: Boolean(response.data.emailSent),
+    passwordSetupLink: response.data.passwordSetupLink || null,
+  };
+};
+
 export const updateUser = async (id, payload) => {
   const response = await api.patch(`/api/users/${id}`, payload);
   return response.data.user;

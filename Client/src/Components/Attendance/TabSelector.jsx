@@ -12,7 +12,7 @@ const TYPE_OPTIONS = [
 
 const ROLE_OPTIONS = [
   { value: "student", label: "Student" },
-  { value: "sathee-mitra", label: "Sathee Mitra" },
+  { value: "sathee-mitra", label: "My Attendance" },
 ];
 
 const selectClass =

@@ -1,9 +1,9 @@
-import { Trash2, Users as UsersIcon } from "lucide-react";
+import { Trash2, Send, Users as UsersIcon } from "lucide-react";
 
 const GRID_COLS = "2fr 1.5fr 2.5fr 1.2fr 1fr";
 const DEFAULT_BADGE = { bg: "bg-gray-100 text-gray-700 border border-gray-200", icon: null };
 
-const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser, loading }) => (
+const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser, onResendInvite, loading }) => (
   <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
     <div
       className="grid gap-4 px-6 py-4 border-b"
@@ -66,7 +66,16 @@ const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser,
                 </span>
               </div>
 
-              <div>
+              <div className="flex items-center gap-1">
+                {!user.hasPassword && (
+                  <button
+                    onClick={() => onResendInvite(user)}
+                    className="text-slate-400 hover:text-blue-600 transition-colors p-1"
+                    title="Resend invite"
+                  >
+                    <Send size={18} />
+                  </button>
+                )}
                 <button
                   onClick={() => onDeleteUser(user)}
                   className="text-slate-400 hover:text-red-600 transition-colors p-1"

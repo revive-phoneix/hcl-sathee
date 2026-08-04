@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Clock, ImageOff } from "lucide-react";
-import { fetchMitraAttendance } from "../../services/mitraAttendance";
+import {
+  fetchMitraAttendance,
+  fetchMitraAttendanceRange,
+} from "../../services/mitraAttendance";
 import TableStatusRow from "../common/TableStatusRow";
 
 const formatTime = (value) => {
@@ -12,23 +15,59 @@ const formatTime = (value) => {
   });
 };
 
-function PhotoTimeCell({ label, photoUrl, time }) {
-  return (
-    <div className="flex flex-col items-center gap-2 py-1">
-      <div className="relative w-24 h-24 rounded-xl border border-dashed border-slate-300 bg-slate-50 overflow-hidden flex items-center justify-center">
-        {photoUrl ? (
-          <img src={photoUrl} alt={label} className="w-full h-full object-cover" />
-        ) : (
-          <div className="flex flex-col items-center gap-1 text-slate-400">
-            <ImageOff size={22} />
-            <span className="text-[10px] font-medium uppercase tracking-wide">No photo</span>
-          </div>
-        )}
-      </div>
+const toInputDate = (date = new Date()) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
-      <div className="flex items-center gap-1 text-xs text-slate-600">
-        <Clock size={12} className="text-slate-400" />
-        <span className="font-medium tabular-nums">{formatTime(time)}</span>
+const parseInputDate = (dateStr) => {
+  const d = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
+  return Number.isNaN(d.getTime()) ? new Date() : d;
+};
+
+const getWeekRange = (dateStr) => {
+  const d = parseInputDate(dateStr);
+  const day = d.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+  const sunday = new Date(monday);
+  sunday.setDate(monday.getDate() + 6);
+  return { from: toInputDate(monday), to: toInputDate(sunday) };
+};
+
+const getMonthRange = (dateStr) => {
+  const d = parseInputDate(dateStr);
+  const from = new Date(d.getFullYear(), d.getMonth(), 1);
+  const to = new Date(d.getFullYear(), d.getMonth() + 1, 0);
+  return { from: toInputDate(from), to: toInputDate(to) };
+};
+
+const getYearRange = (dateStr) => {
+  const d = parseInputDate(dateStr);
+  const from = new Date(d.getFullYear(), 0, 1);
+  const to = new Date(d.getFullYear(), 11, 31);
+  return { from: toInputDate(from), to: toInputDate(to) };
+};
+
+const percentStatusMeta = (percent) => {
+  if (percent == null || Number.isNaN(percent)) {
+    return { statusKey: "none", statusLabel: "—" };
+  }
+  if (percent >= 90) return { statusKey: "excellent", statusLabel: "Excellent" };
+  if (percent >= 85) return { statusKey: "good", statusLabel: "Good" };
+  if (percent >= 80) return { statusKey: "average", statusLabel: "Average" };
+  return { statusKey: "low", statusLabel: "Low" };
+};
+
+function TimeCell({ label, time }) {
+  return (
+    <div className="flex flex-col gap-1 py-1">
+      <div className="text-xs font-medium text-slate-500 uppercase tracking-wide">{label}</div>
+      <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm font-medium text-slate-700 text-center">
+        {formatTime(time)}
       </div>
     </div>
   );
@@ -40,6 +79,9 @@ const EMPTY_RECORD = {
   departurePhotoUrl: null,
   departureTime: null,
   centreId: null,
+  dailyAttendancePercentage: null,
+  statusKey: "none",
+  statusLabel: "—",
 };
 
 export default function SatheeMitraAttendance({
@@ -47,8 +89,9 @@ export default function SatheeMitraAttendance({
   loading = false,
   search = "",
   selectedDate,
+  activeTab = "daily",
 }) {
-  const [recordsByUser, setRecordsByUser] = useState({});
+  const [records, setRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [error, setError] = useState("");
 
@@ -68,24 +111,36 @@ export default function SatheeMitraAttendance({
     let isMounted = true;
 
     const loadRecords = async () => {
-      if (!selectedDate) return;
+      const dateToUse = selectedDate || toInputDate();
+      if (!dateToUse) return;
       setLoadingRecords(true);
       setError("");
+
       try {
-        const records = await fetchMitraAttendance(selectedDate);
-        if (!isMounted) return;
-        const map = {};
-        for (const record of records) {
-          map[String(record.userId)] = record;
+        let recordsData = [];
+        if (activeTab === "daily") {
+          recordsData = await fetchMitraAttendance(dateToUse);
+        } else if (activeTab === "weekly") {
+          const range = getWeekRange(dateToUse);
+          if (range.from && range.to) {
+            recordsData = await fetchMitraAttendanceRange(range.from, range.to);
+          }
+        } else if (activeTab === "monthly") {
+          const range = getMonthRange(dateToUse);
+          if (range.from && range.to) {
+            recordsData = await fetchMitraAttendanceRange(range.from, range.to);
+          }
         }
-        setRecordsByUser(map);
+
+        if (!isMounted) return;
+        setRecords(recordsData);
       } catch (err) {
         console.error("Load mitra attendance error:", err);
         if (!isMounted) return;
         setError(
           err.response?.data?.message || "Unable to load Sathee Mitra attendance"
         );
-        setRecordsByUser({});
+        setRecords([]);
       } finally {
         if (isMounted) setLoadingRecords(false);
       }
@@ -95,9 +150,56 @@ export default function SatheeMitraAttendance({
     return () => {
       isMounted = false;
     };
-  }, [selectedDate]);
+  }, [selectedDate, activeTab]);
 
-  const getRecord = (userId) => recordsByUser[String(userId)] || EMPTY_RECORD;
+  const recordsByUser = useMemo(() => {
+    const map = {};
+    for (const record of records) {
+      const id = String(record.userId);
+      if (!map[id]) map[id] = [];
+      map[id].push(record);
+    }
+    return map;
+  }, [records]);
+
+  const getSummary = (userId) => {
+    const entries = recordsByUser[String(userId)] || [];
+    if (activeTab === "daily") {
+      return entries[0] || EMPTY_RECORD;
+    }
+
+    const validPercents = entries
+      .map((entry) => Number(entry.dailyAttendancePercentage))
+      .filter((val) => Number.isFinite(val));
+    const average =
+      validPercents.length > 0
+        ? validPercents.reduce((sum, value) => sum + value, 0) /
+          validPercents.length
+        : entries.length > 0
+        ? Math.round((entries.filter((entry) => entry.arrivalTime || entry.departureTime).length / entries.length) * 100)
+        : null;
+
+    const { statusKey, statusLabel } = percentStatusMeta(average);
+    const arrivalTimes = entries
+      .map((entry) => entry.arrivalTime)
+      .filter(Boolean)
+      .sort();
+    const departureTimes = entries
+      .map((entry) => entry.departureTime)
+      .filter(Boolean)
+      .sort();
+
+    return {
+      ...EMPTY_RECORD,
+      dailyAttendancePercentage: average,
+      statusKey,
+      statusLabel,
+      arrivalTime: arrivalTimes.length ? arrivalTimes[0] : null,
+      departureTime: departureTimes.length
+        ? departureTimes[departureTimes.length - 1]
+        : null,
+    };
+  };
 
   const busy = loading || loadingRecords;
 
@@ -122,14 +224,14 @@ export default function SatheeMitraAttendance({
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Centre
               </th>
-              <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Centre ID
-              </th>
               <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Arrival
               </th>
               <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Departure
+              </th>
+              <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                Status
               </th>
             </tr>
           </thead>
@@ -144,7 +246,7 @@ export default function SatheeMitraAttendance({
               </TableStatusRow>
             ) : (
               rows.map((mitra, index) => {
-                const record = getRecord(mitra.id);
+                const record = getSummary(mitra.id);
                 const isEven = index % 2 === 0;
 
                 return (
@@ -164,22 +266,27 @@ export default function SatheeMitraAttendance({
                     <td className="px-5 py-4 text-sm text-gray-700 align-middle">
                       {mitra.centre || "—"}
                     </td>
-                    <td className="px-5 py-4 text-sm text-gray-400 align-middle">
-                      {record.centreId || "—"}
+                    <td className="px-5 py-4 align-middle">
+                      <TimeCell label="Arrival" time={record.arrivalTime} />
                     </td>
                     <td className="px-5 py-4 align-middle">
-                      <PhotoTimeCell
-                        label="Arrival"
-                        photoUrl={record.arrivalPhotoUrl}
-                        time={record.arrivalTime}
-                      />
+                      <TimeCell label="Departure" time={record.departureTime} />
                     </td>
-                    <td className="px-5 py-4 align-middle">
-                      <PhotoTimeCell
-                        label="Departure"
-                        photoUrl={record.departurePhotoUrl}
-                        time={record.departureTime}
-                      />
+                    <td className="px-5 py-4 text-center align-middle">
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
+                        record.statusKey === "excellent"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : record.statusKey === "good"
+                          ? "border-blue-200 bg-blue-50 text-blue-700"
+                          : record.statusKey === "average"
+                          ? "border-amber-200 bg-amber-50 text-amber-700"
+                          : record.statusKey === "low"
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-slate-200 bg-slate-50 text-slate-500"
+                      }`}
+                      >
+                        {record.statusLabel || "—"}
+                      </span>
                     </td>
                   </tr>
                 );

@@ -1,5 +1,6 @@
 const User = require("../Models/User");
 const generateToken = require("../Utils/GenerateToken");
+const { verifyInviteToken } = require("../Utils/inviteToken");
 const {
   hashPassword,
   verifyPassword,
@@ -27,15 +28,24 @@ const findUserOrFail = async (res, email) => {
 
 exports.createPassword = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
-    if (!name || !email || !password) {
-      return fail(res, 400, "Name, email and password are required");
+    const { token, password } = req.body;
+    if (!token || !password) {
+      return fail(res, 400, "Token and password are required");
     }
 
-    const user = await findUserOrFail(res, email);
-    if (!user) return;
+    let payload;
+    try {
+      payload = verifyInviteToken(token);
+    } catch (err) {
+      if (err.name === "TokenExpiredError") {
+        return fail(res, 400, "This invite link has expired. Please ask an admin to resend it.");
+      }
+      return fail(res, 400, "This invite link is invalid.");
+    }
 
-    if (user.name?.trim() !== name.trim()) {
+    const user = await findUserOrFail(res, payload.email);
+    if (!user) return;
+    if (user.name?.trim() !== payload.name?.trim()) {
       return fail(res, 400, "Name does not match the invited account");
     }
     if (user.password) {

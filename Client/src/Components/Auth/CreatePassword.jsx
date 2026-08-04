@@ -13,12 +13,25 @@ import {
 } from "./authUi";
 import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
+const decodeJwtPayload = (token) => {
+  try {
+    const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    return JSON.parse(atob(base64));
+  } catch {
+    return null;
+  }
+};
+
 export default function CreatePassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const token = searchParams.get("token") || "";
+  const payload = decodeJwtPayload(token);
+  const isExpired = !payload || (payload.exp && payload.exp * 1000 < Date.now());
+
   const [form, setForm] = useState({
-    name: searchParams.get("name") || "",
-    email: searchParams.get("email") || "",
+    name: payload?.name || "",
+    email: payload?.email || "",
     password: "",
     confirmPassword: "",
   });
@@ -29,15 +42,22 @@ export default function CreatePassword() {
 
   const set = (key) => (e) => setForm((prev) => ({ ...prev, [key]: e.target.value }));
 
+  if (isExpired) {
+    return (
+      <AuthCard title="Link Expired" subtitle="This invite link is no longer valid.">
+        <p className="mt-4 text-sm text-slate-600">
+          Please contact your admin to resend the invite.
+        </p>
+      </AuthCard>
+    );
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setMessage("");
     setStatusText("");
 
-    if (!form.name || !form.email) {
-      return setError("The invite link is missing user details.");
-    }
     const policy = validatePasswordPolicy(form.password);
     if (!policy.valid) return setError(policy.message);
     if (form.password !== form.confirmPassword) {
@@ -48,7 +68,7 @@ export default function CreatePassword() {
     try {
       await authPost(
         "/api/auth/create-password",
-        { name: form.name, email: form.email, password: form.password },
+        { token, password: form.password },
         setStatusText,
         "Creating password…"
       );
@@ -62,6 +82,7 @@ export default function CreatePassword() {
               loginPrefill: {
                 name: form.name.trim(),
                 email: form.email.trim().toLowerCase(),
+                role: payload?.role || "",
               },
             },
           }),

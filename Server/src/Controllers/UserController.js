@@ -26,11 +26,10 @@ const formatEmailError = (err) => {
   }
   return raw;
 };
-
 const toPublicUser = (user) => {
   if (!user) return user;
   const { password, ...safe } = user;
-  return safe;
+  return { ...safe, hasPassword: Boolean(password) };
 };
 
 exports.getUsers = wrap(
@@ -117,7 +116,7 @@ exports.addUser = wrap(
 
     let emailSent = false;
     let emailError = null;
-    const passwordSetupLink = createPasswordLink(name.trim(), normalizedEmail);
+    const passwordSetupLink = createPasswordLink(name.trim(), normalizedEmail, role);
 
     if (normalizedEmail.endsWith(TEST_EMAIL_DOMAIN)) {
       emailError = "Skipped welcome email for @example.com addresses";

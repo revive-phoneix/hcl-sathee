@@ -6,6 +6,7 @@ const {
   updateUser,
   deleteUser,
   saveFcmToken,
+  resendInvite,
 } = require("../Controllers/UserController");
 const {
   authenticate,
@@ -24,6 +25,7 @@ router.patch("/me/fcm-token", saveFcmToken);
 // Create/update/delete remain admin-only.
 router.get("/", requireAdminOrPartner, getUsers);
 router.post("/", requireAdmin, addUser);
+router.post("/:id/resend-invite", requireAdmin, resendInvite);
 router.patch("/:id", requireAdmin, updateUser);
 router.delete("/:id", requireAdmin, deleteUser);
 

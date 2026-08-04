@@ -49,6 +49,7 @@ function UploadCard({
   disabled,
   onFile,
   inputRef,
+  allowUpload,
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -77,31 +78,35 @@ function UploadCard({
         )}
       </div>
 
-      <input
-        ref={inputRef}
-        type="file"
-        accept="image/jpeg,image/png,image/webp,image/jpg"
-        className="hidden"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          e.target.value = "";
-          if (file) onFile(file);
-        }}
-      />
+      {allowUpload ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/jpg"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = "";
+              if (file) onFile(file);
+            }}
+          />
 
-      <button
-        type="button"
-        disabled={disabled || uploading}
-        onClick={() => inputRef.current?.click()}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        <Upload size={16} />
-        {uploading
-          ? "Uploading…"
-          : photoUrl
-            ? `Replace ${title} photo`
-            : `Upload ${title} photo`}
-      </button>
+          <button
+            type="button"
+            disabled={disabled || uploading}
+            onClick={() => inputRef.current?.click()}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Upload size={16} />
+            {uploading
+              ? "Uploading…"
+              : photoUrl
+                ? `Replace ${title} photo`
+                : `Upload ${title} photo`}
+          </button>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -113,6 +118,7 @@ export default function MyMitraAttendance({
   userCentre: sessionUserCentre,
   portalName,
   selectedDate,
+  allowUpload = true,
 }) {
   const today = toInputDate();
   const date = selectedDate || today;
@@ -293,6 +299,7 @@ export default function MyMitraAttendance({
             disabled={!isToday || Boolean(uploadingType)}
             onFile={(file) => handleUpload("arrival", file)}
             inputRef={arrivalRef}
+            allowUpload={allowUpload}
           />
           <UploadCard
             title="Departure"
@@ -302,6 +309,7 @@ export default function MyMitraAttendance({
             disabled={!isToday || Boolean(uploadingType)}
             onFile={(file) => handleUpload("departure", file)}
             inputRef={departureRef}
+            allowUpload={allowUpload}
           />
         </div>
       )}

@@ -20,9 +20,6 @@ export default function AuthBrand() {
         <h1 className="text-2xl font-bold tracking-wide text-black">
           SATHEE
         </h1>
-        <p className="text-sm text-black">
-          Admin Portal
-        </p>
       </div>
 
     </div>

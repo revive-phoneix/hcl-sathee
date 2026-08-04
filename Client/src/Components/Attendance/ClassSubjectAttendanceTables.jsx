@@ -386,6 +386,12 @@ export default function ClassSubjectAttendanceTables({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [timetable, setTimetable] = useState(null);
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedTime, setSelectedTime] = useState("");
+  const [selectedCourse, setSelectedCourse] = useState("");
+  const [appliedSubject, setAppliedSubject] = useState("");
+  const [appliedTime, setAppliedTime] = useState("");
+  const [appliedCourse, setAppliedCourse] = useState("");
   const date = useMemo(() => toInputDate(), []);
 
   useEffect(() => {
@@ -417,10 +423,58 @@ export default function ClassSubjectAttendanceTables({
     };
   }, [portalName]);
 
+  useEffect(() => {
+    setSelectedSubject("");
+    setSelectedTime("");
+    setSelectedCourse("");
+    setAppliedSubject("");
+    setAppliedTime("");
+    setAppliedCourse("");
+  }, [timetable]);
+
   const { day, classes, unsupported } = useMemo(
     () => getTodaysClasses(timetable),
     [timetable]
   );
+
+  const subjectOptions = useMemo(
+    () =>
+      [...new Set(classes.map((item) => item.subject).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [classes]
+  );
+
+  const timeOptions = useMemo(
+    () =>
+      [...new Set(classes.map((item) => item.time).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [classes]
+  );
+
+  const courseOptions = useMemo(
+    () =>
+      [...new Set(classes.map((item) => item.course).filter(Boolean))].sort((a, b) =>
+        a.localeCompare(b)
+      ),
+    [classes]
+  );
+
+  const filteredClasses = useMemo(() => {
+    // If no filters are applied, show nothing until user clicks Go
+    if (!appliedSubject && !appliedTime && !appliedCourse) {
+      return [];
+    }
+
+    return classes.filter((item) => {
+      const subjectMatch =
+        !appliedSubject || normalizeSubject(item.subject) === normalizeSubject(appliedSubject);
+      const timeMatch = !appliedTime || String(item.time || "").trim() === String(appliedTime).trim();
+      const courseMatch = !appliedCourse || String(item.course || "").trim() === String(appliedCourse).trim();
+      return subjectMatch && timeMatch && courseMatch;
+    });
+  }, [classes, appliedSubject, appliedTime, appliedCourse]);
 
   const isWeekendOff = day === "Sunday";
   const centre = userCentre || portalName || "";
@@ -454,26 +508,110 @@ export default function ClassSubjectAttendanceTables({
         </p>
       </div>
 
-      {classes.map((classItem, index) => {
-        const matched = students
-          .filter((student) => studentMatchesClass(student, classItem))
-          .sort((a, b) =>
-            String(a.name || "").localeCompare(String(b.name || ""), undefined, {
-              sensitivity: "base",
-            })
-          );
+      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="min-w-[180px]">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Course
+            </label>
+            <select
+              value={selectedCourse}
+              onChange={(e) => setSelectedCourse(e.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All courses</option>
+              {courseOptions.map((course) => (
+                <option key={course} value={course}>
+                  {course}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        return (
-          <ClassAttendanceTable
-            key={classKey(classItem, index)}
-            classItem={classItem}
-            students={matched}
-            date={date}
-            centre={centre}
-            index={index}
-          />
-        );
-      })}
+          <div className="min-w-[220px]">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Subject
+            </label>
+            <select
+              value={selectedSubject}
+              onChange={(e) => setSelectedSubject(e.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All subjects</option>
+              {subjectOptions.map((subject) => (
+                <option key={subject} value={subject}>
+                  {subject}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="min-w-[180px]">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Time
+            </label>
+            <select
+              value={selectedTime}
+              onChange={(e) => setSelectedTime(e.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
+            >
+              <option value="">All times</option>
+              {timeOptions.map((time) => (
+                <option key={time} value={time}>
+                  {time}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              setAppliedSubject(selectedSubject);
+              setAppliedTime(selectedTime);
+              setAppliedCourse(selectedCourse);
+            }}
+            className="h-11 rounded-xl bg-sky-600 px-4 text-sm font-semibold text-white hover:bg-sky-700"
+          >
+            Go
+          </button>
+        </div>
+
+        {(appliedSubject || appliedTime || appliedCourse) ? (
+          <p className="mt-3 text-sm text-slate-500">
+            Showing {filteredClasses.length} matching class{filteredClasses.length === 1 ? "" : "es"}.
+          </p>
+        ) : null}
+      </div>
+
+      {filteredClasses.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">
+          {appliedSubject || appliedTime || appliedCourse
+            ? "No class matches the selected filters."
+            : "Select filters and click Go to view classes."}
+        </div>
+      ) : (
+        filteredClasses.map((classItem, index) => {
+          const matched = students
+            .filter((student) => studentMatchesClass(student, classItem))
+            .sort((a, b) =>
+              String(a.name || "").localeCompare(String(b.name || ""), undefined, {
+                sensitivity: "base",
+              })
+            );
+
+          return (
+            <ClassAttendanceTable
+              key={classKey(classItem, index)}
+              classItem={classItem}
+              students={matched}
+              date={date}
+              centre={centre}
+              index={index}
+            />
+          );
+        })
+      )}
     </div>
   );
 }

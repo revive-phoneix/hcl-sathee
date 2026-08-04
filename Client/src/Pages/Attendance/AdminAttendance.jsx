@@ -275,16 +275,16 @@ export default function AdminAttendance({
   const [loadingMyRequests, setLoadingMyRequests] = useState(false);
   const [myRequestsError, setMyRequestsError] = useState("");
 
-  const hasCompleteSelection = Boolean(activeTab && selectedCentre && selectedRole);
+  const centreScope = centreFilterEnabled ? selectedCentre : portalName;
+
+  const hasCompleteSelection = Boolean(activeTab && centreScope && selectedRole);
   const viewReady =
     Boolean(appliedType && appliedCentre && appliedRole) &&
     appliedType === activeTab &&
-    appliedCentre === selectedCentre &&
+    appliedCentre === centreScope &&
     appliedRole === selectedRole;
   const isMitraView = viewReady && appliedRole === "sathee-mitra";
   const filtersReady = viewReady;
-
-  const centreScope = centreFilterEnabled ? selectedCentre : portalName;
 
   const centreStudents = useMemo(
     () =>
@@ -308,6 +308,18 @@ export default function AdminAttendance({
       ),
     [mitras, centreScope]
   );
+
+  const currentMitra = useMemo(() => {
+    if (!userId) return [];
+    return [
+      {
+        id: userId,
+        name: userName || "",
+        email: userEmail || "",
+        centre: userCentre || portalName || "",
+      },
+    ];
+  }, [userId, userName, userEmail, userCentre, portalName]);
 
   const recordsByStudentDate = useMemo(() => {
     const map = new Map();
@@ -553,6 +565,30 @@ export default function AdminAttendance({
               <div className="flex flex-wrap items-center gap-3">
                 <button
                   type="button"
+                  onClick={() => setMitraPanel("myAttendance")}
+                  className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    mitraPanel === "myAttendance"
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
+                  }`}
+                >
+                  My Attendance
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMitraPanel("requests")}
+                  className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
+                    mitraPanel === "requests"
+                      ? "border-sky-600 bg-sky-600 text-white"
+                      : "border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
+                  }`}
+                >
+                  MyRequests
+                </button>
+
+                <button
+                  type="button"
                   onClick={() => {
                     setLeaveError("");
                     setLeaveMessage("");
@@ -562,18 +598,6 @@ export default function AdminAttendance({
                 >
                   Apply Leave
                 </button>
-
-                <button
-                  type="button"
-                  onClick={() => setMitraPanel((current) => (current === "requests" ? "attendance" : "requests"))}
-                  className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    mitraPanel === "requests"
-                      ? "border-sky-600 bg-sky-600 text-white"
-                      : "border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
-                  }`}
-                >
-                  MyRequests
-                </button>
               </div>
             </div>
 
@@ -582,7 +606,35 @@ export default function AdminAttendance({
         ) : null}
 
         {mitraSelfUpload ? (
-          mitraPanel === "attendance" ? (
+          mitraPanel === "myAttendance" ? (
+            <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+              <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-xl font-semibold text-slate-900">My Attendance</h3>
+                  <p className="text-sm text-slate-500">
+                    Upload your arrival and departure photos for daily tracking.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setMitraPanel("attendance")}
+                  className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Back to Attendance
+                </button>
+              </div>
+
+              <MyMitraAttendance
+                userId={userId}
+                userName={userName}
+                userEmail={userEmail}
+                userCentre={userCentre}
+                portalName={portalName}
+                selectedDate={selectedDate}
+              />
+            </div>
+          ) : mitraPanel === "attendance" ? (
             <ClassSubjectAttendanceTables
               portalName={portalName}
               userCentre={userCentre}
@@ -660,15 +712,11 @@ export default function AdminAttendance({
             <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
             <p className="mt-1 text-sm text-gray-500">
               {viewReady && appliedRole === "sathee-mitra"
-                ? mitraSelfUpload
-                  ? "Upload your arrival and departure photos. Time is saved automatically."
-                  : "Track Sathee Mitra presence with arrival and departure photo proof."
+                ? "Track Sathee Mitra presence with arrival and departure photo proof."
                 : "Combined centre attendance by day, week, and month."}
             </p>
           </div>
-          {mitraSelfUpload ? (
-            null
-          ) : isAdminView ? (
+          {mitraSelfUpload ? null : isAdminView ? (
             <button
               type="button"
               onClick={() => navigate("/leave-requests")}
@@ -702,7 +750,7 @@ export default function AdminAttendance({
           mitraTabLabel={mitraTabLabel}
           onGo={() => {
             setAppliedType(activeTab);
-            setAppliedCentre(selectedCentre);
+            setAppliedCentre(centreScope);
             setAppliedRole(selectedRole);
           }}
           canGo={hasCompleteSelection}
@@ -740,21 +788,13 @@ export default function AdminAttendance({
                 Choose all three filters and click Go to load the records.
               </p>
             </div>
-          ) : isMitraView && mitraSelfUpload ? (
-            <MyMitraAttendance
-              userId={userId}
-              userName={userName}
-              userEmail={userEmail}
-              userCentre={userCentre}
-              portalName={portalName}
-              selectedDate={selectedDate}
-            />
           ) : isMitraView ? (
             <SatheeMitraAttendance
-              mitras={centreMitras}
+              mitras={mitraSelfUpload ? currentMitra : centreMitras}
               loading={loadingMitras}
               search={search}
               selectedDate={selectedDate}
+              activeTab={appliedType}
             />
           ) : (
             <AttendanceTable

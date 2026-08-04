@@ -71,7 +71,7 @@ function createMessage(from, to, subject, text, html) {
 
 async function sendWelcomeEmail(to, name, role) {
   const from = String(process.env.EMAIL_USER || "").trim();
-  const link = createPasswordLink(name, to);
+  const link = createPasswordLink(name, to, role);
   const text = `Hello ${name},\n\nYour account has been created as ${role}.\n\nPlease set your password using the link below:\n${link}\n\nIf the button does not work, copy and paste this URL into your browser.\n\nWelcome to HCL SATHEE.`;
   const html = `
     <div style="font-family: Arial, sans-serif; color: #1f2937; line-height:1.6;">

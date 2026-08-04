@@ -8,15 +8,19 @@ const VALID_TYPES = new Set(["arrival", "departure"]);
 exports.getMitraAttendance = wrap(
   async (req, res) => {
     const date = (req.query.date || "").trim();
-    if (!date) {
-      return fail(res, 400, "date query param is required (YYYY-MM-DD)");
+    const from = (req.query.from || "").trim();
+    const to = (req.query.to || "").trim();
+
+    let records = [];
+    if (date) {
+      records = await MitraAttendance.findByDate(date);
+    } else if (from && to) {
+      records = await MitraAttendance.findByDateRange(from, to);
+    } else {
+      return fail(res, 400, "Provide date=YYYY-MM-DD or from and to query params");
     }
 
-    const records = filterByUserCentre(
-      await MitraAttendance.findByDate(date),
-      req.user
-    );
-    return ok(res, { records });
+    return ok(res, { records: filterByUserCentre(records, req.user) });
   },
   { label: "Get Mitra Attendance Error", message: "Failed to fetch Sathee Mitra attendance" }
 );

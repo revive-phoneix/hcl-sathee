@@ -223,7 +223,7 @@ export default function AdminLoginCard({ onLoginSuccess }) {
     <div className="max-w-md rounded-3xl bg-[#1e40af] p-8 shadow-2xl lg:max-w-lg lg:p-10 text-white">
       <h2 className="text-3xl font-bold mb-2">Welcome Back</h2>
       <p className="text-sm opacity-90 mb-8">
-        Sign in to access the HCL SATHEE Admin Dashboard.
+        Sign in to access your HCL SATHEE account.
       </p>
 
       <form

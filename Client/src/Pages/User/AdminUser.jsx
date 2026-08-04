@@ -5,7 +5,7 @@ import UserFilter from "../../Components/User/UserFilter";
 import UserToolbar from "../../Components/User/UserToolbar";
 import UserTable from "../../Components/User/UserTable";
 import { MainLayout } from "../../Components/MainLayout";
-import { createUser, fetchUsers, removeUser } from "../../services/users";
+import { createUser, fetchUsers, removeUser, resendInvite } from "../../services/users";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { getInitials } from "../../utils/studentMetrics";
@@ -126,6 +126,16 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
     setUsersError("");
     setUserToDelete(user);
   };
+  const handleResendInvite = async (user) => {
+  setUsersError("");
+  try {
+    const result = await resendInvite(user.id);
+    setUsersError(result.emailSent ? "" : result.message || "Could not resend invite");
+  } catch (error) {
+    console.error("Resend Invite Error:", error);
+    setUsersError(getApiErrorMessage(error, "Unable to resend invite right now"));
+  }
+};
 
   const confirmDeleteUser = async () => {
     if (!userToDelete) return;
@@ -210,6 +220,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
           roleBadge={roleBadge}
           avatarColor={avatarColor}
           onDeleteUser={handleDeleteUser}
+          onResendInvite={handleResendInvite}
           loading={loadingUsers}
         />
       </div>

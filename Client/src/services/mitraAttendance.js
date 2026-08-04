@@ -7,6 +7,16 @@ export const fetchMitraAttendance = async (date) => {
   return response.data.records ?? [];
 };
 
+export const fetchMitraAttendanceRange = async (from, to) => {
+  if (!from || !to) {
+    return [];
+  }
+  const response = await api.get("/api/mitra-attendance", {
+    params: { from, to },
+  });
+  return response.data.records ?? [];
+};
+
 export const uploadMitraAttendancePhoto = async ({
   userId,
   name,
