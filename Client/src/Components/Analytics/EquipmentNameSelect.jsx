@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Search, ChevronDown } from "lucide-react";
-import { EQUIPMENT_CATALOG } from "../../data/equipmentCatalog";
+import { EQUIPMENT_CATALOG } from "../../Data/EquipmentCatalog";
 
 export default function EquipmentNameSelect({ value, onChange, className, placeholder }) {
   const [query, setQuery] = useState(value || "");
