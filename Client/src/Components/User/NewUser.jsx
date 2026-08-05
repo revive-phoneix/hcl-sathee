@@ -4,6 +4,8 @@ import { getCentreValueFromPortal } from "../../utils/portalMapping";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 import { isValidPhone10, sanitizePhoneInput } from "../../utils/phone";
 
+const WEEKDAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
 export default function NewUser({ onClose, onAddUser, submittingUser, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
 
@@ -15,6 +17,7 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
     designation: "",
     centre: defaultCentre,
     isVishist: false,
+    availableDays: [],
   });
 
   const [error, setError] = useState("");
@@ -50,6 +53,7 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
       };
       if (form.role === "SATHEE MITRA") {
         payload.isVishist = Boolean(form.isVishist);
+        payload.availableDays = form.isVishist ? form.availableDays : [];
       }
       await onAddUser(payload);
     } catch (submitError) {
@@ -131,6 +135,8 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
                     centre: prev.centre || defaultCentre,
                     isVishist:
                       e.target.value === "SATHEE MITRA" ? prev.isVishist : false,
+                    availableDays:
+                      e.target.value === "SATHEE MITRA" ? prev.availableDays : [],
                   }))
                 }
                 className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm focus:outline-none focus:border-blue-500 transition-colors"
@@ -142,19 +148,60 @@ export default function NewUser({ onClose, onAddUser, submittingUser, portalName
             </div>
 
             {form.role === "SATHEE MITRA" ? (
-              <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.isVishist)}
-                  onChange={(e) =>
-                    setForm((prev) => ({ ...prev, isVishist: e.target.checked }))
-                  }
-                  className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                />
-                <span className="text-sm font-medium text-slate-700">
-                  Is Vishist?
-                </span>
-              </label>
+              <div className="space-y-3">
+                <label className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.isVishist)}
+                    onChange={(e) =>
+                      setForm((prev) => ({
+                        ...prev,
+                        isVishist: e.target.checked,
+                        availableDays: e.target.checked ? prev.availableDays : [],
+                      }))
+                    }
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  />
+                  <span className="text-sm font-medium text-slate-700">
+                    Is Vishist?
+                  </span>
+                </label>
+
+                {form.isVishist ? (
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <p className="mb-2 text-sm font-medium text-slate-700">Available Days</p>
+                    <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                      {WEEKDAYS.map((day) => {
+                        const checked = form.availableDays.includes(day);
+                        return (
+                          <label
+                            key={day}
+                            className={`flex cursor-pointer items-center justify-center rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${checked
+                              ? "border-blue-600 bg-blue-600 text-white"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                              }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={(e) =>
+                                setForm((prev) => ({
+                                  ...prev,
+                                  availableDays: e.target.checked
+                                    ? [...prev.availableDays, day]
+                                    : prev.availableDays.filter((d) => d !== day),
+                                }))
+                              }
+                              className="hidden"
+                            />
+                            {day.slice(0, 3)}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             ) : null}
           </div>
 
