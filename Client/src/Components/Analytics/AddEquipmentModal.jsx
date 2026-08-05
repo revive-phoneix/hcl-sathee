@@ -2,6 +2,7 @@ import { useState } from "react";
 import { X } from "lucide-react";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import EquipmentNameSelect from "./EquipmentNameSelect";
 
 const EMPTY_FORM = {
   name: "",
@@ -93,15 +94,18 @@ export default function AddEquipmentModal({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5 px-6 py-5">
-          <FormField label="Equipment Name" required hint="Maximum Characters: 100">
-            <input
-              type="text"
+          <FormField label="Equipment Name" required hint="Search predefined equipment or type a custom name">
+            <EquipmentNameSelect
               value={form.name}
-              maxLength={100}
-              onChange={(e) => update("name", e.target.value)}
+              onChange={(item) =>
+                setForm((prev) => ({
+                  ...prev,
+                  name: item.name,
+                  description: item.description || prev.description,
+                }))
+              }
               className={inputClass}
-              placeholder="Enter Equipment Name"
-              required
+              placeholder="Search or type equipment name"
             />
           </FormField>
 
