@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { Camera, Clock, ImageOff, Upload } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { Camera, Clock, ImageOff } from "lucide-react";
 import {
   fetchMitraAttendance,
   uploadMitraAttendancePhoto,
@@ -9,6 +9,7 @@ import { getApiErrorMessage } from "../../utils/apiRequest";
 import { getAuthPayload } from "../../utils/authToken";
 import { compressImageForUpload } from "../../utils/compressImage";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
+import LiveCameraCapture from "./LiveCameraCapture";
 
 const formatTime = (value) => {
   if (!value) return "—";
@@ -41,16 +42,7 @@ function LockedField({ label, value }) {
   );
 }
 
-function UploadCard({
-  title,
-  photoUrl,
-  time,
-  uploading,
-  disabled,
-  onFile,
-  inputRef,
-  allowUpload,
-}) {
+function UploadCard({ title, photoUrl, time, uploading, disabled, onCapture, allowUpload }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       <div className="mb-4 flex items-center justify-between gap-3">
@@ -79,33 +71,19 @@ function UploadCard({
       </div>
 
       {allowUpload ? (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,image/jpg"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (file) onFile(file);
-            }}
-          />
-
-          <button
-            type="button"
-            disabled={disabled || uploading}
-            onClick={() => inputRef.current?.click()}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Upload size={16} />
-            {uploading
-              ? "Uploading…"
-              : photoUrl
-                ? `Replace ${title} photo`
-                : `Upload ${title} photo`}
-          </button>
-        </>
+        <button
+          type="button"
+          disabled={disabled || uploading}
+          onClick={onCapture}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Camera size={16} />
+          {uploading
+            ? "Uploading…"
+            : photoUrl
+              ? `Retake ${title} photo`
+              : `Take ${title} photo`}
+        </button>
       ) : null}
     </div>
   );
@@ -124,8 +102,7 @@ export default function MyMitraAttendance({
   const date = selectedDate || today;
   const isToday = date === today;
 
-  const arrivalRef = useRef(null);
-  const departureRef = useRef(null);
+  const [captureType, setCaptureType] = useState(null); // "arrival" | "departure" | null
 
   const [profile, setProfile] = useState(() => {
     const tokenUser = getAuthPayload();
@@ -173,12 +150,10 @@ export default function MyMitraAttendance({
       setProfile({
         id: user?.id ?? fallback.id,
         name: user?.name || fallback.name,
-        // Prefer DB email from /me; otherwise JWT/session (admin-created login email).
         email: user?.email || fallback.email,
         centre: user?.centre || fallback.centre,
       });
     } catch (err) {
-      // /users/me may 404 until server deploy; JWT still has admin email.
       console.warn("Load current user failed, using session/token:", err?.message || err);
       setProfile(fallback);
     }
@@ -195,8 +170,7 @@ export default function MyMitraAttendance({
     setError("");
     try {
       const records = await fetchMitraAttendance(date);
-      const mine =
-        records.find((r) => String(r.userId) === String(uid)) || null;
+      const mine = records.find((r) => String(r.userId) === String(uid)) || null;
       setRecord(mine);
     } catch (err) {
       console.error("Load own mitra attendance error:", err);
@@ -217,7 +191,7 @@ export default function MyMitraAttendance({
 
   const handleUpload = async (type, file) => {
     if (!isToday) {
-      setError("You can only upload photos for today’s attendance.");
+      setError("You can only upload photos for today's attendance.");
       return;
     }
     if (!profile.id) {
@@ -263,11 +237,11 @@ export default function MyMitraAttendance({
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
         <p className="text-sm font-semibold text-slate-900">My Attendance</p>
         <p className="mt-1 text-xs text-slate-500">
-          Upload arrival and departure photos for{" "}
+          Take a live arrival and departure photo for{" "}
           <span className="font-medium text-slate-700">{date}</span>.
           {isToday
-            ? " Time is recorded automatically when you upload."
-            : " Past days are view-only. New uploads open again tomorrow."}
+            ? " Time is recorded automatically when you capture a photo."
+            : " Past days are view-only. New captures open again tomorrow."}
         </p>
       </div>
 
@@ -297,8 +271,7 @@ export default function MyMitraAttendance({
             time={record?.arrivalTime}
             uploading={uploadingType === "arrival"}
             disabled={!isToday || Boolean(uploadingType)}
-            onFile={(file) => handleUpload("arrival", file)}
-            inputRef={arrivalRef}
+            onCapture={() => setCaptureType("arrival")}
             allowUpload={allowUpload}
           />
           <UploadCard
@@ -307,12 +280,21 @@ export default function MyMitraAttendance({
             time={record?.departureTime}
             uploading={uploadingType === "departure"}
             disabled={!isToday || Boolean(uploadingType)}
-            onFile={(file) => handleUpload("departure", file)}
-            inputRef={departureRef}
+            onCapture={() => setCaptureType("departure")}
             allowUpload={allowUpload}
           />
         </div>
       )}
+
+      <LiveCameraCapture
+        open={Boolean(captureType)}
+        title={captureType === "arrival" ? "Arrival Photo" : "Departure Photo"}
+        onClose={() => setCaptureType(null)}
+        onCapture={(blob) => {
+          const file = new File([blob], `${captureType}-${Date.now()}.jpg`, { type: "image/jpeg" });
+          handleUpload(captureType, file);
+        }}
+      />
     </div>
   );
 }
