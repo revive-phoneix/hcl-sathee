@@ -37,6 +37,9 @@ const normalizeSubject = (value = "") =>
     .toLowerCase()
     .replace(/\s+/g, " ");
 
+const normalizeSearch = (value = "") =>
+  String(value || "").trim().toLowerCase();
+
 const studentDisplayId = (student) =>
   student?.studentId || student?.enrollmentNo || student?.Student_ID || student?.id || "—";
 
@@ -387,9 +390,11 @@ export default function ClassSubjectAttendanceTables({
   const [error, setError] = useState("");
   const [timetable, setTimetable] = useState(null);
   const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedTopic, setSelectedTopic] = useState("");
   const [selectedTime, setSelectedTime] = useState("");
   const [selectedCourse, setSelectedCourse] = useState("");
   const [appliedSubject, setAppliedSubject] = useState("");
+  const [appliedTopic, setAppliedTopic] = useState("");
   const [appliedTime, setAppliedTime] = useState("");
   const [appliedCourse, setAppliedCourse] = useState("");
   const date = useMemo(() => toInputDate(), []);
@@ -425,9 +430,11 @@ export default function ClassSubjectAttendanceTables({
 
   useEffect(() => {
     setSelectedSubject("");
+    setSelectedTopic("");
     setSelectedTime("");
     setSelectedCourse("");
     setAppliedSubject("");
+    setAppliedTopic("");
     setAppliedTime("");
     setAppliedCourse("");
   }, [timetable]);
@@ -463,18 +470,21 @@ export default function ClassSubjectAttendanceTables({
 
   const filteredClasses = useMemo(() => {
     // If no filters are applied, show nothing until user clicks Go
-    if (!appliedSubject && !appliedTime && !appliedCourse) {
+    if (!appliedSubject && !appliedTopic && !appliedTime && !appliedCourse) {
       return [];
     }
 
     return classes.filter((item) => {
       const subjectMatch =
         !appliedSubject || normalizeSubject(item.subject) === normalizeSubject(appliedSubject);
+      const topicValue = String(item.topic ?? item.label ?? "");
+      const topicMatch =
+        !appliedTopic || normalizeSearch(topicValue).includes(normalizeSearch(appliedTopic));
       const timeMatch = !appliedTime || String(item.time || "").trim() === String(appliedTime).trim();
       const courseMatch = !appliedCourse || String(item.course || "").trim() === String(appliedCourse).trim();
-      return subjectMatch && timeMatch && courseMatch;
+      return subjectMatch && topicMatch && timeMatch && courseMatch;
     });
-  }, [classes, appliedSubject, appliedTime, appliedCourse]);
+  }, [classes, appliedSubject, appliedTopic, appliedTime, appliedCourse]);
 
   const isWeekendOff = day === "Sunday";
   const centre = userCentre || portalName || "";
@@ -546,16 +556,29 @@ export default function ClassSubjectAttendanceTables({
             </select>
           </div>
 
+          <div className="min-w-[220px]">
+            <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Topic
+            </label>
+            <input
+              type="text"
+              placeholder="Enter topic"
+              value={selectedTopic}
+              onChange={(e) => setSelectedTopic(e.target.value)}
+              className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
+            />
+          </div>
+
           <div className="min-w-[180px]">
             <label className="mb-2 block text-xs font-semibold uppercase tracking-wider text-slate-500">
-              Time
+              Time Slot
             </label>
             <select
               value={selectedTime}
               onChange={(e) => setSelectedTime(e.target.value)}
               className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm text-slate-700 outline-none"
             >
-              <option value="">All times</option>
+              <option value="">All time slots</option>
               {timeOptions.map((time) => (
                 <option key={time} value={time}>
                   {time}
@@ -568,6 +591,7 @@ export default function ClassSubjectAttendanceTables({
             type="button"
             onClick={() => {
               setAppliedSubject(selectedSubject);
+              setAppliedTopic(selectedTopic);
               setAppliedTime(selectedTime);
               setAppliedCourse(selectedCourse);
             }}
@@ -577,7 +601,7 @@ export default function ClassSubjectAttendanceTables({
           </button>
         </div>
 
-        {(appliedSubject || appliedTime || appliedCourse) ? (
+        {(appliedSubject || appliedTopic || appliedTime || appliedCourse) ? (
           <p className="mt-3 text-sm text-slate-500">
             Showing {filteredClasses.length} matching class{filteredClasses.length === 1 ? "" : "es"}.
           </p>
@@ -586,7 +610,7 @@ export default function ClassSubjectAttendanceTables({
 
       {filteredClasses.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-5 py-8 text-center text-sm text-slate-500">
-          {appliedSubject || appliedTime || appliedCourse
+          {appliedSubject || appliedTopic || appliedTime || appliedCourse
             ? "No class matches the selected filters."
             : "Select filters and click Go to view classes."}
         </div>

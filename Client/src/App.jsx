@@ -314,7 +314,7 @@ const AppContent = () => {
   return (
     <>
       <div className="px-4 pt-4 md:px-8">
-        <NotificationPermissionBanner />
+        <NotificationPermissionBanner showLeaveRequest={isAdmin} />
       </div>
       <Routes>
         <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} userRole={userRole} />} />

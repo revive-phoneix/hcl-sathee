@@ -5,7 +5,7 @@ import { registerDeviceToken } from "../../services/notifications";
 
 const DISMISS_KEY = "sathee_notif_banner_dismissed";
 
-const NotificationPermissionBanner = () => {
+const NotificationPermissionBanner = ({ showLeaveRequest = false }) => {
   const [visible, setVisible] = useState(false);
 
   // Decide whether to show the banner, or silently (re)register
@@ -61,7 +61,7 @@ const NotificationPermissionBanner = () => {
       <div className="flex items-center gap-2">
         <Bell size={18} className="shrink-0" />
         <p className="text-sm">
-          Turn on notifications to get alerts for announcements and leave requests.
+          Turn on notifications to get alerts for announcements{showLeaveRequest ? " and leave requests." : "."}
         </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
