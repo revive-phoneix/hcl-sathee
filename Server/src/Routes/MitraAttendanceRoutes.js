@@ -26,6 +26,8 @@ const upload = multer({
 });
 
 router.get("/", authenticate, requireAdminOrPartner, getMitraAttendance);
+router.patch("/:userId/approve", authenticate, requireAdmin, approveMitraAttendance);
+
 router.post("/upload", authenticate, requireSatheeMitra, (req, res, next) => {
   upload.single("photo")(req, res, (err) => {
     if (err) {
@@ -36,7 +38,6 @@ router.post("/upload", authenticate, requireSatheeMitra, (req, res, next) => {
     }
     return uploadMitraPhoto(req, res, next);
   });
-  router.patch("/:userId/approve", authenticate, requireAdmin, approveMitraAttendance);
 });
 
 module.exports = router;
