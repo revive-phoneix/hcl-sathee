@@ -1,46 +1,85 @@
-import { ArrowUpRight } from "lucide-react";
+import { useState } from "react";
+import { ArrowUpRight, Globe, X } from "lucide-react";
 import HCLLogo from "../../assets/HCL.svg";
 import SatheeLogo from "../../assets/sathee.svg";
+import AddDashboardModal from "../../Components/Selector/AddDashboardModal";
+import {
+  addCustomDashboard,
+  getCustomDashboards,
+  removeCustomDashboard,
+} from "../../utils/customDashboards";
 
-function LogoIcon({ src, alt }) {
+function LogoIcon({ src, alt, size = 24 }) {
   return (
     <img
       src={src}
       alt={alt}
-      style={{ width: "100%", height: "100%" }}
-      className="h-full w-full rounded-xl object-cover"
+      style={{ width: size, height: size }}
+      className="rounded-md object-cover"
     />
   );
 }
 
-export default function DashboardSelect({ openHCLSathee }) {
-  const cards = [
+export default function DashboardSelect({ openHCLSathee, userRole }) {
+  const isAdmin = String(userRole || "").trim().toUpperCase() === "ADMIN";
+
+  const [customDashboards, setCustomDashboards] = useState(() => getCustomDashboards());
+  const [modalOpen, setModalOpen] = useState(false);
+
+  const handleAdd = ({ title, url }) => {
+    setCustomDashboards(addCustomDashboard({ title, url }));
+  };
+
+  const handleRemove = (id) => {
+    setCustomDashboards(removeCustomDashboard(id));
+  };
+
+  const builtInCards = [
     {
+      id: "hcl-sathee",
       title: "HCL SATHEE",
       subtitle: "Open your internal HCL SATHEE analytics workspace",
-      icon: () => <LogoIcon src={HCLLogo} alt="HCL" />,
+      icon: (size) => <LogoIcon src={HCLLogo} alt="HCL" size={size} />,
       buttonText: "Open HCL SATHEE",
       onClick: openHCLSathee,
       badge: "Internal",
     },
     {
+      id: "sathee",
       title: "SATHEE",
       subtitle: "Go to the official SATHEE learning portal",
-      icon: () => <LogoIcon src={SatheeLogo} alt="SATHEE" />,
+      icon: (size) => <LogoIcon src={SatheeLogo} alt="SATHEE" size={size} />,
       buttonText: "Visit SATHEE",
       onClick: () =>
         window.open("https://sathee.iitk.ac.in/", "_blank", "noopener,noreferrer"),
       badge: "External",
     },
-    {
-      title: "ADD NEW DASHBOARD",
-      subtitle: "Create OR add a new custom dashboard",
-      icon: ArrowUpRight,
-      buttonText: "Add New Dashboard",
-      onClick: () => {},
-      badge: "External",
-    },
   ];
+
+  const customCards = customDashboards.map((dashboard) => ({
+    id: dashboard.id,
+    title: dashboard.title,
+    subtitle: dashboard.url,
+    icon: (size) => <Globe size={size} />,
+    buttonText: `Open ${dashboard.title}`,
+    onClick: () => window.open(dashboard.url, "_blank", "noopener,noreferrer"),
+    badge: "External",
+    removable: true,
+  }));
+
+  const addDashboardCard = {
+    id: "add-dashboard",
+    title: "ADD NEW DASHBOARD",
+    subtitle: "Create OR add a new custom dashboard",
+    icon: (size) => <ArrowUpRight size={size} />,
+    buttonText: "Add New Dashboard",
+    onClick: () => setModalOpen(true),
+    badge: "Custom",
+  };
+
+  const cards = isAdmin
+    ? [...builtInCards, ...customCards, addDashboardCard]
+    : builtInCards;
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#94A3B8] text-white">
@@ -56,7 +95,7 @@ export default function DashboardSelect({ openHCLSathee }) {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,.16),transparent_45%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,.12),transparent_40%)]" />
 
       <div className="relative mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 lg:px-10 lg:py-14">
-        <p className="inline-flex w-fit rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-4xs font-semibold uppercase tracking-wider text-black">
+        <p className="inline-flex w-fit rounded-full border border-blue-500/20 bg-blue-500/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-wider text-black">
           Dashboard Selection
         </p>
 
@@ -68,39 +107,48 @@ export default function DashboardSelect({ openHCLSathee }) {
           </span>
         </h1>
 
-        <p className="mt-3 max-w-2xl text-sm-bold text-slate-400 sm:text-black">
+        <p className="mt-3 max-w-2xl text-sm font-bold text-slate-400 sm:text-black">
           You are logged in successfully. Select where you want to continue.
         </p>
 
         <div className="mt-8 grid gap-5 md:grid-cols-2 lg:mt-10 lg:gap-7">
           {cards.map(
-            ({ title, subtitle, icon: Icon, buttonText, onClick, badge }) => (
+            ({ id, title, subtitle, icon, buttonText, onClick, badge, removable }) => (
               <article
-                key={title}
-                className="group rounded-2xl border border-slate-700/70 bg-[#F1F5F9]/90 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.35)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-blue-500/40 hover:shadow-[0_20px_70px_rgba(59,130,246,0.2)] lg:p-7 text-black"
+                key={id}
+                className="group relative rounded-2xl border border-slate-700/70 bg-[#F1F5F9]/90 p-6 shadow-[0_20px_60px_rgba(2,6,23,0.35)] backdrop-blur-sm transition duration-300 hover:-translate-y-1 hover:border-blue-500/40 hover:shadow-[0_20px_70px_rgba(59,130,246,0.2)] lg:p-7 text-black"
               >
+                {removable ? (
+                  <button
+                    type="button"
+                    onClick={() => handleRemove(id)}
+                    className="absolute right-4 top-4 rounded-full p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    title="Remove dashboard"
+                  >
+                    <X size={16} />
+                  </button>
+                ) : null}
+
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/15 text-blue-300 ring-1 ring-blue-500/20">
-                    <Icon size={24} />
+                    {icon(24)}
                   </div>
 
-                  <span className="rounded-full border border-slate-600 bg-slate-800/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-black">
+                  <span className="rounded-full border border-slate-600 bg-slate-800/70 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-white">
                     {badge}
                   </span>
                 </div>
 
-                <h2 className="mt-5 text-2xl font-bold tracking-tight">
-                  {title}
-                </h2>
+                <h2 className="mt-5 text-2xl font-bold tracking-tight">{title}</h2>
 
-                <p className="mt-2 text-sm leading-relaxed text-black">
+                <p className="mt-2 truncate text-sm leading-relaxed text-black">
                   {subtitle}
                 </p>
 
                 <button
                   type="button"
                   onClick={onClick}
-                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/15 px-4 py-2.5 text-sm  font-semibold text-black transition hover:border-blue-400/60 hover:bg-blue-500/25"
+                  className="mt-6 inline-flex items-center gap-2 rounded-xl border border-blue-500/30 bg-blue-500/15 px-4 py-2.5 text-sm font-semibold text-black transition hover:border-blue-400/60 hover:bg-blue-500/25"
                 >
                   {buttonText}
                   <ArrowUpRight
@@ -113,6 +161,14 @@ export default function DashboardSelect({ openHCLSathee }) {
           )}
         </div>
       </div>
+
+      {isAdmin ? (
+        <AddDashboardModal
+          open={modalOpen}
+          onClose={() => setModalOpen(false)}
+          onAdd={handleAdd}
+        />
+      ) : null}
     </div>
   );
 }

@@ -317,7 +317,7 @@ const AppContent = () => {
         <NotificationPermissionBanner />
       </div>
       <Routes>
-        <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} />} />
+        <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} userRole={userRole} />} />
 
         <Route
           path="/portals"

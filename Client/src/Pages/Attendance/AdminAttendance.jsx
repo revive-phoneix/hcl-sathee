@@ -795,6 +795,7 @@ export default function AdminAttendance({
               search={search}
               selectedDate={selectedDate}
               activeTab={appliedType}
+              canApprove={!readOnly && !mitraSelfUpload}
             />
           ) : (
             <AttendanceTable

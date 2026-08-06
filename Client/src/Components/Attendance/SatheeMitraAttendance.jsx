@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { Clock, ImageOff } from "lucide-react";
+import { Clock, ImageOff, Check, Lock } from "lucide-react";
 import {
   fetchMitraAttendance,
   fetchMitraAttendanceRange,
+  approveMitraAttendance,
 } from "../../services/mitraAttendance";
 import TableStatusRow from "../common/TableStatusRow";
 
@@ -82,6 +83,7 @@ const EMPTY_RECORD = {
   dailyAttendancePercentage: null,
   statusKey: "none",
   statusLabel: "—",
+  approved: false,
 };
 
 export default function SatheeMitraAttendance({
@@ -90,10 +92,12 @@ export default function SatheeMitraAttendance({
   search = "",
   selectedDate,
   activeTab = "daily",
+  canApprove = false,
 }) {
   const [records, setRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
   const [error, setError] = useState("");
+  const [approvingId, setApprovingId] = useState(null);
 
   const rows = useMemo(() => {
     const q = search.toLowerCase().trim();
@@ -174,10 +178,10 @@ export default function SatheeMitraAttendance({
     const average =
       validPercents.length > 0
         ? validPercents.reduce((sum, value) => sum + value, 0) /
-          validPercents.length
+        validPercents.length
         : entries.length > 0
-        ? Math.round((entries.filter((entry) => entry.arrivalTime || entry.departureTime).length / entries.length) * 100)
-        : null;
+          ? Math.round((entries.filter((entry) => entry.arrivalTime || entry.departureTime).length / entries.length) * 100)
+          : null;
 
     const { statusKey, statusLabel } = percentStatusMeta(average);
     const arrivalTimes = entries
@@ -201,7 +205,25 @@ export default function SatheeMitraAttendance({
     };
   };
 
+  const handleApprove = async (userId, date) => {
+    setApprovingId(userId);
+    try {
+      const updated = await approveMitraAttendance(userId, date);
+      setRecords((prev) =>
+        prev.map((r) =>
+          String(r.userId) === String(userId) && r.date === date ? updated : r
+        )
+      );
+    } catch (err) {
+      console.error("Approve attendance error:", err);
+      setError(err.response?.data?.message || err.message || "Unable to approve attendance");
+    } finally {
+      setApprovingId(null);
+    }
+  };
+
   const busy = loading || loadingRecords;
+  const colSpan = canApprove ? 7 : 6;
 
   return (
     <div>
@@ -233,21 +255,27 @@ export default function SatheeMitraAttendance({
               <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Status
               </th>
+              {canApprove ? (
+                <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  Action
+                </th>
+              ) : null}
             </tr>
           </thead>
           <tbody>
             {busy ? (
-              <TableStatusRow colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
+              <TableStatusRow colSpan={colSpan} className="px-6 py-12 text-center text-sm text-gray-400">
                 Loading Sathee Mitra attendance…
               </TableStatusRow>
             ) : rows.length === 0 ? (
-              <TableStatusRow colSpan={6} className="px-6 py-12 text-center text-sm text-gray-400">
+              <TableStatusRow colSpan={colSpan} className="px-6 py-12 text-center text-sm text-gray-400">
                 No Sathee Mitra found for this centre.
               </TableStatusRow>
             ) : (
               rows.map((mitra, index) => {
                 const record = getSummary(mitra.id);
                 const isEven = index % 2 === 0;
+                const dateForRow = selectedDate || toInputDate();
 
                 return (
                   <tr
@@ -273,21 +301,59 @@ export default function SatheeMitraAttendance({
                       <TimeCell label="Departure" time={record.departureTime} />
                     </td>
                     <td className="px-5 py-4 text-center align-middle">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${
-                        record.statusKey === "excellent"
-                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                          : record.statusKey === "good"
-                          ? "border-blue-200 bg-blue-50 text-blue-700"
-                          : record.statusKey === "average"
-                          ? "border-amber-200 bg-amber-50 text-amber-700"
-                          : record.statusKey === "low"
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
-                          : "border-slate-200 bg-slate-50 text-slate-500"
-                      }`}
-                      >
-                        {record.statusLabel || "—"}
-                      </span>
+                      {activeTab === "daily" ? (
+                        record.approved ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                            <Check size={12} /> Approved
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-500">
+                            —
+                          </span>
+                        )
+                      ) : (
+                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${record.statusKey === "excellent"
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : record.statusKey === "good"
+                              ? "border-blue-200 bg-blue-50 text-blue-700"
+                              : record.statusKey === "average"
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : record.statusKey === "low"
+                                  ? "border-rose-200 bg-rose-50 text-rose-700"
+                                  : "border-slate-200 bg-slate-50 text-slate-500"
+                          }`}
+                        >
+                          {record.statusLabel || "—"}
+                        </span>
+                      )}
                     </td>
+                    {canApprove ? (
+                      <td className="px-5 py-4 text-center align-middle">
+                        {activeTab !== "daily" ? (
+                          <span className="text-xs text-slate-400">Daily only</span>
+                        ) : !record.arrivalTime ? (
+                          <span className="text-xs text-slate-400">—</span>
+                        ) : record.approved ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                            <Check size={12} /> Approved
+                          </span>
+                        ) : Date.now() - new Date(record.arrivalTime).getTime() >
+                          24 * 60 * 60 * 1000 ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-400">
+                            <Lock size={12} /> Expired
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={approvingId === mitra.id}
+                            onClick={() => handleApprove(mitra.id, dateForRow)}
+                            className="rounded-full bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {approvingId === mitra.id ? "Marking…" : "Mark Attendance"}
+                          </button>
+                        )}
+                      </td>
+                    ) : null}
                   </tr>
                 );
               })

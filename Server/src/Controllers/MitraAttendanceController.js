@@ -76,3 +76,21 @@ exports.uploadMitraPhoto = wrap(
     useErrorMessage: true,
   }
 );
+
+exports.approveMitraAttendance = wrap(
+  async (req, res) => {
+    const { userId } = req.params;
+    const date = (req.body?.date || "").trim();
+    if (!userId || !date) {
+      return fail(res, 400, "userId and date are required");
+    }
+
+    try {
+      const record = await MitraAttendance.approveAttendance(userId, date, req.user?.id);
+      return ok(res, { message: "Attendance approved", record });
+    } catch (err) {
+      return fail(res, err.status || 400, err.message || "Unable to approve attendance");
+    }
+  },
+  { label: "Approve Mitra Attendance Error", message: "Failed to approve attendance" }
+);

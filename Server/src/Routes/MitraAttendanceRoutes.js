@@ -3,11 +3,13 @@ const multer = require("multer");
 const {
   getMitraAttendance,
   uploadMitraPhoto,
+  approveMitraAttendance,
 } = require("../Controllers/MitraAttendanceController");
 const {
   authenticate,
   requireAdminOrPartner,
   requireSatheeMitra,
+  requireAdmin,
 } = require("../Middleware/auth");
 
 const router = express.Router();
@@ -34,6 +36,7 @@ router.post("/upload", authenticate, requireSatheeMitra, (req, res, next) => {
     }
     return uploadMitraPhoto(req, res, next);
   });
+  router.patch("/:userId/approve", authenticate, requireAdmin, approveMitraAttendance);
 });
 
 module.exports = router;

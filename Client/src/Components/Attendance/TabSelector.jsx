@@ -10,19 +10,14 @@ const TYPE_OPTIONS = [
   { value: "monthly", label: "Monthly" },
 ];
 
-const ROLE_OPTIONS = [
-  { value: "student", label: "Student" },
-  { value: "sathee-mitra", label: "My Attendance" },
-];
 
 const selectClass =
   "min-w-[160px] px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100 transition-colors";
 
 const pillClass = (active) =>
-  `px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-    active
-      ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
-      : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
+  `px-5 py-2 rounded-full text-sm font-medium transition-all duration-200 ${active
+    ? "bg-blue-600 text-white shadow-sm shadow-blue-200"
+    : "bg-white text-gray-500 hover:bg-gray-100 border border-gray-200"
   }`;
 
 export default function TabSelector({
@@ -41,6 +36,11 @@ export default function TabSelector({
   const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
     ? activeTab
     : "";
+
+  const roleOptions = [
+    { value: "student", label: "Student" },
+    { value: "sathee-mitra", label: mitraTabLabel },
+  ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5">
@@ -81,7 +81,7 @@ export default function TabSelector({
         aria-label="Select role"
       >
         <option value="">Select Role</option>
-        {ROLE_OPTIONS.map((role) => (
+        {roleOptions.map((role) => (
           <option key={role.value} value={role.value}>
             {role.label}
           </option>

@@ -17,6 +17,11 @@ export const fetchMitraAttendanceRange = async (from, to) => {
   return response.data.records ?? [];
 };
 
+export const approveMitraAttendance = async (userId, date) => {
+  const response = await api.patch(`/api/mitra-attendance/${userId}/approve`, { date });
+  return response.data.record;
+};
+
 export const uploadMitraAttendancePhoto = async ({
   userId,
   name,

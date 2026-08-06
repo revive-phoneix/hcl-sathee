@@ -64,6 +64,9 @@ const toApiRecord = (docId, data) => {
     arrivalTime: toDate(data.arrivalTime),
     departurePhotoUrl: data.departurePhotoUrl ?? null,
     departureTime: toDate(data.departureTime),
+    approved: Boolean(data.approved),
+approvedBy: data.approvedBy ?? null,
+approvedAt: toDate(data.approvedAt),
     dailyAttendancePercentage: percentages.dailyAttendancePercentage,
     weeklyAttendancePercentage: percentages.weeklyAttendancePercentage,
     monthlyAttendancePercentage: percentages.monthlyAttendancePercentage,
@@ -73,6 +76,49 @@ const toApiRecord = (docId, data) => {
 };
 
 const buildDocId = (userId, date) => `${userId}_${date}`;
+
+const APPROVAL_WINDOW_HOURS = 24;
+
+const approveAttendance = async (userId, date, approvedBy) => {
+  const docId = buildDocId(userId, date);
+  const ref = attendancesRef().doc(docId);
+  const doc = await ref.get();
+  if (!doc.exists) {
+    const err = new Error("Attendance record not found");
+    err.status = 404;
+    throw err;
+  }
+
+  const data = doc.data();
+  if (!data.arrivalTime) {
+    const err = new Error("Cannot approve attendance with no arrival record");
+    err.status = 400;
+    throw err;
+  }
+  if (data.approved) {
+    const err = new Error("This attendance is already approved");
+    err.status = 400;
+    throw err;
+  }
+
+  const arrival = toDate(data.arrivalTime);
+  const hoursSince = (Date.now() - arrival.getTime()) / (1000 * 60 * 60);
+  if (hoursSince > APPROVAL_WINDOW_HOURS) {
+    const err = new Error("Approval window has expired (24 hours)");
+    err.status = 400;
+    throw err;
+  }
+
+  await ref.update({
+    approved: true,
+    approvedBy,
+    approvedAt: new Date(),
+    updated_at: new Date(),
+  });
+
+  const updated = await ref.get();
+  return toApiRecord(updated.id, updated.data());
+};
 
 const findByDate = async (date) => {
   const snap = await attendancesRef().where("date", "==", date).get();
@@ -254,4 +300,5 @@ module.exports = {
   upsertCheckIn,
   resolvePercentage,
   resolveAttendancePercentages,
+  approveAttendance,
 };
