@@ -304,7 +304,7 @@ export default function SatheeMitraAttendance({
                       {activeTab === "daily" ? (
                         record.approved ? (
                           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                            <Check size={12} /> Approved
+                            <Check size={12} /> Present
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border border-slate-200 bg-slate-50 text-slate-500">
