@@ -43,6 +43,7 @@ const toApiLog = (docId, data) => ({
   centre: data.centre ?? null,
   course: data.course ?? null,
   subject: data.subject,
+  topic: data.topic ?? null,
   date: data.date,
   time: data.time ?? "",
   status: normalizeStatus(data.status),
@@ -97,6 +98,7 @@ const upsert = async ({
   subject,
   date,
   time = "",
+  topic = null,
   status,
 }) => {
   const dateOnly = toDateOnly(date);
@@ -134,6 +136,7 @@ const upsert = async ({
     centre: centre || base.centre || null,
     course: course || base.course || null,
     subject: subjectName,
+    topic: topic || base.topic || null,
     date: dateOnly,
     time: timeKey,
     status: normalizedStatus,

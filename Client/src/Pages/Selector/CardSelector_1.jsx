@@ -9,13 +9,12 @@ import {
   removeCustomDashboard,
 } from "../../utils/customDashboards";
 
-function LogoIcon({ src, alt, size = 24 }) {
+function LogoIcon({ src, alt }) {
   return (
     <img
       src={src}
       alt={alt}
-      style={{ width: size, height: size }}
-      className="rounded-md object-cover"
+      className="h-full w-full rounded-md object-cover"
     />
   );
 }

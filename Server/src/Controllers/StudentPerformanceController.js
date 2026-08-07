@@ -243,12 +243,14 @@ exports.saveDailySubjectAttendance = wrap(
       time = "",
       course = null,
       centre = null,
+      topic = null,
       records,
     } = req.body || {};
 
     const dateOnly = toDateOnly(date);
     const subjectName = String(subject || "").trim();
     const timeKey = String(time || "").trim();
+    const topicText = String(topic || "").trim() || null;
 
     if (!dateOnly || !subjectName) {
       return fail(res, 400, "date and subject are required");
@@ -302,6 +304,7 @@ exports.saveDailySubjectAttendance = wrap(
           centre: centre || student.centre,
           course: course || student.course,
           subject: subjectName,
+          topic: topicText,
           date: dateOnly,
           time: timeKey,
           status: row.status,
@@ -329,6 +332,7 @@ exports.saveDailySubjectAttendance = wrap(
       date: dateOnly,
       subject: subjectName,
       time: timeKey,
+      topic: topicText,
       savedCount: saved.length,
       records: saved,
       aggregates,
