@@ -486,7 +486,7 @@ export default function ClassSubjectAttendanceTables({
       const courseMatch = !appliedCourse || String(item.course || "").trim() === String(appliedCourse).trim();
       return subjectMatch && timeMatch && courseMatch;
     });
-  }, [classes, appliedSubject, appliedTime, appliedCourse]);
+  }, [classes, appliedSubject, appliedTime, appliedCourse, hasSearched]);
 
   const centre = userCentre || portalName || "";
 
