@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getUsers,
+  getAdminUsers,
   getMe,
   addUser,
   updateUser,
