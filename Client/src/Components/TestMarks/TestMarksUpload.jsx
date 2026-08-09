@@ -93,12 +93,12 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 space-y-6">
-      <h2 className="text-lg font-semibold text-slate-800">Test Marks</h2>
+    <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 space-y-6">
+      <h2 className="text-lg font-semibold text-slate-900">Test Marks</h2>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <select
-          className="rounded-xl border border-slate-200 p-2 text-sm"
+          className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
           onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); }}
         >
@@ -107,7 +107,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         </select>
 
         <select
-          className="rounded-xl border border-slate-200 p-2 text-sm"
+          className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={testId}
           onChange={(e) => setTestId(e.target.value)}
           disabled={!course}
@@ -118,14 +118,14 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
 
         <div className="flex gap-2">
           <input
-            className="rounded-xl border border-slate-200 p-2 text-sm flex-1"
+            className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900 flex-1"
             placeholder="New test name"
             value={newTestName}
             onChange={(e) => setNewTestName(e.target.value)}
             disabled={!course}
           />
           <button
-            className="rounded-xl bg-slate-800 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
+            className="rounded-xl bg-slate-900 px-3 py-2 text-xs font-medium text-white disabled:opacity-40"
             onClick={handleCreateTest}
             disabled={!course}
           >
@@ -135,7 +135,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       </div>
 
       <select
-        className="w-full rounded-xl border border-slate-200 p-2 text-sm"
+        className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         value={studentId}
         onChange={(e) => setStudentId(e.target.value)}
         disabled={!course}
@@ -146,41 +146,42 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         ))}
       </select>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           type="file"
           accept="application/pdf,image/*"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
+          className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         />
         <button
-          className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
+          className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
           onClick={handleRunOcr}
           disabled={!file}
         >
           Extract with OCR
         </button>
       </div>
-      {ocrMessage && <p className="text-xs text-slate-500">{ocrMessage}</p>}
+      {ocrMessage && <p className="text-xs text-slate-600">{ocrMessage}</p>}
 
       {rows.length > 0 && (
         <div className="space-y-2">
-          <p className="text-xs font-medium text-slate-500">Review before saving — OCR values may need correction.</p>
+          <p className="text-xs font-medium text-slate-600">Review before saving — OCR values may need correction.</p>
           {rows.map((row, i) => (
-            <div key={i} className="grid grid-cols-3 gap-2 items-center">
+            <div key={i} className="grid gap-2 items-center sm:grid-cols-3">
               <input
-                className="rounded-lg border border-slate-200 p-2 text-sm"
+                className="rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"
                 value={row.subject}
                 onChange={(e) => updateRow(i, "subject", e.target.value)}
               />
               <input
-                className="rounded-lg border border-slate-200 p-2 text-sm"
+                className="rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"
                 type="number"
                 placeholder="Marks obtained"
                 value={row.marksObtained}
                 onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
               />
               <input
-                className="rounded-lg border border-slate-200 p-2 text-sm"
+                className="rounded-lg border border-slate-300 bg-white p-2 text-sm text-slate-900"
                 type="number"
                 placeholder="Total marks"
                 value={row.totalMarks}
@@ -192,13 +193,13 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       )}
 
       <button
-        className="w-full rounded-xl bg-emerald-600 py-3 text-sm font-medium text-white disabled:opacity-40"
+        className="w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white disabled:opacity-40"
         onClick={handleSave}
         disabled={!testId || !studentId || !rows.length || saving}
       >
         {saving ? "Saving…" : "Save Test Marks"}
       </button>
-      {saveMessage && <p className="text-xs text-slate-600">{saveMessage}</p>}
+      {saveMessage && <p className="text-xs text-slate-700">{saveMessage}</p>}
     </div>
   );
 }

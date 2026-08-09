@@ -35,6 +35,11 @@ export const createStudent = async (payload) => {
   return parseStudent(response.data.student);
 };
 
+export const updateStudent = async (id, payload) => {
+  const response = await api.patch(`/api/students/${id}`, payload);
+  return parseStudent(response.data.student);
+};
+
 export const removeStudent = async (id) => {
   await api.delete(`/api/students/${id}`);
 };

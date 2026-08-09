@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
-import {
-  BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation,
-} from "react-router-dom";
-import {
-  LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle, MessageSquareText,
-} from "lucide-react";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, } from "react-router-dom";
+import { LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle, MessageSquareText, ClipboardList } from "lucide-react";
 
 import Authentication from "./Pages/Auth/Authentication";
 import CreatePassword from "./Components/Auth/CreatePassword";
@@ -31,6 +27,7 @@ import MyProfile from "./Pages/Profile/MyProfile";
 import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
 import QueryAndSupport from "./Pages/Support/QueryAndSupport";
 import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
+import SM_TestMarks from "./Pages/TestMarks/SM_TestMarks";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -84,8 +81,9 @@ const MITRA_PATH_TO_NAV = {
   "/mitra/attendance": 1,
   "/mitra/analytics": 2,
   "/mitra/students": 3,
-  "/mitra/announcements": 4,
-  "/mitra/profile": 5,
+  "/mitra/test-marks": 4,
+  "/mitra/announcements": 5,
+  "/mitra/profile": 6,
 };
 
 const MITRA_NAV_PATHS = [
@@ -93,6 +91,7 @@ const MITRA_NAV_PATHS = [
   "/mitra/attendance",
   "/mitra/analytics",
   "/mitra/students",
+  "/mitra/test-marks",
   "/mitra/announcements",
   "/mitra/profile",
 ];
@@ -189,6 +188,7 @@ const AppContent = () => {
     { icon: CalendarDays, label: "Attendance Record" },
     { icon: TrendingUp, label: "Progress and Analytics" },
     { icon: IdCard, label: "Students" },
+    { icon: ClipboardList, label: "Test Marks" },
     { icon: Megaphone, label: "Announcements" },
     { icon: UserCircle, label: "My Profile" },
   ];
@@ -406,6 +406,7 @@ const AppContent = () => {
         />
         <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
         <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
+        <Route path="/mitra/test-marks" element={<SM_TestMarks {...mitraLayout} userCentre={userCentre} />} />
         <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
         <Route
           path="/mitra/profile"

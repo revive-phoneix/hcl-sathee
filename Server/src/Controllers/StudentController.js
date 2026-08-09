@@ -236,6 +236,142 @@ exports.addStudent = wrap(
   { label: "Add Student Error", message: "Failed to add student" }
 );
 
+exports.updateStudent = wrap(
+  async (req, res) => {
+    const existing = await Student.findById(req.params.id);
+    if (!existing) {
+      return fail(res, 404, "Student not found");
+    }
+
+    const scoped = filterByUserCentre([existing], req.user);
+    if (!scoped.length) {
+      return fail(res, 403, "You can only update students from your centre");
+    }
+
+    const {
+      studentId,
+      enrollmentNo,
+      name,
+      gender,
+      email,
+      phone,
+      centre,
+      course,
+      category,
+      address,
+      parents,
+      subjects,
+      marks,
+      attendance,
+      qualifications,
+      avatarColor,
+      initials,
+    } = req.body;
+
+    const patch = {};
+    if (studentId != null) {
+      const trimmed = String(studentId).trim();
+      if (!trimmed) {
+        return fail(res, 400, "Student ID cannot be empty");
+      }
+      patch.studentId = trimmed;
+    }
+    if (enrollmentNo != null) {
+      patch.enrollmentNo = String(enrollmentNo).trim() || null;
+    }
+    if (name != null) {
+      const trimmed = String(name).trim();
+      if (!trimmed) {
+        return fail(res, 400, "Name cannot be empty");
+      }
+      patch.name = trimmed;
+    }
+    if (gender != null) {
+      patch.gender = String(gender).trim();
+    }
+    if (email != null) {
+      const normalizedEmail = String(email).trim().toLowerCase();
+      if (!normalizedEmail) {
+        return fail(res, 400, "Email cannot be empty");
+      }
+      const found = await Student.findByEmail(normalizedEmail);
+      if (found && String(found.id) !== String(existing.id)) {
+        return fail(res, 409, "A student with this email already exists");
+      }
+      patch.email = normalizedEmail;
+    }
+    if (phone != null) {
+      const normalizedPhone = normalizePhone10(phone);
+      if (!normalizedPhone) {
+        return fail(res, 400, "Phone number must be exactly 10 digits");
+      }
+      patch.phone = normalizedPhone;
+    }
+    if (centre != null) {
+      patch.centre = String(centre).trim() || null;
+    }
+    if (course != null) {
+      patch.course = normalizeCourseCode(String(course).trim()) || String(course).trim() || null;
+    }
+    if (category != null) {
+      patch.category = String(category).trim() || null;
+    }
+    if (address != null) {
+      patch.address = String(address).trim() || null;
+    }
+    if (parents != null) {
+      const normalizedParents = { ...(parents || {}) };
+      if (normalizedParents.fatherPhone != null) {
+        if (!isOptionalPhone10(normalizedParents.fatherPhone)) {
+          return fail(res, 400, "Parent phone numbers must be exactly 10 digits");
+        }
+        normalizedParents.fatherPhone = normalizedParents.fatherPhone?.trim()
+          ? normalizePhone10(normalizedParents.fatherPhone)
+          : "";
+      }
+      if (normalizedParents.motherPhone != null) {
+        if (!isOptionalPhone10(normalizedParents.motherPhone)) {
+          return fail(res, 400, "Parent phone numbers must be exactly 10 digits");
+        }
+        normalizedParents.motherPhone = normalizedParents.motherPhone?.trim()
+          ? normalizePhone10(normalizedParents.motherPhone)
+          : "";
+      }
+      patch.parents = normalizedParents;
+    }
+    if (subjects != null) {
+      patch.subjects = subjects;
+    }
+    if (marks != null) {
+      patch.marks = marks;
+    }
+    if (attendance != null) {
+      patch.attendance = attendance;
+    }
+    if (qualifications != null) {
+      patch.qualifications = qualifications;
+    }
+    if (avatarColor != null) {
+      patch.avatarColor = avatarColor;
+    }
+    if (initials != null) {
+      patch.initials = initials;
+    }
+
+    if (!Object.keys(patch).length) {
+      return fail(res, 400, "No valid fields to update");
+    }
+
+    const updated = await Student.update(req.params.id, patch);
+    if (!updated) {
+      return fail(res, 404, "Student not found");
+    }
+
+    return ok(res, { message: "Student updated successfully", student: updated });
+  },
+  { label: "Update Student Error", message: "Failed to update student" }
+);
+
 exports.deleteStudent = wrap(
   async (req, res) => {
     const student = await Student.findById(req.params.id);

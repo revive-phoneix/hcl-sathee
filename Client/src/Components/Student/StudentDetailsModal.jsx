@@ -14,6 +14,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [formData, setFormData] = useState(null);
   const [error, setError] = useState("");
+  const [saving, setSaving] = useState(false);
   useEscapeToClose(onClose, open);
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
 
   if (!open || !student || !formData) return null;
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (formData.phone && !isValidPhone10(formData.phone)) {
       setError("Student phone number must be exactly 10 digits");
       return;
@@ -72,14 +73,23 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
       return;
     }
     setError("");
-    if (onSave) {
-      onSave({
+    if (!onSave) return;
+
+    setSaving(true);
+    try {
+      const success = await onSave({
         ...formData,
         marks: student.marks || formData.marks,
         attendance: student.attendance || formData.attendance,
       });
+      if (success) {
+        setIsEditing(false);
+      }
+    } catch (saveError) {
+      setError(saveError?.message || "Unable to save student details. Please try again.");
+    } finally {
+      setSaving(false);
     }
-    setIsEditing(false);
   };
 
   const updateForm = (field, value, section = null) => {
@@ -392,6 +402,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 {isEditing && (
                   <button
                     onClick={handleSave}
+                    disabled={saving}
                     style={{
                       background: "#10b981",
                       color: "#fff",
@@ -400,10 +411,11 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                       borderRadius: 8,
                       fontSize: 16,
                       fontWeight: 600,
-                      cursor: "pointer"
+                      cursor: saving ? "not-allowed" : "pointer",
+                      opacity: saving ? 0.75 : 1,
                     }}
                   >
-                    Save Changes
+                    {saving ? "Saving…" : "Save Changes"}
                   </button>
                 )}
               </>

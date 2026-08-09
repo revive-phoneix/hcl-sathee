@@ -6,7 +6,7 @@ import StudentToolbar from "../../Components/Student/StudentToolbar";
 import StudentTable from "../../Components/Student/StudentTable";
 import NewStudent from "../../Components/Student/NewStudent";
 import StudentDetailsModal from "../../Components/Student/StudentDetailsModal";
-import { fetchStudents, createStudent, removeStudent } from "../../services/students";
+import { fetchStudents, createStudent, updateStudent, removeStudent } from "../../services/students";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { AVATAR_COLORS, getInitials } from "../../utils/studentMetrics";
 
@@ -79,11 +79,19 @@ export default function Student({
     }
   };
 
-  const handleUpdateStudent = (updatedStudent) => {
-    setStudents((prev) =>
-      prev.map((student) => (student.id === updatedStudent.id ? updatedStudent : student))
-    );
-    setSelectedStudent(updatedStudent);
+  const handleUpdateStudent = async (updatedStudent) => {
+    try {
+      const updated = await updateStudent(updatedStudent.id, updatedStudent);
+      setStudents((prev) =>
+        prev.map((student) => (student.id === updated.id ? updated : student))
+      );
+      setSelectedStudent(updated);
+      return true;
+    } catch (error) {
+      console.error("Update Student Error:", error);
+      setStudentsError(getApiErrorMessage(error, "Unable to update student details"));
+      return false;
+    }
   };
 
   const handleDeleteStudent = (student) => {
