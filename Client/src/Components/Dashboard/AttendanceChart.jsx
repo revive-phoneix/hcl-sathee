@@ -112,9 +112,6 @@ export function AttendanceChart({ portalName }) {
               <p className="mt-2 text-4xl font-bold tracking-tight text-black">
                 {Number(summary.percentage) || 0}%
               </p>
-              <p className="mt-2 text-sm text-black">
-                {Number(summary.presentCount) || 0} of {Number(summary.totalStudents) || 0} students present
-              </p>
             </div>
           </>
         )}
