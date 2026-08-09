@@ -14,6 +14,7 @@ const equipmentRoutes = require("./Routes/EquipmentRoutes");
 const scheduleRoutes = require("./Routes/ScheduleRoutes");
 const timetableRoutes = require("./Routes/TimetableRoutes");
 const leaveRequestRoutes = require("./Routes/LeaveRequestRoutes");
+const supportQueryRoutes = require("./Routes/SupportQueryRoutes");
 
 const app = express();
 
@@ -49,6 +50,7 @@ app.use("/api/equipments", equipmentRoutes);
 app.use("/api/schedules", scheduleRoutes);
 app.use("/api/timetables", timetableRoutes);
 app.use("/api/leave-requests", leaveRequestRoutes);
+app.use("/api/support-queries", supportQueryRoutes);
 
 try {
   initFirebase();

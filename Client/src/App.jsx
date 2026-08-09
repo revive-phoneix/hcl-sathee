@@ -3,7 +3,7 @@ import {
   BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation,
 } from "react-router-dom";
 import {
-  LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle,
+  LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle, MessageSquareText,
 } from "lucide-react";
 
 import Authentication from "./Pages/Auth/Authentication";
@@ -29,6 +29,7 @@ import HCLPartnerAnalytics from "./Pages/Analytics/HCLPartnerAnalytics";
 import SM_Analytics from "./Pages/Analytics/SM_Analytics";
 import MyProfile from "./Pages/Profile/MyProfile";
 import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
+import QueryAndSupport from "./Pages/Support/QueryAndSupport";
 import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
 import {
   canAccessPortal,
@@ -64,7 +65,8 @@ const PARTNER_PATH_TO_NAV = {
   "/partner/analytics": 2,
   "/partner/students": 3,
   "/partner/announcements": 4,
-  "/partner/profile": 5,
+  "/partner/support": 5,
+  "/partner/profile": 6,
 };
 
 const PARTNER_NAV_PATHS = [
@@ -73,6 +75,7 @@ const PARTNER_NAV_PATHS = [
   "/partner/analytics",
   "/partner/students",
   "/partner/announcements",
+  "/partner/support",
   "/partner/profile",
 ];
 
@@ -177,6 +180,7 @@ const AppContent = () => {
     { icon: TrendingUp, label: "Progress and Analytics" },
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
+    { icon: MessageSquareText, label: "Query and Support" },
     { icon: UserCircle, label: "My Profile" },
   ];
 
@@ -367,6 +371,10 @@ const AppContent = () => {
         <Route
           path="/partner/announcements"
           element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
+        />
+        <Route
+          path="/partner/support"
+          element={<QueryAndSupport {...partnerLayout} userName={userName} userEmail={userEmail} />}
         />
         <Route
           path="/partner/profile"

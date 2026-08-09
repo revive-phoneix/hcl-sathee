@@ -23,6 +23,7 @@ router.patch("/me/fcm-token", saveFcmToken);
 
 // Partners may list Sathee Mitra in their centre (for attendance view).
 // Create/update/delete remain admin-only.
+router.get("/admins", requireAdminOrPartner, getAdminUsers);
 router.get("/", requireAdminOrPartner, getUsers);
 router.post("/", requireAdmin, addUser);
 router.post("/:id/resend-invite", requireAdmin, resendInvite);

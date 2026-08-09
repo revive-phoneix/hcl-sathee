@@ -35,6 +35,11 @@ export const updateUser = async (id, payload) => {
   return response.data.user;
 };
 
+export const fetchAdminUsers = async () => {
+  const response = await api.get("/api/users/admins");
+  return response.data.users ?? [];
+};
+
 export const removeUser = async (id) => {
   await api.delete(`/api/users/${id}`);
 };

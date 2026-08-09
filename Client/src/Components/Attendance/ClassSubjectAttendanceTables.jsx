@@ -488,7 +488,6 @@ export default function ClassSubjectAttendanceTables({
     });
   }, [classes, appliedSubject, appliedTime, appliedCourse]);
 
-  const isWeekendOff = day === "Sunday";
   const centre = userCentre || portalName || "";
 
   if (loading || studentsLoading) {
@@ -507,7 +506,7 @@ export default function ClassSubjectAttendanceTables({
     );
   }
 
-  if (unsupported || isWeekendOff || !classes.length) {
+  if (unsupported || !classes.length) {
     return null;
   }
 

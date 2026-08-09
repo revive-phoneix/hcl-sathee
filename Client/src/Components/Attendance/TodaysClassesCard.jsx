@@ -51,14 +51,14 @@ export default function TodaysClassesCard({ portalName = "" }) {
     [timetable]
   );
 
-  const isWeekendOff = day === "Sunday";
+  const isSunday = day === "Sunday";
   const summary = loading
     ? "Loading…"
     : error
       ? "Unable to load"
       : unsupported
         ? "Grid timetable required"
-        : isWeekendOff
+        : isSunday && classes.length === 0
           ? "No classes (Sunday)"
           : `${classes.length} class${classes.length === 1 ? "" : "es"}`;
 
@@ -110,7 +110,7 @@ export default function TodaysClassesCard({ portalName = "" }) {
               Today&apos;s classes need an Excel weekly grid timetable (Mon–Sat columns).
               SVG uploads cannot be broken into class slots — upload a grid timetable from the dashboard.
             </p>
-          ) : isWeekendOff ? (
+          ) : isSunday && !classes.length ? (
             <p className="py-4 text-sm text-slate-600">
               No centre classes scheduled for Sunday.
             </p>

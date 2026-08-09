@@ -49,6 +49,15 @@ exports.getUsers = wrap(
   { label: "Get Users Error", message: "Failed to fetch users" }
 );
 
+exports.getAdminUsers = wrap(
+  async (req, res) => {
+    const users = await User.findAll();
+    const admins = users.filter((user) => isAdminRole(user.role));
+    return ok(res, { users: admins.map(toPublicUser) });
+  },
+  { label: "Get Admin Users Error", message: "Failed to fetch admin users" }
+);
+
 exports.getMe = wrap(
   async (req, res) => {
     const user = await User.findById(req.user?.id);
