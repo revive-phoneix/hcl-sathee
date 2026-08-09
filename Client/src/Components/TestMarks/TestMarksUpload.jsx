@@ -142,7 +142,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       >
         <option value="">Select student</option>
         {courseStudents.map((s) => (
-          <option key={s.id} value={s.id}>{s.name} — {s.enrollmentNo || s.id}</option>
+          <option key={s.id} value={s.id}>{s.name} — {s.studentId || s.id}</option>
         ))}
       </select>
 
