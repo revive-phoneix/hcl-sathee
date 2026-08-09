@@ -89,6 +89,8 @@ function ClassAttendanceTable({
   const [locked, setLocked] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [photoFile, setPhotoFile] = useState(null);
+  const [photoPreview, setPhotoPreview] = useState(null);
 
   const loadExisting = useCallback(async () => {
     if (!classItem.subject || !students.length) {
@@ -163,6 +165,24 @@ function ClassAttendanceTable({
     setError("");
   };
 
+  const handlePhotoChange = (event) => {
+    const file = event.target.files?.[0] || null;
+    if (!file) {
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    if (!file.type?.startsWith("image/")) {
+      setError("Please upload a valid image file.");
+      setPhotoFile(null);
+      setPhotoPreview(null);
+      return;
+    }
+    setError("");
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+  };
+
   const handleSave = async () => {
     if (locked || saving) return;
 
@@ -202,6 +222,7 @@ function ClassAttendanceTable({
         centre: centre || null,
         topic: topic || null,
         records,
+        photo: photoFile,
       });
       const failed = Array.isArray(result?.errors) ? result.errors.length : 0;
       if (failed > 0) {
@@ -213,6 +234,9 @@ function ClassAttendanceTable({
         setMessage(
           `Saved attendance for ${result.savedCount || records.length} student(s).`
         );
+      }
+      if (photoFile) {
+        setPhotoFile(null);
       }
       await loadExisting();
     } catch (err) {
@@ -259,6 +283,23 @@ function ClassAttendanceTable({
           {error}
         </div>
       ) : null}
+      <div className="mx-5 mt-4 grid gap-3">
+        <label className="text-sm font-semibold text-slate-700">Class Photo Proof</label>
+        <input
+          type="file"
+          accept="image/*"
+          onChange={handlePhotoChange}
+          disabled={locked || saving}
+          className="block w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700"
+        />
+        {photoPreview ? (
+          <img
+            src={photoPreview}
+            alt="Photo preview"
+            className="h-40 w-full rounded-xl object-cover border border-slate-200"
+          />
+        ) : null}
+      </div>
 
       <div className="overflow-x-auto">
         <table className="w-full min-w-[640px]">

@@ -47,6 +47,8 @@ const toApiLog = (docId, data) => ({
   date: data.date,
   time: data.time ?? "",
   status: normalizeStatus(data.status),
+  photoUrl: data.photoUrl ?? null,
+  photoPath: data.photoPath ?? null,
   created_at: toDate(data.created_at),
   updated_at: toDate(data.updated_at),
 });
@@ -72,6 +74,34 @@ const findByDateSubjectTime = async ({ date, subject, time = "", centre = null }
     rows = rows.filter((row) => matchesCentre(row.centre, centre));
   }
 
+  return rows;
+};
+const findByDate = async (date, centre = null) => {
+  const dateOnly = toDateOnly(date);
+  if (!dateOnly) return [];
+
+  const snap = await logsRef().where("date", "==", dateOnly).get();
+  let rows = snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
+
+  if (centre) {
+    const { matchesCentre } = require("../Utils/centreMatch");
+    rows = rows.filter((row) => matchesCentre(row.centre, centre));
+  }
+  return rows;
+};
+
+const findByDateRange = async (fromDate, toDateArg, centre = null) => {
+  const from = toDateOnly(fromDate);
+  const to = toDateOnly(toDateArg);
+  if (!from || !to) return [];
+
+  const snap = await logsRef().where("date", ">=", from).where("date", "<=", to).get();
+  let rows = snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
+
+  if (centre) {
+    const { matchesCentre } = require("../Utils/centreMatch");
+    rows = rows.filter((row) => matchesCentre(row.centre, centre));
+  }
   return rows;
 };
 
@@ -140,6 +170,8 @@ const upsert = async ({
     date: dateOnly,
     time: timeKey,
     status: normalizedStatus,
+    photoUrl: data.photoUrl ?? base.photoUrl ?? null,
+    photoPath: data.photoPath ?? base.photoPath ?? null,
     updated_at: now,
   };
 
@@ -156,4 +188,6 @@ module.exports = {
   findByStudentAndSubject,
   findByStudentId,
   upsert,
+  findByDate,
+  findByDateRange,
 };

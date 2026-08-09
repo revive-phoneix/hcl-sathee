@@ -1,3 +1,4 @@
+const path = require("path");
 const Student = require("../Models/Student");
 const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
@@ -10,10 +11,8 @@ const {
 } = require("../Utils/centreMatch");
 const { toDateOnly } = require("../Utils/firestoreHelpers");
 const { recomputeSubjectAttendance } = require("../Utils/recomputeSubjectAttendance");
-const {
-  normalizeCourseCode,
-  resolveEnrolledSubjects,
-} = require("../Utils/courseSubjects");
+const { normalizeCourseCode, resolveEnrolledSubjects } = require("../Utils/courseSubjects");
+const { withStorageBucket } = require("../config/firebase");
 
 const subjectPct = (row) => {
   if (!row) return 0;
@@ -235,6 +234,47 @@ exports.getDailySubjectAttendance = wrap(
   }
 );
 
+const uploadClassPhoto = async (file, date, subject, time) => {
+  if (!file?.buffer?.length) {
+    throw new Error("Photo file is required");
+  }
+
+  const originalName = String(file.originalname || "photo").trim();
+  const ext = path.extname(originalName).toLowerCase() || ".jpg";
+  const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
+  const storagePath = `class-attendance/${date}/${subject.replace(/[^a-zA-Z0-9]+/g, "-")}/${time || "notime"}-${Date.now()}${safeExt}`;
+
+  const uploadResult = await withStorageBucket(async (bucket) => {
+    const storageFile = bucket.file(storagePath);
+    await storageFile.save(file.buffer, {
+      metadata: {
+        contentType: file.mimetype || "image/jpeg",
+        cacheControl: "public, max-age=31536000",
+      },
+      resumable: false,
+    });
+
+    let url;
+    try {
+      const [signedUrl] = await storageFile.getSignedUrl({
+        action: "read",
+        expires: new Date("2500-01-01T00:00:00.000Z"),
+      });
+      url = signedUrl;
+    } catch {
+      await storageFile.makePublic();
+      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    }
+
+    return { url, storagePath };
+  });
+
+  return {
+    photoUrl: uploadResult.url,
+    photoPath: uploadResult.storagePath,
+  };
+};
+
 exports.saveDailySubjectAttendance = wrap(
   async (req, res) => {
     const {
@@ -255,15 +295,30 @@ exports.saveDailySubjectAttendance = wrap(
     if (!dateOnly || !subjectName) {
       return fail(res, 400, "date and subject are required");
     }
-    if (!Array.isArray(records) || records.length === 0) {
+
+    let attendanceRecords = records;
+    if (!Array.isArray(attendanceRecords)) {
+      try {
+        attendanceRecords = JSON.parse(String(records || "[]"));
+      } catch (err) {
+        attendanceRecords = [];
+      }
+    }
+
+    if (!Array.isArray(attendanceRecords) || attendanceRecords.length === 0) {
       return fail(res, 400, "records array is required");
+    }
+
+    let photoFields = {};
+    if (req.file) {
+      photoFields = await uploadClassPhoto(req.file, dateOnly, subjectName, timeKey);
     }
 
     const saved = [];
     const errors = [];
     const touchedPairs = new Map();
 
-    for (const row of records) {
+    for (const row of attendanceRecords) {
       const studentId = row?.studentId;
       if (studentId == null || studentId === "") {
         errors.push({ studentId, message: "studentId is required" });
@@ -308,6 +363,7 @@ exports.saveDailySubjectAttendance = wrap(
           date: dateOnly,
           time: timeKey,
           status: row.status,
+          ...photoFields,
         });
         saved.push(log);
         touchedPairs.set(`${student.id}::${subjectName}`, {
@@ -344,4 +400,67 @@ exports.saveDailySubjectAttendance = wrap(
     message: "Failed to save daily subject attendance",
     useErrorMessage: true,
   }
+);
+
+const getDateRangeForPeriod = (period, anchorDate) => {
+  const anchor = new Date(`${anchorDate}T00:00:00`);
+  if (Number.isNaN(anchor.getTime())) return { from: anchorDate, to: anchorDate };
+
+  if (period === "weekly") {
+    const day = anchor.getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const monday = new Date(anchor);
+    monday.setDate(anchor.getDate() + mondayOffset);
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    return { from: toDateOnly(monday), to: toDateOnly(sunday) };
+  }
+
+  if (period === "monthly") {
+    const from = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
+    const to = new Date(anchor.getFullYear(), anchor.getMonth() + 1, 0);
+    return { from: toDateOnly(from), to: toDateOnly(to) };
+  }
+
+  return { from: anchorDate, to: anchorDate };
+};
+
+exports.getAttendanceSummary = wrap(
+  async (req, res) => {
+    const period = ["daily", "weekly", "monthly"].includes(req.query.period)
+      ? req.query.period
+      : "daily";
+    const centre = req.query.centre || null;
+    const anchorDate = toDateOnly(req.query.date) || toDateOnly(new Date());
+
+    const { from, to } = getDateRangeForPeriod(period, anchorDate);
+    const records =
+      period === "daily"
+        ? await DailySubjectAttendance.findByDate(anchorDate, centre)
+        : await DailySubjectAttendance.findByDateRange(from, to, centre);
+
+    const allStudents = await Student.findAll();
+    const centreStudents = centre
+      ? allStudents.filter((s) => matchesCentre(s.centre, centre))
+      : allStudents;
+    const totalStudents = centreStudents.length;
+
+    const presentIds = new Set(
+      records.filter((r) => r.status === "present").map((r) => String(r.studentId))
+    );
+    const presentCount = presentIds.size;
+    const absentCount = Math.max(totalStudents - presentCount, 0);
+    const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+
+    return ok(res, {
+      period,
+      from,
+      to,
+      totalStudents,
+      presentCount,
+      absentCount,
+      percentage,
+    });
+  },
+  { label: "Attendance Summary Error", message: "Failed to load attendance summary" }
 );
