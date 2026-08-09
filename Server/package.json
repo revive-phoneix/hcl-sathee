@@ -33,6 +33,7 @@
     "pg": "^8.22.0",
     "pg-hstore": "^2.3.4",
     "sequelize": "^6.37.8",
-    "uuid": "^14.0.1"
+    "uuid": "^14.0.1",
+    "@google-cloud/vision": "^4.3.0"
   }
 }

@@ -1,0 +1,175 @@
+const path = require("path");
+const Test = require("../Models/Test");
+const TestSubjectMark = require("../Models/TestSubjectMark");
+const Student = require("../Models/Student");
+const { withStorageBucket } = require("../config/firebase");
+const { fail, ok, wrap } = require("../Utils/httpResponse");
+const { extractMarksFromBuffer } = require("../Utils/ocrAnswerSheet");
+const { buildCourseProgressTimeline } = require("../Utils/testProgress");
+const { matchesCentre, isAdminRole } = require("../Utils/centreMatch");
+
+const assertCentreAccess = (req, centre) => {
+  if (isAdminRole(req.user?.role)) return true;
+  if (!req.user?.centre) return false;
+  return matchesCentre(centre, req.user.centre);
+};
+
+exports.listTests = wrap(
+  async (req, res) => {
+    const course = String(req.query.course || "").trim();
+    if (!course) return fail(res, 400, "course is required");
+
+    const centre = isAdminRole(req.user?.role) ? req.query.centre || null : req.user?.centre || null;
+    const tests = await Test.findByCourse(course, centre);
+    return ok(res, { tests });
+  },
+  { label: "List Tests Error", message: "Failed to fetch tests" }
+);
+
+exports.createTest = wrap(
+  async (req, res) => {
+    const { name, course, centre, testDate } = req.body;
+    if (!course) return fail(res, 400, "course is required");
+
+    const resolvedCentre = centre || req.user?.centre || null;
+    if (!assertCentreAccess(req, resolvedCentre)) {
+      return fail(res, 403, "Centre access denied");
+    }
+
+    const test = await Test.create({
+      name,
+      course,
+      centre: resolvedCentre,
+      testDate,
+      createdBy: req.user?.id || null,
+    });
+    return ok(res, 201, { test });
+  },
+  { label: "Create Test Error", message: "Failed to create test" }
+);
+
+exports.ocrPrefillTestMarks = wrap(
+  async (req, res) => {
+    if (!req.file?.buffer?.length) {
+      return fail(res, 400, "answerSheet file is required");
+    }
+    const { text, marks, available } = await extractMarksFromBuffer(req.file.buffer);
+    return ok(res, {
+      available,
+      marks, // [{ subject, marksObtained, totalMarks, confidence }]
+      rawText: available ? text : null,
+      message: available
+        ? "OCR pre-fill complete — please review before saving."
+        : "OCR is not configured on this server. Enter marks manually.",
+    });
+  },
+  { label: "OCR Prefill Error", message: "Failed to run OCR on answer sheet" }
+);
+
+const uploadAnswerSheet = async (file, testId, studentId) => {
+  const ext = path.extname(file.originalname || "").toLowerCase() || ".pdf";
+  const safeExt = [".pdf", ".jpg", ".jpeg", ".png"].includes(ext) ? ext : ".pdf";
+  const storagePath = `test-marks/${testId}/${studentId}-${Date.now()}${safeExt}`;
+
+  return withStorageBucket(async (bucket) => {
+    const storageFile = bucket.file(storagePath);
+    await storageFile.save(file.buffer, {
+      metadata: { contentType: file.mimetype || "application/pdf", cacheControl: "public, max-age=31536000" },
+      resumable: false,
+    });
+    let url;
+    try {
+      const [signedUrl] = await storageFile.getSignedUrl({
+        action: "read",
+        expires: new Date("2500-01-01T00:00:00.000Z"),
+      });
+      url = signedUrl;
+    } catch {
+      await storageFile.makePublic();
+      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    }
+    return { url, storagePath };
+  });
+};
+
+exports.saveTestMarks = wrap(
+  async (req, res) => {
+    const { testId, studentId, course = null, centre = null, records } = req.body || {};
+
+    if (!testId || !studentId) {
+      return fail(res, 400, "testId and studentId are required");
+    }
+
+    const student = await Student.findById(studentId);
+    if (!student) return fail(res, 404, "Student not found");
+    if (!assertCentreAccess(req, centre || student.centre)) {
+      return fail(res, 403, "Centre access denied for this student");
+    }
+
+    let subjectRecords = records;
+    if (!Array.isArray(subjectRecords)) {
+      try {
+        subjectRecords = JSON.parse(String(records || "[]"));
+      } catch {
+        subjectRecords = [];
+      }
+    }
+    if (!subjectRecords.length) {
+      return fail(res, 400, "records array (subject, marksObtained, totalMarks) is required");
+    }
+
+    let answerSheetUrl = null;
+    let answerSheetPath = null;
+    if (req.file) {
+      const uploaded = await uploadAnswerSheet(req.file, testId, student.id);
+      answerSheetUrl = uploaded.url;
+      answerSheetPath = uploaded.storagePath;
+    }
+
+    const saved = [];
+    const errors = [];
+    for (const row of subjectRecords) {
+      try {
+        const mark = await TestSubjectMark.upsert({
+          testId,
+          studentId: student.id,
+          course: course || student.course,
+          centre: centre || student.centre,
+          subject: row.subject,
+          marksObtained: row.marksObtained,
+          totalMarks: row.totalMarks,
+          answerSheetUrl,
+          answerSheetPath,
+          source: row.source || "manual",
+          verifiedByMitra: true, // Mitra explicitly submitted this value
+          enteredBy: req.user?.id || null,
+        });
+        saved.push(mark);
+      } catch (error) {
+        errors.push({ subject: row.subject, message: error.message });
+      }
+    }
+
+    return ok(res, {
+      message: "Test marks saved",
+      testId,
+      studentId: student.id,
+      savedCount: saved.length,
+      records: saved,
+      errors,
+    });
+  },
+  { label: "Save Test Marks Error", message: "Failed to save test marks", useErrorMessage: true }
+);
+
+exports.getCourseProgress = wrap(
+  async (req, res) => {
+    const course = String(req.query.course || "").trim();
+    if (!course) return fail(res, 400, "course is required");
+
+    const centre = isAdminRole(req.user?.role) ? req.query.centre || null : req.user?.centre || null;
+    const timeline = await buildCourseProgressTimeline(course, centre);
+    return ok(res, { course, centre, timeline });
+  },
+  { label: "Course Progress Error", message: "Failed to build course progress" }
+);
