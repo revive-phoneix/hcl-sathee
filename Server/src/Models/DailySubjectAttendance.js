@@ -130,6 +130,8 @@ const upsert = async ({
   time = "",
   topic = null,
   status,
+  photoUrl = null,
+  photoPath = null,
 }) => {
   const dateOnly = toDateOnly(date);
   if (!studentId || !subject || !dateOnly) {
@@ -170,8 +172,8 @@ const upsert = async ({
     date: dateOnly,
     time: timeKey,
     status: normalizedStatus,
-    photoUrl: data.photoUrl ?? base.photoUrl ?? null,
-    photoPath: data.photoPath ?? base.photoPath ?? null,
+    photoUrl: photoUrl ?? base.photoUrl ?? null,
+    photoPath: photoPath ?? base.photoPath ?? null,
     updated_at: now,
   };
 
