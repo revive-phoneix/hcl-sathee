@@ -76,6 +76,14 @@ export const getStudentProgressRates = (student) => {
     }
   }
 
+  // Include test mark subject percentages if available
+  if (student.subjectPercentages && typeof student.subjectPercentages === "object") {
+    for (const percentage of Object.values(student.subjectPercentages)) {
+      const pct = parsePercentValue(percentage);
+      if (pct != null) scores.push(pct);
+    }
+  }
+
   for (const value of Object.values(parseJsonField(student.marks))) {
     const marks = parsePercentValue(value);
     if (marks != null) {
@@ -95,7 +103,7 @@ export const getProgressColor = (progress) => {
 };
 
 const EXAM_BATCHES = [
-  { key: "JEE", exam: "JEE Exams" },
+  { key: "JEE", exam: "JEE" },
   { key: "NEET", exam: "NEET" },
   { key: "SSC", exam: "SSC" },
   { key: "CLAT", exam: "CLAT" },

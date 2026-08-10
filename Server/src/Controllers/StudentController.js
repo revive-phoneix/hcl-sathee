@@ -1,6 +1,7 @@
 const Student = require("../Models/Student");
 const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
+const TestSubjectMark = require("../Models/TestSubjectMark");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { filterByUserCentre } = require("../Utils/centreMatch");
 const {
@@ -52,7 +53,7 @@ const buildMapsFromRecords = (
   return { marks, attendance };
 };
 
-const enrichStudent = (student, performances = [], attendances = []) => {
+const enrichStudent = (student, performances = [], attendances = [], testMarks = []) => {
   const listedSubjects =
     Array.isArray(student.subjects) && student.subjects.length
       ? student.subjects
@@ -62,6 +63,7 @@ const enrichStudent = (student, performances = [], attendances = []) => {
             ...Object.keys(student.attendance || {}),
             ...performances.map((row) => row.subject),
             ...attendances.map((row) => row.subject),
+            ...testMarks.map((row) => row.subject),
           ]),
         ].filter(Boolean);
 
@@ -74,6 +76,21 @@ const enrichStudent = (student, performances = [], attendances = []) => {
     student.attendance || {}
   );
 
+  // Calculate test mark percentages
+  const subjectPercentages = {};
+  for (const testMark of testMarks) {
+    if (testMark.subject && testMark.subjectPercentage != null) {
+      subjectPercentages[testMark.subject] = Number(testMark.subjectPercentage);
+    }
+  }
+
+  // Calculate overall percentage as average of subject percentages
+  const percentageValues = Object.values(subjectPercentages);
+  const overallPercentage =
+    percentageValues.length > 0
+      ? Math.round((percentageValues.reduce((a, b) => a + b, 0) / percentageValues.length) * 10) / 10
+      : null;
+
   return {
     ...student,
     course: normalizeCourseCode(student.course) || student.course,
@@ -82,6 +99,9 @@ const enrichStudent = (student, performances = [], attendances = []) => {
     attendance: maps.attendance,
     performances,
     attendances,
+    testMarks,
+    subjectPercentages,
+    overallPercentage,
   };
 };
 
@@ -126,11 +146,12 @@ exports.getStudents = wrap(
     const enriched = await Promise.all(
       students.map(async (student) => {
         const studentKey = Number(student.id) || student.id;
-        const [performances, attendances] = await Promise.all([
+        const [performances, attendances, testMarks] = await Promise.all([
           SubjectPerformance.findByStudentId(studentKey),
           SubjectAttendance.findByStudentId(studentKey),
+          TestSubjectMark.findByStudent(studentKey),
         ]);
-        return enrichStudent(student, performances, attendances);
+        return enrichStudent(student, performances, attendances, testMarks);
       })
     );
 

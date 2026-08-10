@@ -258,44 +258,58 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           </div>
 
           <div className="space-y-3">
-            {rows.map((row, i) => (
-              <div key={i} className="rounded-xl border border-slate-300 bg-white p-4">
-                <p className="mb-3 text-sm font-semibold text-slate-900">{row.subject}</p>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
-                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Marks Gained
-                    </label>
-                    <input
-                      type="number"
-                      readOnly={locked}
-                      className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
-                        locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
-                      }`}
-                      value={row.marksObtained}
-                      onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
-                    />
-                  </div>
-                  <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
-                    <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
-                      Total Marks
-                    </label>
-                    <input
-                      type="number"
-                      readOnly={locked}
-                      className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
-                        locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
-                      }`}
-                      value={row.totalMarks}
-                      onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
-                    />
+            {rows.map((row, i) => {
+              const marksObtained = Number(row.marksObtained) || 0;
+              const totalMarks = Number(row.totalMarks) || 0;
+              const percentage = totalMarks > 0 ? ((marksObtained / totalMarks) * 100).toFixed(1) : "—";
+
+              return (
+                <div key={i} className="rounded-xl border border-slate-300 bg-white p-4">
+                  <p className="mb-3 text-sm font-semibold text-slate-900">{row.subject}</p>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
+                      <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Marks Gained
+                      </label>
+                      <input
+                        type="number"
+                        readOnly={locked}
+                        className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
+                          locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
+                        }`}
+                        value={row.marksObtained}
+                        onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
+                      />
+                    </div>
+                    <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
+                      <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                        Total Marks
+                      </label>
+                      <input
+                        type="number"
+                        readOnly={locked}
+                        className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
+                          locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
+                        }`}
+                        value={row.totalMarks}
+                        onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
+                      />
+                    </div>
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                      <label className="block text-xs font-medium uppercase tracking-wide text-emerald-700">
+                        Percentage
+                      </label>
+                      <p className="mt-1 text-lg font-semibold text-emerald-900">
+                        {typeof percentage === "number" ? `${percentage}%` : percentage}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl border border-slate-900 bg-slate-900 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-300">Grand Total</p>
               <p className="mt-1 text-2xl font-bold text-white">
@@ -306,6 +320,20 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
               <p className="text-xs font-medium uppercase tracking-wide text-slate-300">Max Marks</p>
               <p className="mt-1 text-2xl font-bold text-white">
                 {rows.reduce((sum, r) => sum + (Number(r.totalMarks) || 0), 0)}
+              </p>
+            </div>
+            <div className="rounded-xl border border-emerald-600 bg-emerald-600 p-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-emerald-100">Average %</p>
+              <p className="mt-1 text-2xl font-bold text-white">
+                {rows.length > 0
+                  ? (
+                      rows.reduce((sum, r) => {
+                        const obtained = Number(r.marksObtained) || 0;
+                        const total = Number(r.totalMarks) || 0;
+                        return sum + (total > 0 ? (obtained / total) * 100 : 0);
+                      }, 0) / rows.length
+                    ).toFixed(1) + "%"
+                  : "—"}
               </p>
             </div>
           </div>

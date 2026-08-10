@@ -3,6 +3,7 @@ const Student = require("../Models/Student");
 const SubjectPerformance = require("../Models/SubjectPerformance");
 const SubjectAttendance = require("../Models/SubjectAttendance");
 const DailySubjectAttendance = require("../Models/DailySubjectAttendance");
+const TestSubjectMark = require("../Models/TestSubjectMark");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
   filterByUserCentre,
@@ -28,7 +29,7 @@ const subjectPct = (row) => {
   );
 };
 
-const enrichWithSubjectMaps = (student, performances = [], attendances = []) => {
+const enrichWithSubjectMaps = (student, performances = [], attendances = [], testMarks = []) => {
   const listedSubjects =
     Array.isArray(student.subjects) && student.subjects.length
       ? student.subjects
@@ -38,6 +39,7 @@ const enrichWithSubjectMaps = (student, performances = [], attendances = []) => 
             ...Object.keys(student.attendance || {}),
             ...performances.map((row) => row.subject),
             ...attendances.map((row) => row.subject),
+            ...testMarks.map((row) => row.subject),
           ]),
         ].filter(Boolean);
 
@@ -55,11 +57,27 @@ const enrichWithSubjectMaps = (student, performances = [], attendances = []) => 
       marks[perf.subject] = Number(perf.marks) || 0;
     }
   }
+
+  // Integrate test marks with calculated percentages
+  const subjectPercentages = {};
+  for (const testMark of testMarks) {
+    if (testMark.subject && testMark.subjectPercentage != null) {
+      subjectPercentages[testMark.subject] = Number(testMark.subjectPercentage);
+    }
+  }
+
   for (const att of attendances) {
     if (Object.prototype.hasOwnProperty.call(attendance, att.subject)) {
       attendance[att.subject] = subjectPct(att);
     }
   }
+
+  // Calculate overall percentage as average of subject percentages from test marks
+  const percentageValues = Object.values(subjectPercentages);
+  const overallPercentage =
+    percentageValues.length > 0
+      ? Math.round((percentageValues.reduce((a, b) => a + b, 0) / percentageValues.length) * 10) / 10
+      : null;
 
   return {
     ...student,
@@ -69,6 +87,9 @@ const enrichWithSubjectMaps = (student, performances = [], attendances = []) => 
     attendance,
     performances,
     attendances,
+    testMarks,
+    subjectPercentages,
+    overallPercentage,
   };
 };
 
@@ -94,11 +115,12 @@ exports.getStudentsWithPerformance = wrap(
     const enriched = await Promise.all(
       students.map(async (student) => {
         const studentKey = Number(student.id) || student.id;
-        const [performances, attendances] = await Promise.all([
+        const [performances, attendances, testMarks] = await Promise.all([
           SubjectPerformance.findByStudentId(studentKey),
           SubjectAttendance.findByStudentId(studentKey),
+          TestSubjectMark.findByStudent(studentKey),
         ]);
-        return enrichWithSubjectMaps(student, performances, attendances);
+        return enrichWithSubjectMaps(student, performances, attendances, testMarks);
       })
     );
 

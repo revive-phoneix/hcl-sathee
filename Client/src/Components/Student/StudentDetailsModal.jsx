@@ -294,16 +294,68 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
                   Auto-updated from tests/exams — not editable.
                 </p>
+                
+                {/* Overall Performance */}
+                {formData.overallPercentage != null && (
+                  <div
+                    style={{
+                      background: "#f0fdf4",
+                      border: "1px solid #86efac",
+                      borderRadius: 10,
+                      padding: "14px 18px",
+                      marginBottom: 16,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      color: "#0f172a",
+                    }}
+                  >
+                    <div>
+                      <strong style={{ fontSize: 15 }}>Overall Performance</strong>
+                      <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
+                        Average of all subject test percentages
+                      </div>
+                    </div>
+                    <div style={{ fontSize: 24, fontWeight: 700, color: "#16a34a" }}>
+                      {formData.overallPercentage.toFixed(1)}%
+                    </div>
+                  </div>
+                )}
+
+                {/* Subject-wise Percentages */}
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, color: "black" }}>
                   {enrolledSubjects.length === 0 ? (
                     <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
                   ) : (
-                    enrolledSubjects.map((subject) => (
-                      <div key={subject} style={{ background: "#E0F2FE", padding: "12px 16px", borderRadius: 8 }}>
-                        <strong>{subject}</strong>
-                        <div style={{ marginTop: 6 }}>{formData.marks?.[subject] ?? 0}</div>
-                      </div>
-                    ))
+                    enrolledSubjects.map((subject) => {
+                      const percentage = formData.subjectPercentages?.[subject];
+                      const hasPercentage = percentage != null && percentage !== 0;
+                      
+                      return (
+                        <div key={subject} style={{ 
+                          background: hasPercentage ? "#E0F2FE" : "#f3f4f6", 
+                          padding: "12px 16px", 
+                          borderRadius: 8 
+                        }}>
+                          <strong>{subject}</strong>
+                          <div style={{ marginTop: 6, fontSize: 14 }}>
+                            {hasPercentage ? (
+                              <>
+                                <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
+                                  {percentage.toFixed(1)}%
+                                </span>
+                                <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
+                                  Test Performance
+                                </div>
+                              </>
+                            ) : (
+                              <span style={{ color: "#94a3b8" }}>No test data</span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
                   )}
                 </div>
               </div>
