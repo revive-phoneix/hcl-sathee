@@ -4,6 +4,30 @@ const mammoth = require("mammoth");
 // Same pattern used for OCR text — "Physics: 34/50", "Chemistry - 41 / 50", etc.
 const MARK_LINE_REGEX = /([A-Za-z][A-Za-z .&]{2,30})[:\-]?\s*(\d{1,3})\s*\/\s*(\d{1,3})/g;
 
+const IGNORED_SUBJECT_PATTERNS = [
+  /\bdate\b/i,
+  /\bcentre\b/i,
+  /\bcenter\b/i,
+  /\btotal\b/i,
+  /\bgrand\s*total\b/i,
+  /\broll\b/i,
+  /\badmission\b/i,
+  /\bregistration\b/i,
+  /\bmarks?\b/i,
+  /\bpercentage\b/i,
+  /\bpercent\b/i,
+  /\brank\b/i,
+  /\bsignature\b/i,
+  /\bremarks?\b/i,
+  /\brajasthan\b/i,
+];
+
+const shouldIgnoreSubject = (subject) => {
+  const trimmed = subject.trim();
+  if (!trimmed) return true;
+  return IGNORED_SUBJECT_PATTERNS.some((re) => re.test(trimmed));
+};
+
 const extractTextFromDocument = async (buffer, mimetype) => {
   if (mimetype === "application/pdf") {
     const result = await pdfParse(buffer);
@@ -22,12 +46,18 @@ const extractTextFromDocument = async (buffer, mimetype) => {
 const extractMarksFromDocument = async (buffer, mimetype) => {
   const text = await extractTextFromDocument(buffer, mimetype);
 
-  const marks = [...text.matchAll(MARK_LINE_REGEX)].map(([, subject, obtained, total]) => ({
-    subject: subject.trim(),
-    marksObtained: Number(obtained),
-    totalMarks: Number(total),
-    confidence: "high", // came from real embedded text, not OCR guesswork
-  }));
+  const marks = [...text.matchAll(MARK_LINE_REGEX)]
+    .map(([, subject, obtained, total]) => {
+      const cleaned = subject.trim();
+      if (shouldIgnoreSubject(cleaned)) return null;
+      return {
+        subject: cleaned,
+        marksObtained: Number(obtained),
+        totalMarks: Number(total),
+        confidence: "high", // came from real embedded text, not OCR guesswork
+      };
+    })
+    .filter(Boolean);
 
   return { text, marks, available: true };
 };
