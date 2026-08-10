@@ -12,11 +12,20 @@ export const createTest = async ({ name, course, centre, testDate }) => {
   return response.data.test;
 };
 
-export const ocrPrefillTestMarks = async (answerSheetFile) => {
+export const ocrPrefillTestMarks = async (answerSheetFile, subjects = []) => {
   const formData = new FormData();
   formData.append("answerSheet", answerSheetFile);
+  formData.append("subjects", JSON.stringify(subjects));
   const response = await api.post("/api/test-marks/ocr-prefill", formData);
-  return response.data; // { available, marks, rawText, message }
+  return response.data;
+};
+
+export const documentPrefillTestMarks = async (answerSheetFile, subjects = []) => {
+  const formData = new FormData();
+  formData.append("answerSheet", answerSheetFile);
+  formData.append("subjects", JSON.stringify(subjects));
+  const response = await api.post("/api/test-marks/document-prefill", formData);
+  return response.data;
 };
 
 export const saveTestMarks = async ({ testId, studentId, course, centre, records, answerSheetFile }) => {
@@ -29,13 +38,6 @@ export const saveTestMarks = async ({ testId, studentId, course, centre, records
   if (answerSheetFile) formData.append("answerSheet", answerSheetFile);
 
   const response = await api.post("/api/test-marks", formData);
-  return response.data;
-};
-
-export const documentPrefillTestMarks = async (answerSheetFile) => {
-  const formData = new FormData();
-  formData.append("answerSheet", answerSheetFile);
-  const response = await api.post("/api/test-marks/document-prefill", formData);
   return response.data;
 };
 

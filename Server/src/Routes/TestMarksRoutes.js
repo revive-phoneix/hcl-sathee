@@ -13,58 +13,31 @@ const { authenticate, requireAdminOrMitra } = require("../Middleware/auth");
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 }, // answer sheet PDFs can run larger than a photo
+  limits: { fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, cb) => {
-    const allowed =
+    const okType =
       file.mimetype === "application/pdf" ||
       file.mimetype?.startsWith("image/") ||
       file.mimetype === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
       file.mimetype === "application/msword";
-    if (!allowed) return cb(new Error("Only PDF, image, or Word uploads are allowed"));
+    if (!okType) return cb(new Error("Only PDF, Word, or image uploads are allowed"));
     cb(null, true);
   },
 });
-const uploadDocument = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 15 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowed = [
-      "application/pdf",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/msword",
-    ];
-    if (!allowed.includes(file.mimetype)) {
-      return cb(new Error("Only PDF or Word (.doc/.docx) uploads are allowed here"));
-    }
-    cb(null, true);
-  },
-});
+
+const uploadSingle = (req, res, next) => {
+  upload.single("answerSheet")(req, res, (err) => {
+    if (err) return res.status(400).json({ success: false, message: err.message });
+    next();
+  });
+};
 
 router.get("/tests", authenticate, requireAdminOrMitra, listTests);
 router.post("/tests", authenticate, requireAdminOrMitra, createTest);
 
-router.post(
-  "/ocr-prefill",
-  authenticate,
-  requireAdminOrMitra,
-  upload.single("answerSheet"),
-  ocrPrefillTestMarks
-);
-router.post(
-  "/document-prefill",
-  authenticate,
-  requireAdminOrMitra,
-  uploadDocument.single("answerSheet"),
-  documentPrefillTestMarks
-);
-
-router.post(
-  "/",
-  authenticate,
-  requireAdminOrMitra,
-  upload.single("answerSheet"),
-  saveTestMarks
-);
+router.post("/ocr-prefill", authenticate, requireAdminOrMitra, uploadSingle, ocrPrefillTestMarks);
+router.post("/document-prefill", authenticate, requireAdminOrMitra, uploadSingle, documentPrefillTestMarks);
+router.post("/", authenticate, requireAdminOrMitra, uploadSingle, saveTestMarks);
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);
 

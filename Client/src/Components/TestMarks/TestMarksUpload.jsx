@@ -19,6 +19,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [studentId, setStudentId] = useState("");
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState([]); // [{ subject, marksObtained, totalMarks }]
+  const [locked, setLocked] = useState(false); // true = auto-extracted, read-only
   const [ocrMessage, setOcrMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
@@ -53,7 +54,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const buildRowsFromSubjects = (extractedMarks) => {
     const subjects = selectedStudent?.subjects?.length ? selectedStudent.subjects : [];
     if (!subjects.length) {
-      // No known subject list for this student — fall back to raw extraction.
       return extractedMarks.map((m) => ({ ...m }));
     }
     return subjects.map((subject) => {
@@ -71,23 +71,25 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const handleRunOcr = async () => {
-    if (!file) return;
+    if (!file || !selectedStudent) return;
     setOcrMessage("Running OCR…");
-    const { available, marks, message } = await ocrPrefillTestMarks(file);
+    const { available, marks, message } = await ocrPrefillTestMarks(file, selectedStudent.subjects || []);
     setOcrMessage(message);
     if (available) {
       setRows(buildRowsFromSubjects(marks));
+      setLocked(true);
     }
   };
 
   const handleRunDocumentExtract = async () => {
-    if (!file) return;
+    if (!file || !selectedStudent) return;
     setOcrMessage("Reading document…");
     try {
-      const { available, marks, message } = await documentPrefillTestMarks(file);
+      const { available, marks, message } = await documentPrefillTestMarks(file, selectedStudent.subjects || []);
       setOcrMessage(message);
       if (available) {
         setRows(buildRowsFromSubjects(marks));
+        setLocked(true);
       }
     } catch (err) {
       setOcrMessage(err?.response?.data?.message || "Unable to read this file");
@@ -95,6 +97,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const handleStartManualEntry = () => {
+    setLocked(false);
     if (selectedStudent?.subjects?.length) {
       setRows(selectedStudent.subjects.map((subject) => ({ subject, marksObtained: "", totalMarks: "" })));
       return;
@@ -103,6 +106,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const updateRow = (index, field, value) => {
+    if (locked) return;
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
@@ -120,7 +124,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           subject: r.subject,
           marksObtained: Number(r.marksObtained) || 0,
           totalMarks: Number(r.totalMarks) || 0,
-          source: r.confidence ? "ocr" : "manual",
+          source: locked ? "ocr" : "manual",
         })),
         answerSheetFile: file,
       });
@@ -140,7 +144,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         <select
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
-          onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); }}
+          onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); setLocked(false); }}
         >
           <option value="">Select course</option>
           {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -177,7 +181,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       <select
         className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         value={studentId}
-        onChange={(e) => setStudentId(e.target.value)}
+        onChange={(e) => { setStudentId(e.target.value); setRows([]); setLocked(false); }}
         disabled={!course}
       >
         <option value="">Select student</option>
@@ -207,6 +211,13 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         >
           Extract from PDF/Word (Text)
         </button>
+        <button
+          className="rounded-xl bg-slate-200 px-4 py-2 text-xs font-medium text-slate-800 disabled:opacity-40"
+          onClick={handleStartManualEntry}
+          disabled={!studentId}
+        >
+          Manual Entry
+        </button>
       </div>
       <p className="text-xs text-slate-500">
         Use <b>Extract with OCR</b> for a photographed/scanned sheet, or <b>Extract from PDF/Word</b> for a
@@ -216,11 +227,23 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
 
       {rows.length > 0 && (
         <div className="space-y-4">
-          <p className="text-xs font-medium text-slate-600">
-            Review before saving — extracted values may need correction.
-          </p>
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-medium text-slate-600">
+              {locked
+                ? "Extracted automatically — locked to prevent accidental edits."
+                : "Manual entry — fields are editable."}
+            </p>
+            {locked && (
+              <button
+                type="button"
+                className="text-xs font-medium text-sky-600 underline"
+                onClick={() => setLocked(false)}
+              >
+                Something wrong? Unlock to correct
+              </button>
+            )}
+          </div>
 
-          {/* Centre + Date */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-300 bg-white p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Centre</p>
@@ -234,30 +257,35 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
             </div>
           </div>
 
-          {/* Per-subject cards */}
           <div className="space-y-3">
             {rows.map((row, i) => (
               <div key={i} className="rounded-xl border border-slate-300 bg-white p-4">
                 <p className="mb-3 text-sm font-semibold text-slate-900">{row.subject}</p>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
                     <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                       Marks Gained
                     </label>
                     <input
                       type="number"
-                      className="mt-1 w-full bg-transparent text-lg font-semibold text-slate-900 focus:outline-none"
+                      readOnly={locked}
+                      className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
+                        locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
+                      }`}
                       value={row.marksObtained}
                       onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
                     />
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
                     <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                       Total Marks
                     </label>
                     <input
                       type="number"
-                      className="mt-1 w-full bg-transparent text-lg font-semibold text-slate-900 focus:outline-none"
+                      readOnly={locked}
+                      className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
+                        locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
+                      }`}
                       value={row.totalMarks}
                       onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
                     />
@@ -267,7 +295,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
             ))}
           </div>
 
-          {/* Grand Total + Max Marks — auto-computed from the rows above, always in sync */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="rounded-xl border border-slate-900 bg-slate-900 p-4">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-300">Grand Total</p>

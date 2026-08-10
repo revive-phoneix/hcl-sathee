@@ -15,6 +15,16 @@ const assertCentreAccess = (req, centre) => {
   return matchesCentre(centre, req.user.centre);
 };
 
+const parseSubjects = (body) => {
+  if (Array.isArray(body?.subjects)) return body.subjects;
+  try {
+    const parsed = JSON.parse(body?.subjects || "[]");
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
 exports.listTests = wrap(
   async (req, res) => {
     const course = String(req.query.course || "").trim();
@@ -54,13 +64,16 @@ exports.ocrPrefillTestMarks = wrap(
     if (!req.file?.buffer?.length) {
       return fail(res, 400, "answerSheet file is required");
     }
-    const { text, marks, available } = await extractMarksFromBuffer(req.file.buffer);
+    const subjects = parseSubjects(req.body);
+    const { text, marks, available } = await extractMarksFromBuffer(req.file.buffer, subjects);
     return ok(res, {
       available,
       marks, // [{ subject, marksObtained, totalMarks, confidence }]
       rawText: available ? text : null,
       message: available
-        ? "OCR pre-fill complete — please review before saving."
+        ? (marks.length
+            ? "OCR pre-fill complete — please review before saving."
+            : "OCR ran, but no subject sections were matched. Enter marks manually.")
         : "OCR is not configured on this server. Enter marks manually.",
     });
   },
@@ -72,15 +85,16 @@ exports.documentPrefillTestMarks = wrap(
     if (!req.file?.buffer?.length) {
       return fail(res, 400, "answerSheet file is required");
     }
+    const subjects = parseSubjects(req.body);
     try {
-      const { text, marks } = await extractMarksFromDocument(req.file.buffer, req.file.mimetype);
+      const { text, marks } = await extractMarksFromDocument(req.file.buffer, req.file.mimetype, subjects);
       return ok(res, {
         available: true,
         marks,
         rawText: text,
         message: marks.length
           ? "Text extracted — please review before saving."
-          : "File read successfully, but no 'Subject: marks/total' lines were found. Enter marks manually.",
+          : "File read successfully, but no subject sections matched your student's subject list.",
       });
     } catch (err) {
       return fail(res, 400, err.message || "Unable to read this file");
@@ -129,6 +143,12 @@ exports.saveTestMarks = wrap(
       return fail(res, 403, "Centre access denied for this student");
     }
 
+    const test = await Test.findById(testId);
+    if (!test) return fail(res, 404, "Test not found");
+    if (course && test.course !== String(course).trim().toUpperCase()) {
+      return fail(res, 400, "testId does not belong to the given course");
+    }
+
     let subjectRecords = records;
     if (!Array.isArray(subjectRecords)) {
       try {
@@ -164,7 +184,7 @@ exports.saveTestMarks = wrap(
           answerSheetUrl,
           answerSheetPath,
           source: row.source || "manual",
-          verifiedByMitra: true, // Mitra explicitly submitted this value
+          verifiedByMitra: true,
           enteredBy: req.user?.id || null,
         });
         saved.push(mark);
