@@ -181,6 +181,7 @@ exports.saveTestMarks = wrap(
           subject: row.subject,
           marksObtained: row.marksObtained,
           totalMarks: row.totalMarks,
+          subjectPercentage: row.subjectPercentage, // Pre-calculated percentage from frontend
           answerSheetUrl,
           answerSheetPath,
           source: row.source || "manual",

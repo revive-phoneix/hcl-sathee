@@ -67,6 +67,7 @@ const upsert = async ({
   subject,
   marksObtained,
   totalMarks,
+  subjectPercentage = null, // Optional pre-calculated percentage
   answerSheetUrl = null,
   answerSheetPath = null,
   source = "manual",
@@ -100,7 +101,7 @@ const upsert = async ({
     subject: subjectName,
     marksObtained: obtained,
     totalMarks: total,
-    subjectPercentage: roundPct(obtained, total),
+    subjectPercentage: subjectPercentage ?? roundPct(obtained, total), // Use provided or calculate
     answerSheetUrl: answerSheetUrl ?? base.answerSheetUrl ?? null,
     answerSheetPath: answerSheetPath ?? base.answerSheetPath ?? null,
     source,

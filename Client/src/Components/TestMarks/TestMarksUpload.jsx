@@ -120,12 +120,18 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         studentId,
         course,
         centre: mitraCentre || selectedStudent?.centre,
-        records: rows.map((r) => ({
-          subject: r.subject,
-          marksObtained: Number(r.marksObtained) || 0,
-          totalMarks: Number(r.totalMarks) || 0,
-          source: locked ? "ocr" : "manual",
-        })),
+        records: rows.map((r) => {
+          const marksObtained = Number(r.marksObtained) || 0;
+          const totalMarks = Number(r.totalMarks) || 0;
+          const subjectPercentage = totalMarks > 0 ? Math.round((marksObtained / totalMarks) * 1000) / 10 : null;
+          return {
+            subject: r.subject,
+            marksObtained,
+            totalMarks,
+            subjectPercentage,
+            source: locked ? "ocr" : "manual",
+          };
+        }),
         answerSheetFile: file,
       });
       setSaveMessage(`Saved ${result.savedCount} subject mark(s).`);
