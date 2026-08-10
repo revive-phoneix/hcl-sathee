@@ -4,6 +4,7 @@ import {
   fetchTests,
   createTest,
   ocrPrefillTestMarks,
+  documentPrefillTestMarks,
   saveTestMarks,
 } from "../../services/testMarks";
 
@@ -60,6 +61,30 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       // fallback: blank rows for the student's enrolled subjects, for manual entry
       setRows(selectedStudent.subjects.map((subject) => ({ subject, marksObtained: "", totalMarks: "" })));
     }
+  };
+
+  const handleRunDocumentExtract = async () => {
+    if (!file) return;
+    setOcrMessage("Reading document…");
+    try {
+      const { available, marks, message } = await documentPrefillTestMarks(file);
+      setOcrMessage(message);
+      if (available && marks.length) {
+        setRows(marks.map((m) => ({ ...m })));
+      } else if (selectedStudent?.subjects?.length) {
+        setRows(selectedStudent.subjects.map((subject) => ({ subject, marksObtained: "", totalMarks: "" })));
+      }
+    } catch (err) {
+      setOcrMessage(err?.response?.data?.message || "Unable to read this file");
+    }
+  };
+
+  const handleStartManualEntry = () => {
+    if (selectedStudent?.subjects?.length) {
+      setRows(selectedStudent.subjects.map((subject) => ({ subject, marksObtained: "", totalMarks: "" })));
+      return;
+    }
+    setRows([{ subject: "", marksObtained: "", totalMarks: "" }]);
   };
 
   const updateRow = (index, field, value) => {
@@ -149,7 +174,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
         <input
           type="file"
-          accept="application/pdf,image/*"
+          accept="application/pdf,image/*,.doc,.docx"
           onChange={(e) => setFile(e.target.files?.[0] || null)}
           className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         />
@@ -160,7 +185,18 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         >
           Extract with OCR
         </button>
+        <button
+          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
+          onClick={handleRunDocumentExtract}
+          disabled={!file}
+        >
+          Extract from PDF/Word (Text)
+        </button>
       </div>
+      <p className="text-xs text-slate-500">
+        Use <b>Extract with OCR</b> for a photographed/scanned sheet, or <b>Extract from PDF/Word</b> for a
+        digitally typed PDF or Word answer sheet.
+      </p>
       {ocrMessage && <p className="text-xs text-slate-600">{ocrMessage}</p>}
 
       {rows.length > 0 && (

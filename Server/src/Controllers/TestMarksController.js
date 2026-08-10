@@ -5,6 +5,7 @@ const Student = require("../Models/Student");
 const { withStorageBucket } = require("../config/firebase");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { extractMarksFromBuffer } = require("../Utils/ocrAnswerSheet");
+const { extractMarksFromDocument } = require("../Utils/parseAnswerSheetDocument");
 const { buildCourseProgressTimeline } = require("../Utils/testProgress");
 const { matchesCentre, isAdminRole } = require("../Utils/centreMatch");
 
@@ -66,9 +67,31 @@ exports.ocrPrefillTestMarks = wrap(
   { label: "OCR Prefill Error", message: "Failed to run OCR on answer sheet" }
 );
 
+exports.documentPrefillTestMarks = wrap(
+  async (req, res) => {
+    if (!req.file?.buffer?.length) {
+      return fail(res, 400, "answerSheet file is required");
+    }
+    try {
+      const { text, marks } = await extractMarksFromDocument(req.file.buffer, req.file.mimetype);
+      return ok(res, {
+        available: true,
+        marks,
+        rawText: text,
+        message: marks.length
+          ? "Text extracted — please review before saving."
+          : "File read successfully, but no 'Subject: marks/total' lines were found. Enter marks manually.",
+      });
+    } catch (err) {
+      return fail(res, 400, err.message || "Unable to read this file");
+    }
+  },
+  { label: "Document Prefill Error", message: "Failed to extract marks from document" }
+);
+
 const uploadAnswerSheet = async (file, testId, studentId) => {
   const ext = path.extname(file.originalname || "").toLowerCase() || ".pdf";
-  const safeExt = [".pdf", ".jpg", ".jpeg", ".png"].includes(ext) ? ext : ".pdf";
+  const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".docx", ".doc"].includes(ext) ? ext : ".pdf";
   const storagePath = `test-marks/${testId}/${studentId}-${Date.now()}${safeExt}`;
 
   return withStorageBucket(async (bucket) => {

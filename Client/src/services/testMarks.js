@@ -32,6 +32,13 @@ export const saveTestMarks = async ({ testId, studentId, course, centre, records
   return response.data;
 };
 
+export const documentPrefillTestMarks = async (answerSheetFile) => {
+  const formData = new FormData();
+  formData.append("answerSheet", answerSheetFile);
+  const response = await api.post("/api/test-marks/document-prefill", formData);
+  return response.data;
+};
+
 export const fetchCourseProgress = async (course, centre = "") => {
   const response = await api.get("/api/test-marks/course-progress", {
     params: { course, ...(centre ? { centre } : {}) },
