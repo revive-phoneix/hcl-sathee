@@ -33,7 +33,7 @@ const toApiMark = (docId, data) => ({
   subjectPercentage: data.subjectPercentage ?? roundPct(data.marksObtained, data.totalMarks),
   answerSheetUrl: data.answerSheetUrl ?? null,
   answerSheetPath: data.answerSheetPath ?? null,
-  source: data.source ?? "manual", // "manual" | "ocr"
+  source: data.source ?? "manual",
   verifiedByMitra: Boolean(data.verifiedByMitra),
   enteredBy: data.enteredBy ?? null,
   created_at: toDate(data.created_at),

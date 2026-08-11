@@ -13,16 +13,6 @@ const assertCentreAccess = (req, centre) => {
   return matchesCentre(centre, req.user.centre);
 };
 
-const parseSubjects = (body) => {
-  if (Array.isArray(body?.subjects)) return body.subjects;
-  try {
-    const parsed = JSON.parse(body?.subjects || "[]");
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-};
-
 exports.listTests = wrap(
   async (req, res) => {
     const course = String(req.query.course || "").trim();

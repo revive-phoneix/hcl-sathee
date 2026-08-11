@@ -19,7 +19,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [studentId, setStudentId] = useState("");
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState([]); // [{ subject, marksObtained, totalMarks }]
-  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -51,7 +50,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const handleStartManualEntry = () => {
-    setLocked(false);
     if (selectedStudent?.subjects?.length) {
       setRows(selectedStudent.subjects.map((subject) => ({ subject, marksObtained: "", totalMarks: "" })));
       return;
@@ -65,7 +63,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const updateRow = (index, field, value) => {
-    if (locked) return;
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
   };
 
@@ -89,7 +86,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
             marksObtained,
             totalMarks,
             subjectPercentage,
-            source: locked ? "ocr" : "manual",
+            source: "manual",
           };
         }),
         answerSheetFile: file,
@@ -120,7 +117,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         <select
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
-          onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); setLocked(false); }}
+          onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); }}
         >
           <option value="">Select course</option>
           {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -157,7 +154,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       <select
         className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         value={studentId}
-        onChange={(e) => { setStudentId(e.target.value); setRows([]); setLocked(false); }}
+        onChange={(e) => { setStudentId(e.target.value); setRows([]); }}
         disabled={!course}
       >
         <option value="">Select student</option>
@@ -195,20 +192,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       {rows.length > 0 && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <p className="text-xs font-medium text-slate-600">
-              {locked
-                ? "Extracted automatically — locked to prevent accidental edits."
-                : "Manual entry — fields are editable."}
-            </p>
-            {locked && (
-              <button
-                type="button"
-                className="text-xs font-medium text-sky-600 underline"
-                onClick={() => setLocked(false)}
-              >
-                Something wrong? Unlock to correct
-              </button>
-            )}
+            <p className="text-xs font-medium text-slate-600">Manual entry — fields are editable.</p>
           </div>
 
           <div className="grid gap-3 sm:grid-cols-2">
@@ -234,30 +218,24 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                 <div key={i} className="rounded-xl border border-slate-300 bg-white p-4">
                   <p className="mb-3 text-sm font-semibold text-slate-900">{row.subject}</p>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                         Marks Gained
                       </label>
                       <input
                         type="number"
-                        readOnly={locked}
-                        className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
-                          locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
-                        }`}
+                        className="mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none text-slate-900"
                         value={row.marksObtained}
                         onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
                       />
                     </div>
-                    <div className={`rounded-lg border p-3 ${locked ? "border-slate-100 bg-slate-100" : "border-slate-200 bg-slate-50"}`}>
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
                         Total Marks
                       </label>
                       <input
                         type="number"
-                        readOnly={locked}
-                        className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${
-                          locked ? "text-slate-600 cursor-not-allowed" : "text-slate-900"
-                        }`}
+                        className="mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none text-slate-900"
                         value={row.totalMarks}
                         onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
                       />
