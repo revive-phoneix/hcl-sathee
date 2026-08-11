@@ -102,6 +102,50 @@ export const getProgressColor = (progress) => {
   return "#EF4444";
 };
 
+const getLatestWeeklyPerformanceMarks = (student = {}) => {
+  if (!Array.isArray(student?.testMarks)) return [];
+
+  const latestBySubject = new Map();
+  for (const mark of student.testMarks) {
+    if (!mark || !mark.subject) continue;
+    const normalizedType = String(mark.testType || "performance").trim().toLowerCase();
+    if (normalizedType !== "performance") continue;
+
+    const key = String(mark.subject).trim();
+    const currentTime = new Date(mark.created_at || mark.updated_at || 0).getTime();
+    const existing = latestBySubject.get(key);
+    const existingTime = existing ? new Date(existing.created_at || existing.updated_at || 0).getTime() : 0;
+
+    if (!existing || currentTime >= existingTime) {
+      latestBySubject.set(key, mark);
+    }
+  }
+
+  return [...latestBySubject.values()];
+};
+
+const getStudentWeeklyPerformanceAverage = (student = {}) => {
+  const scores = [];
+
+  for (const mark of getLatestWeeklyPerformanceMarks(student)) {
+    let value = null;
+
+    if (mark.subjectPercentage != null) {
+      value = parsePercentValue(mark.subjectPercentage);
+    } else {
+      const obtained = Number(mark.marksObtained) || 0;
+      const total = Number(mark.totalMarks) || 0;
+      value = total > 0 ? (obtained / total) * 100 : null;
+    }
+
+    if (value != null && Number.isFinite(value)) {
+      scores.push(value);
+    }
+  }
+
+  return scores.length ? average(scores) : null;
+};
+
 const EXAM_BATCHES = [
   { key: "JEE", exam: "JEE" },
   { key: "NEET", exam: "NEET" },
@@ -150,8 +194,10 @@ export const getCourseExamProgress = (students = []) => {
       };
     }
 
-    const scores = courseStudents.flatMap(getStudentProgressRates);
-    const progress = average(scores);
+    const studentAverages = courseStudents
+      .map((student) => getStudentWeeklyPerformanceAverage(student))
+      .filter((value) => value != null && Number.isFinite(value));
+    const progress = studentAverages.length ? average(studentAverages) : null;
     const rounded = progress == null ? 0 : Math.round(progress);
 
     return {
