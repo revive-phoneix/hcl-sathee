@@ -1,17 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchStudents } from "../../services/students";
-import {
-  fetchTests,
-  createTest,
-  ocrPrefillTestMarks,
-  documentPrefillTestMarks,
-  saveTestMarks,
-} from "../../services/testMarks";
+import { fetchTests, createTest, saveTestMarks } from "../../services/testMarks";
 
 const COURSES = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
+const TEST_TYPES = [
+  { value: "performance", label: "Performance Test (Weekly)" },
+  { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
+];
 
 export default function TestMarksUpload({ mitraCentre = "" }) {
   const [students, setStudents] = useState([]);
+  const [testType, setTestType] = useState("performance");
   const [course, setCourse] = useState("");
   const [tests, setTests] = useState([]);
   const [testId, setTestId] = useState("");
@@ -19,8 +19,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [studentId, setStudentId] = useState("");
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState([]); // [{ subject, marksObtained, totalMarks }]
-  const [locked, setLocked] = useState(false); // true = auto-extracted, read-only
-  const [ocrMessage, setOcrMessage] = useState("");
+  const [locked, setLocked] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
 
@@ -51,51 +50,6 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     setNewTestName("");
   };
 
-  const buildRowsFromSubjects = (extractedMarks) => {
-    const subjects = selectedStudent?.subjects?.length ? selectedStudent.subjects : [];
-    if (!subjects.length) {
-      return extractedMarks.map((m) => ({ ...m }));
-    }
-    return subjects.map((subject) => {
-      const match = extractedMarks.find(
-        (m) =>
-          m.subject.toLowerCase().includes(subject.toLowerCase()) ||
-          subject.toLowerCase().includes(m.subject.toLowerCase())
-      );
-      return {
-        subject,
-        marksObtained: match ? match.marksObtained : "",
-        totalMarks: match ? match.totalMarks : "",
-      };
-    });
-  };
-
-  const handleRunOcr = async () => {
-    if (!file || !selectedStudent) return;
-    setOcrMessage("Running OCR…");
-    const { available, marks, message } = await ocrPrefillTestMarks(file, selectedStudent.subjects || []);
-    setOcrMessage(message);
-    if (available) {
-      setRows(buildRowsFromSubjects(marks));
-      setLocked(true);
-    }
-  };
-
-  const handleRunDocumentExtract = async () => {
-    if (!file || !selectedStudent) return;
-    setOcrMessage("Reading document…");
-    try {
-      const { available, marks, message } = await documentPrefillTestMarks(file, selectedStudent.subjects || []);
-      setOcrMessage(message);
-      if (available) {
-        setRows(buildRowsFromSubjects(marks));
-        setLocked(true);
-      }
-    } catch (err) {
-      setOcrMessage(err?.response?.data?.message || "Unable to read this file");
-    }
-  };
-
   const handleStartManualEntry = () => {
     setLocked(false);
     if (selectedStudent?.subjects?.length) {
@@ -103,6 +57,11 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       return;
     }
     setRows([{ subject: "", marksObtained: "", totalMarks: "" }]);
+  };
+
+  const handleUpload = () => {
+    if (!file || !studentId) return;
+    setSaveMessage("Answer sheet file selected and will be saved when you save test marks.");
   };
 
   const updateRow = (index, field, value) => {
@@ -117,6 +76,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     try {
       const result = await saveTestMarks({
         testId,
+        testType,
         studentId,
         course,
         centre: mitraCentre || selectedStudent?.centre,
@@ -146,7 +106,17 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     <div className="rounded-3xl border border-slate-200 bg-slate-50 p-6 space-y-6">
       <h2 className="text-lg font-semibold text-slate-900">Test Marks</h2>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-4">
+        <select
+          className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
+          value={testType}
+          onChange={(e) => setTestType(e.target.value)}
+        >
+          {TEST_TYPES.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+
         <select
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
@@ -205,17 +175,10 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         />
         <button
           className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
-          onClick={handleRunOcr}
+          onClick={handleUpload}
           disabled={!file || !studentId}
         >
-          Extract with OCR
-        </button>
-        <button
-          className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
-          onClick={handleRunDocumentExtract}
-          disabled={!file || !studentId}
-        >
-          Extract from PDF/Word (Text)
+          Upload
         </button>
         <button
           className="rounded-xl bg-slate-200 px-4 py-2 text-xs font-medium text-slate-800 disabled:opacity-40"
@@ -226,10 +189,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         </button>
       </div>
       <p className="text-xs text-slate-500">
-        Use <b>Extract with OCR</b> for a photographed/scanned sheet, or <b>Extract from PDF/Word</b> for a
-        digitally typed PDF or Word answer sheet.
+        Upload the answer sheet document for backend saving, then type marks manually below.
       </p>
-      {ocrMessage && <p className="text-xs text-slate-600">{ocrMessage}</p>}
 
       {rows.length > 0 && (
         <div className="space-y-4">

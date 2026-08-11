@@ -9,9 +9,16 @@ import { average, parsePercentValue } from "../../utils/studentMetrics";
 import { resolveEnrolledSubjects } from "../../utils/courseSubjects";
 import StudentAnalyticsPanel from "./StudentAnalyticsPanel";
 
+const TEST_TYPE_OPTIONS = [
+  { value: "performance", label: "Performance Test (Weekly)" },
+  { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
+];
+
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedTestType, setSelectedTestType] = useState("performance");
   const [formData, setFormData] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -34,6 +41,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
         attendance,
         qualifications: { ...(student.qualifications || {}) },
       });
+      setSelectedTestType("performance");
       setIsEditing(false);
       setShowAnalytics(false);
       setError("");
@@ -57,6 +65,45 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
     const avg = average(rates);
     return avg == null ? null : Math.round(avg * 10) / 10;
   }, [formData, enrolledSubjects]);
+
+  const filteredTestMarks = useMemo(() => {
+    if (!formData?.testMarks) return [];
+    return formData.testMarks.filter((mark) => {
+      if (!mark || !mark.subject) return false;
+      return (mark.testType || "performance") === selectedTestType;
+    });
+  }, [formData, selectedTestType]);
+
+  const selectedPerformanceMarks = useMemo(() => {
+    return filteredTestMarks.reduce((acc, mark) => {
+      if (!mark || !mark.subject) return acc;
+      const key = String(mark.subject).trim();
+      const currentTime = new Date(mark.created_at || mark.updated_at || 0).getTime();
+      const existing = acc[key];
+      const existingTime = existing ? new Date(existing.created_at || existing.updated_at || 0).getTime() : 0;
+      if (!existing || currentTime >= existingTime) {
+        acc[key] = mark;
+      }
+      return acc;
+    }, {});
+  }, [filteredTestMarks]);
+
+  const selectedOverallPerformance = useMemo(() => {
+    const values = Object.values(selectedPerformanceMarks)
+      .map((mark) => {
+        if (!mark) return null;
+        if (mark.subjectPercentage != null) {
+          return Number(mark.subjectPercentage);
+        }
+        const obtained = Number(mark.marksObtained) || 0;
+        const total = Number(mark.totalMarks) || 0;
+        return total > 0 ? (obtained / total) * 100 : null;
+      })
+      .filter((value) => value != null && Number.isFinite(value));
+
+    if (!values.length) return null;
+    return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+  }, [selectedPerformanceMarks]);
 
   if (!open || !student || !formData) return null;
 
@@ -294,9 +341,33 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
                   Auto-updated from tests/exams — not editable.
                 </p>
-                
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+                  {TEST_TYPE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSelectedTestType(option.value)}
+                      style={{
+                        background: selectedTestType === option.value ? "#1e40af" : "#e2e8f0",
+                        color: selectedTestType === option.value ? "#fff" : "#0f172a",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ marginBottom: 10, color: "#475569", fontSize: 13 }}>
+                  Showing marks for <strong>{TEST_TYPE_OPTIONS.find((item) => item.value === selectedTestType)?.label}</strong>.
+                </div>
+
                 {/* Overall Performance */}
-                {formData.overallPercentage != null && (
+                {selectedOverallPerformance != null && (
                   <div
                     style={{
                       background: "#f0fdf4",
@@ -314,11 +385,11 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                     <div>
                       <strong style={{ fontSize: 15 }}>Overall Performance</strong>
                       <div style={{ marginTop: 4, fontSize: 12, color: "#64748b" }}>
-                        Average of all subject test percentages
+                        Average of selected test category marks
                       </div>
                     </div>
                     <div style={{ fontSize: 24, fontWeight: 700, color: "#16a34a" }}>
-                      {formData.overallPercentage.toFixed(1)}%
+                      {selectedOverallPerformance.toFixed(1)}%
                     </div>
                   </div>
                 )}
@@ -329,24 +400,30 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                     <p style={{ margin: 0, color: "#94a3b8", fontSize: 14 }}>No subjects yet.</p>
                   ) : (
                     enrolledSubjects.map((subject) => {
-                      const percentage = formData.subjectPercentages?.[subject];
-                      const hasPercentage = percentage != null && percentage !== 0;
-                      
+                      const subjectMark = selectedPerformanceMarks[subject];
+                      const hasMark = subjectMark && subjectMark.marksObtained != null && subjectMark.totalMarks != null;
+                      const marksObtained = hasMark ? Number(subjectMark.marksObtained) : null;
+                      const totalMarks = hasMark ? Number(subjectMark.totalMarks) : null;
+                      const percentage = subjectMark?.subjectPercentage != null ? Number(subjectMark.subjectPercentage) : null;
+
                       return (
-                        <div key={subject} style={{ 
-                          background: hasPercentage ? "#E0F2FE" : "#f3f4f6", 
-                          padding: "12px 16px", 
-                          borderRadius: 8 
-                        }}>
+                        <div
+                          key={subject}
+                          style={{
+                            background: hasMark ? "#E0F2FE" : "#f3f4f6",
+                            padding: "12px 16px",
+                            borderRadius: 8,
+                          }}
+                        >
                           <strong>{subject}</strong>
                           <div style={{ marginTop: 6, fontSize: 14 }}>
-                            {hasPercentage ? (
+                            {hasMark ? (
                               <>
                                 <span style={{ fontSize: 16, fontWeight: 700, color: "#0f172a" }}>
-                                  {percentage.toFixed(1)}%
+                                  {marksObtained}/{totalMarks}
                                 </span>
                                 <div style={{ fontSize: 11, color: "#64748b", marginTop: 2 }}>
-                                  Test Performance
+                                  {percentage != null ? `${percentage.toFixed(1)}%` : "Marks recorded"}
                                 </div>
                               </>
                             ) : (

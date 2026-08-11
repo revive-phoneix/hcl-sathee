@@ -23,6 +23,7 @@ const buildDocId = (testId, studentId, subject) =>
 const toApiMark = (docId, data) => ({
   id: docId,
   testId: data.testId,
+  testType: data.testType ?? "performance",
   studentId: data.studentId,
   course: data.course ?? null,
   centre: data.centre ?? null,
@@ -61,6 +62,7 @@ const findByStudent = async (studentId) => {
 
 const upsert = async ({
   testId,
+  testType = "performance",
   studentId,
   course = null,
   centre = null,
@@ -95,6 +97,7 @@ const upsert = async ({
     ...base,
     id: docId,
     testId,
+    testType,
     studentId: Number(studentId) || studentId,
     course: course || base.course || null,
     centre: centre || base.centre || null,

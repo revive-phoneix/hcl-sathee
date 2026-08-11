@@ -4,8 +4,6 @@ const TestSubjectMark = require("../Models/TestSubjectMark");
 const Student = require("../Models/Student");
 const { withStorageBucket } = require("../config/firebase");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
-const { extractMarksFromBuffer } = require("../Utils/ocrAnswerSheet");
-const { extractMarksFromDocument } = require("../Utils/parseAnswerSheetDocument");
 const { buildCourseProgressTimeline } = require("../Utils/testProgress");
 const { matchesCentre, isAdminRole } = require("../Utils/centreMatch");
 
@@ -59,50 +57,6 @@ exports.createTest = wrap(
   { label: "Create Test Error", message: "Failed to create test" }
 );
 
-exports.ocrPrefillTestMarks = wrap(
-  async (req, res) => {
-    if (!req.file?.buffer?.length) {
-      return fail(res, 400, "answerSheet file is required");
-    }
-    const subjects = parseSubjects(req.body);
-    const { text, marks, available } = await extractMarksFromBuffer(req.file.buffer, subjects);
-    return ok(res, {
-      available,
-      marks, // [{ subject, marksObtained, totalMarks, confidence }]
-      rawText: available ? text : null,
-      message: available
-        ? (marks.length
-            ? "OCR pre-fill complete — please review before saving."
-            : "OCR ran, but no subject sections were matched. Enter marks manually.")
-        : "OCR is not configured on this server. Enter marks manually.",
-    });
-  },
-  { label: "OCR Prefill Error", message: "Failed to run OCR on answer sheet" }
-);
-
-exports.documentPrefillTestMarks = wrap(
-  async (req, res) => {
-    if (!req.file?.buffer?.length) {
-      return fail(res, 400, "answerSheet file is required");
-    }
-    const subjects = parseSubjects(req.body);
-    try {
-      const { text, marks } = await extractMarksFromDocument(req.file.buffer, req.file.mimetype, subjects);
-      return ok(res, {
-        available: true,
-        marks,
-        rawText: text,
-        message: marks.length
-          ? "Text extracted — please review before saving."
-          : "File read successfully, but no subject sections matched your student's subject list.",
-      });
-    } catch (err) {
-      return fail(res, 400, err.message || "Unable to read this file");
-    }
-  },
-  { label: "Document Prefill Error", message: "Failed to extract marks from document" }
-);
-
 const uploadAnswerSheet = async (file, testId, studentId) => {
   const ext = path.extname(file.originalname || "").toLowerCase() || ".pdf";
   const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".docx", ".doc"].includes(ext) ? ext : ".pdf";
@@ -131,7 +85,7 @@ const uploadAnswerSheet = async (file, testId, studentId) => {
 
 exports.saveTestMarks = wrap(
   async (req, res) => {
-    const { testId, studentId, course = null, centre = null, records } = req.body || {};
+    const { testId, testType = "performance", studentId, course = null, centre = null, records } = req.body || {};
 
     if (!testId || !studentId) {
       return fail(res, 400, "testId and studentId are required");
@@ -175,6 +129,7 @@ exports.saveTestMarks = wrap(
       try {
         const mark = await TestSubjectMark.upsert({
           testId,
+          testType: row.testType || testType,
           studentId: student.id,
           course: course || student.course,
           centre: centre || student.centre,

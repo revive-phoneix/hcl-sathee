@@ -12,25 +12,11 @@ export const createTest = async ({ name, course, centre, testDate }) => {
   return response.data.test;
 };
 
-export const ocrPrefillTestMarks = async (answerSheetFile, subjects = []) => {
-  const formData = new FormData();
-  formData.append("answerSheet", answerSheetFile);
-  formData.append("subjects", JSON.stringify(subjects));
-  const response = await api.post("/api/test-marks/ocr-prefill", formData);
-  return response.data;
-};
 
-export const documentPrefillTestMarks = async (answerSheetFile, subjects = []) => {
-  const formData = new FormData();
-  formData.append("answerSheet", answerSheetFile);
-  formData.append("subjects", JSON.stringify(subjects));
-  const response = await api.post("/api/test-marks/document-prefill", formData);
-  return response.data;
-};
-
-export const saveTestMarks = async ({ testId, studentId, course, centre, records, answerSheetFile }) => {
+export const saveTestMarks = async ({ testId, testType, studentId, course, centre, records, answerSheetFile }) => {
   const formData = new FormData();
   formData.append("testId", testId);
+  formData.append("testType", testType || "performance");
   formData.append("studentId", studentId);
   formData.append("course", course || "");
   formData.append("centre", centre || "");
