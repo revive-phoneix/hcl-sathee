@@ -70,7 +70,7 @@ export function MainLayout({
   }, []);
 
   return (
-    <div className="h-screen w-screen flex flex-col overflow-hidden bg-[#F1F5F9] font-sans text-white">
+    <div className="min-h-screen w-screen flex flex-col overflow-visible bg-[#F1F5F9] font-sans text-white">
       <header className="h-16 flex items-center justify-between gap-3 px-4 sm:px-6 border-b border-[#3B82F6]/20 bg-[#5785d0] z-50">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <button
@@ -104,7 +104,7 @@ export function MainLayout({
         </button>
       </header>
 
-      <div className="flex flex-1 overflow-hidden relative">
+      <div className="flex flex-1 overflow-visible relative">
         <aside
           className={`hidden lg:flex flex-col border-r border-[#3B82F6]/20 bg-[#eef0f4] transition-all ${
             sidebarCollapsed ? "w-16" : "w-64"
@@ -175,7 +175,7 @@ export function MainLayout({
           </div>
         ) : null}
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-[#F1F5F9]">
+        <main className="flex-1 overflow-visible p-4 sm:p-6 lg:p-8 bg-[#F1F5F9]">
           {children}
         </main>
       </div>

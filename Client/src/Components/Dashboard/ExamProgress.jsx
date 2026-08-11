@@ -9,10 +9,10 @@ export function ExamProgress({ students = [], loading = false }) {
   );
 
   return (
-    <div className="bg-[#ccd2dd] border border-[#3B82F6]/20 rounded-3xl p-6 h-[420px] flex flex-col overflow-hidden">
+    <div className="bg-[#ccd2dd] border border-[#3B82F6]/20 rounded-3xl p-6 flex flex-col overflow-visible">
       <SectionHeader title="Batch Exam Progress" />
 
-      <div className="flex-1 overflow-y-auto pr-2 space-y-5 mt-4 custom-scroll">
+      <div className="space-y-5 mt-4">
         {loading ? (
           <p className="text-sm text-slate-600 py-8 text-center">Loading exam progress…</p>
         ) : (
