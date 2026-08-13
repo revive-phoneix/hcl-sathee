@@ -700,7 +700,7 @@ export default function AdminAttendance({
                 headingLabel={attendancePanel === "vishistAttendance" ? "Vishist Attendance" : "My Attendance"}
                 headingDescription={
                   attendancePanel === "vishistAttendance"
-                    ? "Upload your Sathee Vishist attendance for"
+                    ? "Upload Sathee Vishist attendance for"
                     : "Take a live arrival and departure photo for"
                 }
               />
