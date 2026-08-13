@@ -7,6 +7,7 @@ const {
   filterByUserCentre,
   isAdminRole,
   isHclPartnerRole,
+  isSatheeMitraRole,
 } = require("../Utils/centreMatch");
 const { isValidPhone10, normalizePhone10 } = require("../Utils/phone");
 
@@ -36,11 +37,13 @@ exports.getUsers = wrap(
   async (req, res) => {
     let users = await User.findAll();
 
-    if (isHclPartnerRole(req.user?.role)) {
+    if (isAdminRole(req.user?.role)) {
+      users = users;
+    } else if (isHclPartnerRole(req.user?.role) || isSatheeMitraRole(req.user?.role)) {
       users = filterByUserCentre(users, req.user).filter((user) =>
         isMitra(user.role)
       );
-    } else if (!isAdminRole(req.user?.role)) {
+    } else {
       users = [];
     }
 
