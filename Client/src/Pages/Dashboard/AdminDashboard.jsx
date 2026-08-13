@@ -1,8 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { TrendingUp } from "lucide-react";
 
 import { MainLayout } from "../../Components/MainLayout";
-import { StatCard } from "../../Components/Dashboard/StatCard";
 import { WelcomeBanner } from "../../Components/Dashboard/WelcomeBanner";
 import { AttendanceChart } from "../../Components/Dashboard/AttendanceChart";
 import { StudentsByCourseChart } from "../../Components/Dashboard/StudentsByCourseChart";
@@ -11,13 +9,6 @@ import { ExamProgress } from "../../Components/Dashboard/ExamProgress";
 import { fetchStudentPerformance } from "../../services/studentPerformance";
 import { fetchAttendanceSummary } from "../../services/dailySubjectAttendance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
-import { average, getStudentProgressRates } from "../../utils/studentMetrics";
-
-const formatPercent = (value) => (value == null ? "—" : `${value.toFixed(1)}%`);
-
-const STAT_CARDS = (stats, loadingStats) => [
-  { icon: TrendingUp, label: "Avg. Progress", value: formatPercent(stats.progressAvg), iconBg: "bg-amber-500/10", iconColor: "text-amber-400" },
-].map((card) => ({ ...card, loading: loadingStats }));
 
 export default function AdminDashboard({
   portalName,
@@ -77,14 +68,11 @@ export default function AdminDashboard({
     const centreStudents = students.filter((student) =>
       matchesPortalCentre(student.centre, portalName)
     );
-    const progressRates = centreStudents.flatMap(getStudentProgressRates);
 
     return {
-      totalStudents: centreStudents.length,
-      progressAvg: average(progressRates),
       centreStudents,
     };
-  }, [students, portalName, todaySummary]);
+  }, [students, portalName]);
 
   return (
     <MainLayout
@@ -111,16 +99,7 @@ export default function AdminDashboard({
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="lg:col-span-2">
-            <StudentsByCourseChart students={stats.centreStudents} loading={loadingStats} />
-          </div>
-          <div className="grid grid-cols-1 gap-5">
-            {STAT_CARDS(stats, loadingStats).map((card) => (
-              <StatCard key={card.label} {...card} />
-            ))}
-          </div>
-        </div>
+        <StudentsByCourseChart students={stats.centreStudents} loading={loadingStats} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <AttendanceChart portalName={portalName} />

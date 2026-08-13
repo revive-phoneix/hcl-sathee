@@ -45,7 +45,7 @@ export function StudentsByCourseChart({ students = [], loading = false }) {
   const total = data.reduce((sum, d) => sum + d.count, 0);
 
   return (
-    <div className="rounded-3xl border border-slate-200 bg-white p-6 h-[280px] flex flex-col">
+    <div className="rounded-3xl border border-slate-200 bg-white p-6 h-[400px] flex flex-col">
       <div>
         <p className="text-sm font-semibold text-slate-900">Students by Course</p>
         <p className="text-xs text-slate-500">
