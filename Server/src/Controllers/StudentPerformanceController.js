@@ -447,6 +447,17 @@ const getDateRangeForPeriod = (period, anchorDate) => {
   return { from: anchorDate, to: anchorDate };
 };
 
+const enumerateDates = (from, to) => {
+  const dates = [];
+  const cursor = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cursor <= end) {
+    dates.push(toDateOnly(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+};
+
 exports.getAttendanceSummary = wrap(
   async (req, res) => {
     const period = ["daily", "weekly", "monthly"].includes(req.query.period)
@@ -467,22 +478,44 @@ exports.getAttendanceSummary = wrap(
       : allStudents;
     const totalStudents = centreStudents.length;
 
-    const presentIds = new Set(
-      records.filter((r) => r.status === "present").map((r) => String(r.studentId))
-    );
-    const presentCount = presentIds.size;
-    const absentCount = Math.max(totalStudents - presentCount, 0);
-    const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+    if (period === "daily") {
+      const presentIds = new Set(
+        records.filter((r) => r.status === "present").map((r) => String(r.studentId))
+      );
+      const presentCount = presentIds.size;
+      const absentCount = Math.max(totalStudents - presentCount, 0);
+      const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
 
-    return ok(res, {
-      period,
-      from,
-      to,
-      totalStudents,
-      presentCount,
-      absentCount,
-      percentage,
+      return ok(res, { period, from, to, totalStudents, presentCount, absentCount, percentage });
+    }
+
+    // Weekly/monthly: average each individual day's attendance % across the
+    // FULL fixed period length (always 7 for week, real day-count for month).
+    // A day with no records counts as 0% — never skipped, never excluded.
+    const recordsByDate = {};
+    for (const r of records) {
+      if (!recordsByDate[r.date]) recordsByDate[r.date] = [];
+      recordsByDate[r.date].push(r);
+    }
+
+    const allDates = enumerateDates(from, to);
+    const dailyPercentages = allDates.map((date) => {
+      const dayRecords = recordsByDate[date] || [];
+      const presentIdsForDay = new Set(
+        dayRecords.filter((r) => r.status === "present").map((r) => String(r.studentId))
+      );
+      return totalStudents > 0 ? (presentIdsForDay.size / totalStudents) * 100 : 0;
     });
+
+    const percentage =
+      dailyPercentages.length > 0
+        ? Math.round(dailyPercentages.reduce((sum, p) => sum + p, 0) / dailyPercentages.length)
+        : 0;
+
+    const presentCount = Math.round((percentage / 100) * totalStudents);
+    const absentCount = Math.max(totalStudents - presentCount, 0);
+
+    return ok(res, { period, from, to, totalStudents, presentCount, absentCount, percentage });
   },
   { label: "Attendance Summary Error", message: "Failed to load attendance summary" }
 );

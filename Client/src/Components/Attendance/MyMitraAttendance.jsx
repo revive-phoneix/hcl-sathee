@@ -97,6 +97,8 @@ export default function MyMitraAttendance({
   portalName,
   selectedDate,
   allowUpload = true,
+  headingLabel = "My Attendance",
+  headingDescription = "Take a live arrival and departure photo for",
 }) {
   const today = toInputDate();
   const date = selectedDate || today;
@@ -235,9 +237,9 @@ export default function MyMitraAttendance({
   return (
     <div className="space-y-5 px-5 py-5">
       <div className="rounded-2xl border border-slate-200 bg-slate-50 px-5 py-4">
-        <p className="text-sm font-semibold text-slate-900">My Attendance</p>
+        <p className="text-sm font-semibold text-slate-900">{headingLabel}</p>
         <p className="mt-1 text-xs text-slate-500">
-          Take a live arrival and departure photo for{" "}
+          {headingDescription}{" "}
           <span className="font-medium text-slate-700">{date}</span>.
           {isToday
             ? " Time is recorded automatically when you capture a photo."
