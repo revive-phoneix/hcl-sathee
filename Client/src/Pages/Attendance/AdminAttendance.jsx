@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { MainLayout } from "../../Components/MainLayout";
@@ -262,6 +262,8 @@ export default function AdminAttendance({
   const [students, setStudents] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
   const [loadingMitras, setLoadingMitras] = useState(false);
+  const [attendanceDropdownOpen, setAttendanceDropdownOpen] = useState(false);
+  const attendanceMenuRef = useRef(null);
   const [loadingStudents, setLoadingStudents] = useState(false);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [exporting, setExporting] = useState(false);
@@ -274,6 +276,28 @@ export default function AdminAttendance({
   const [myRequests, setMyRequests] = useState([]);
   const [loadingMyRequests, setLoadingMyRequests] = useState(false);
   const [myRequestsError, setMyRequestsError] = useState("");
+  const [attendancePanel, setAttendancePanel] = useState("myAttendance");
+
+  useEffect(() => {
+    if (!attendanceDropdownOpen) return undefined;
+    const handlePointerDown = (event) => {
+      if (!attendanceMenuRef.current?.contains(event.target)) {
+        setAttendanceDropdownOpen(false);
+      }
+    };
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") {
+        setAttendanceDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [attendanceDropdownOpen]);
 
   const centreScope = centreFilterEnabled ? selectedCentre : portalName;
 
@@ -307,6 +331,11 @@ export default function AdminAttendance({
           matchesPortalCentre(user.centre, centreScope)
       ),
     [mitras, centreScope]
+  );
+
+  const centreVishistMitras = useMemo(
+    () => centreMitras.filter((user) => Boolean(user.isVishist)),
+    [centreMitras]
   );
 
   const currentMitra = useMemo(() => {
@@ -454,9 +483,9 @@ export default function AdminAttendance({
   }, [viewReady, appliedRole, appliedType, appliedCentre, selectedDate, centreFilterEnabled]);
 
   useEffect(() => {
-    if (mitraTabEnabled && !mitraSelfUpload) loadMitras();
+    if (mitraTabEnabled) loadMitras();
     loadStudents();
-  }, [mitraTabEnabled, mitraSelfUpload, loadMitras, loadStudents]);
+  }, [mitraTabEnabled, loadMitras, loadStudents]);
 
   useEffect(() => {
     loadAttendance();
@@ -556,24 +585,56 @@ export default function AdminAttendance({
           <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
               <div>
-                <h2 className="text-lg font-semibold text-slate-900">My Attendance</h2>
+                <h2 className="text-lg font-semibold text-slate-900">Attendance</h2>
                 <p className="text-sm text-slate-500">
-                  Switch to MyRequests to review your leave submission history.
+                  Choose the attendance view for your own record or Sathee Vishist mentors.
                 </p>
               </div>
 
               <div className="flex flex-wrap items-center gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMitraPanel("myAttendance")}
-                  className={`shrink-0 rounded-xl border px-4 py-2.5 text-sm font-semibold transition-colors ${
-                    mitraPanel === "myAttendance"
-                      ? "border-sky-600 bg-sky-600 text-white"
-                      : "border-sky-200 bg-white text-sky-700 hover:bg-sky-50"
-                  }`}
-                >
-                  My Attendance
-                </button>
+                <div ref={attendanceMenuRef} className="relative inline-flex">
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceDropdownOpen((prev) => !prev)}
+                    aria-haspopup="menu"
+                    aria-expanded={attendanceDropdownOpen}
+                    className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+                  >
+                    Attendance
+                    <span className={`inline-block transition-transform ${attendanceDropdownOpen ? "rotate-180" : ""}`}>
+                      ▼
+                    </span>
+                  </button>
+
+                  {attendanceDropdownOpen ? (
+                    <div className="absolute right-0 top-full z-20 mt-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttendancePanel("myAttendance");
+                          setMitraPanel("myAttendance");
+                          setAttendanceDropdownOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <span>My Attendance</span>
+                        {attendancePanel === "myAttendance" ? <span className="text-sky-600">Selected</span> : null}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAttendancePanel("vishistAttendance");
+                          setMitraPanel("myAttendance");
+                          setAttendanceDropdownOpen(false);
+                        }}
+                        className="flex w-full items-center justify-between px-4 py-3 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      >
+                        <span>Vishist Attendance</span>
+                        {attendancePanel === "vishistAttendance" ? <span className="text-sky-600">Selected</span> : null}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
 
                 <button
                   type="button"
@@ -610,9 +671,13 @@ export default function AdminAttendance({
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
               <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <h3 className="text-xl font-semibold text-slate-900">My Attendance</h3>
+                  <h3 className="text-xl font-semibold text-slate-900">
+                    {attendancePanel === "vishistAttendance" ? "Vishist Attendance" : "My Attendance"}
+                  </h3>
                   <p className="text-sm text-slate-500">
-                    Upload your arrival and departure photos for daily tracking.
+                    {attendancePanel === "vishistAttendance"
+                      ? "Review attendance for Sathee Vishist mentors in your centre."
+                      : "Upload your arrival and departure photos for daily tracking."}
                   </p>
                 </div>
 
@@ -625,14 +690,25 @@ export default function AdminAttendance({
                 </button>
               </div>
 
-              <MyMitraAttendance
-                userId={userId}
-                userName={userName}
-                userEmail={userEmail}
-                userCentre={userCentre}
-                portalName={portalName}
-                selectedDate={selectedDate}
-              />
+              {attendancePanel === "vishistAttendance" ? (
+                <SatheeMitraAttendance
+                  mitras={centreVishistMitras}
+                  loading={loadingMitras}
+                  search={search}
+                  selectedDate={selectedDate}
+                  activeTab={appliedType || "daily"}
+                  canApprove={false}
+                />
+              ) : (
+                <MyMitraAttendance
+                  userId={userId}
+                  userName={userName}
+                  userEmail={userEmail}
+                  userCentre={userCentre}
+                  portalName={portalName}
+                  selectedDate={selectedDate}
+                />
+              )}
             </div>
           ) : mitraPanel === "attendance" ? (
             <ClassSubjectAttendanceTables

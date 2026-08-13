@@ -1,27 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, TrendingUp, Users, GraduationCap } from "lucide-react";
+import { TrendingUp } from "lucide-react";
 
 import { MainLayout } from "../../Components/MainLayout";
 import { StatCard } from "../../Components/Dashboard/StatCard";
 import { WelcomeBanner } from "../../Components/Dashboard/WelcomeBanner";
 import { AttendanceChart } from "../../Components/Dashboard/AttendanceChart";
+import { StudentsByCourseChart } from "../../Components/Dashboard/StudentsByCourseChart";
 import { QuickActions } from "../../Components/Dashboard/QuickActions";
 import { ExamProgress } from "../../Components/Dashboard/ExamProgress";
 import { fetchStudentPerformance } from "../../services/studentPerformance";
+import { fetchAttendanceSummary } from "../../services/dailySubjectAttendance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
-import {
-  average,
-  getStudentAttendanceRates,
-  getStudentProgressRates,
-} from "../../utils/studentMetrics";
+import { average, getStudentProgressRates } from "../../utils/studentMetrics";
 
-const formatCount = (value) => value.toLocaleString("en-IN");
 const formatPercent = (value) => (value == null ? "—" : `${value.toFixed(1)}%`);
 
 const STAT_CARDS = (stats, loadingStats) => [
-  { icon: GraduationCap, label: "Total Students", value: formatCount(stats.totalStudents), iconBg: "bg-blue-500/10", iconColor: "text-blue-400" },
-  { icon: Users, label: "Active Today", value: formatCount(stats.activeToday), iconBg: "bg-emerald-500/10", iconColor: "text-emerald-400" },
-    { icon: TrendingUp, label: "Avg. Progress", value: formatPercent(stats.progressAvg), iconBg: "bg-amber-500/10", iconColor: "text-amber-400" },
+  { icon: TrendingUp, label: "Avg. Progress", value: formatPercent(stats.progressAvg), iconBg: "bg-amber-500/10", iconColor: "text-amber-400" },
 ].map((card) => ({ ...card, loading: loadingStats }));
 
 export default function AdminDashboard({
@@ -39,6 +34,7 @@ export default function AdminDashboard({
   const [students, setStudents] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
   const [statsError, setStatsError] = useState("");
+  const [todaySummary, setTodaySummary] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,25 +63,28 @@ export default function AdminDashboard({
     };
   }, []);
 
+  useEffect(() => {
+    let isMounted = true;
+    fetchAttendanceSummary({ period: "daily", centre: portalName })
+      .then((data) => isMounted && setTodaySummary(data))
+      .catch(() => isMounted && setTodaySummary(null));
+    return () => {
+      isMounted = false;
+    };
+  }, [portalName]);
+
   const stats = useMemo(() => {
     const centreStudents = students.filter((student) =>
       matchesPortalCentre(student.centre, portalName)
     );
-
-    const attendanceRates = centreStudents.flatMap(getStudentAttendanceRates);
     const progressRates = centreStudents.flatMap(getStudentProgressRates);
-    const activeToday = centreStudents.filter(
-      (student) => getStudentAttendanceRates(student).length > 0
-    ).length;
 
     return {
       totalStudents: centreStudents.length,
-      activeToday,
-      attendanceAvg: average(attendanceRates),
       progressAvg: average(progressRates),
       centreStudents,
     };
-  }, [students, portalName]);
+  }, [students, portalName, todaySummary]);
 
   return (
     <MainLayout
@@ -112,10 +111,15 @@ export default function AdminDashboard({
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
-          {STAT_CARDS(stats, loadingStats).map((card) => (
-            <StatCard key={card.label} {...card} />
-          ))}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2">
+            <StudentsByCourseChart students={stats.centreStudents} loading={loadingStats} />
+          </div>
+          <div className="grid grid-cols-1 gap-5">
+            {STAT_CARDS(stats, loadingStats).map((card) => (
+              <StatCard key={card.label} {...card} />
+            ))}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
