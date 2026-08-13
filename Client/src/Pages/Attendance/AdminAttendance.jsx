@@ -10,7 +10,7 @@ import MyMitraAttendance from "../../Components/Attendance/MyMitraAttendance";
 import ApplyLeaveModal from "../../Components/Attendance/ApplyLeaveModal";
 import TodaysClassesCard from "../../Components/Attendance/TodaysClassesCard";
 import ClassSubjectAttendanceTables from "../../Components/Attendance/ClassSubjectAttendanceTables";
-import { fetchCurrentUser, fetchUsers } from "../../services/users";
+import { fetchUsers } from "../../services/users";
 import { applyLeaveRequest, fetchMyLeaveRequests } from "../../services/leaveRequests";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { fetchStudents } from "../../services/students";
@@ -261,7 +261,6 @@ export default function AdminAttendance({
   const [mitras, setMitras] = useState([]);
   const [students, setStudents] = useState([]);
   const [attendanceRecords, setAttendanceRecords] = useState([]);
-  const [currentUserProfile, setCurrentUserProfile] = useState(null);
   const [loadingMitras, setLoadingMitras] = useState(false);
   const [attendanceDropdownOpen, setAttendanceDropdownOpen] = useState(false);
   const attendanceMenuRef = useRef(null);
@@ -339,42 +338,6 @@ export default function AdminAttendance({
     [centreMitras]
   );
 
-  useEffect(() => {
-    if (!mitraSelfUpload || !userId) {
-      setCurrentUserProfile(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    fetchCurrentUser()
-      .then((user) => {
-        if (!cancelled) setCurrentUserProfile(user || null);
-      })
-      .catch((err) => {
-        console.warn("Load current mitra profile error:", err?.message || err);
-        if (!cancelled) setCurrentUserProfile(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [mitraSelfUpload, userId]);
-
-  const currentMitraRecord = useMemo(() => {
-    if (!userId) return null;
-    return (
-      mitras.find((user) => String(user.id) === String(userId)) ||
-      (currentUserProfile && String(currentUserProfile.id) === String(userId)
-        ? currentUserProfile
-        : null)
-    );
-  }, [mitras, userId, currentUserProfile]);
-
-  const isCurrentMitraVishist = Boolean(
-    currentMitraRecord?.isVishist ?? currentUserProfile?.isVishist ?? false
-  );
-
   const currentMitra = useMemo(() => {
     if (!userId) return [];
     return [
@@ -383,10 +346,9 @@ export default function AdminAttendance({
         name: userName || "",
         email: userEmail || "",
         centre: userCentre || portalName || "",
-        isVishist: isCurrentMitraVishist,
       },
     ];
-  }, [userId, userName, userEmail, userCentre, portalName, isCurrentMitraVishist]);
+  }, [userId, userName, userEmail, userCentre, portalName]);
 
   const recordsByStudentDate = useMemo(() => {
     const map = new Map();
@@ -728,31 +690,20 @@ export default function AdminAttendance({
                 </button>
               </div>
 
-              {attendancePanel === "vishistAttendance" && !isCurrentMitraVishist ? (
-                <SatheeMitraAttendance
-                  mitras={centreVishistMitras}
-                  loading={loadingMitras}
-                  search={search}
-                  selectedDate={selectedDate}
-                  activeTab={appliedType || "daily"}
-                  canApprove={false}
-                />
-              ) : (
-                <MyMitraAttendance
-                  userId={userId}
-                  userName={userName}
-                  userEmail={userEmail}
-                  userCentre={userCentre}
-                  portalName={portalName}
-                  selectedDate={selectedDate}
-                  headingLabel={attendancePanel === "vishistAttendance" ? "Vishist Attendance" : "My Attendance"}
-                  headingDescription={
-                    attendancePanel === "vishistAttendance"
-                      ? "Upload your Sathee Vishist attendance for"
-                      : "Take a live arrival and departure photo for"
-                  }
-                />
-              )}
+              <MyMitraAttendance
+                userId={userId}
+                userName={userName}
+                userEmail={userEmail}
+                userCentre={userCentre}
+                portalName={portalName}
+                selectedDate={selectedDate}
+                headingLabel={attendancePanel === "vishistAttendance" ? "Vishist Attendance" : "My Attendance"}
+                headingDescription={
+                  attendancePanel === "vishistAttendance"
+                    ? "Upload your Sathee Vishist attendance for"
+                    : "Take a live arrival and departure photo for"
+                }
+              />
             </div>
           ) : mitraPanel === "attendance" ? (
             <ClassSubjectAttendanceTables
