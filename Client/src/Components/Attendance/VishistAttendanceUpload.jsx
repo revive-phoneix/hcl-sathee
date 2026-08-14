@@ -67,6 +67,8 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
         setTopicTaught("");
         setPhotoFile(null);
         setPhotoPreview(null);
+        setError("");
+        setMessage("");
     };
 
     const handleSubmit = async (e) => {
@@ -74,25 +76,29 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
         setError("");
         setMessage("");
 
-        if (!selectedId) return setError("Select a Sathee Vishist name");
-        if (!subject.trim()) return setError("Enter the subject");
-        if (!topicTaught.trim()) return setError("Enter the topic taught");
+        const cleanSubject = subject.trim();
+        const cleanTopic = topicTaught.trim();
+
+        if (!selectedId) return setError("Select a Sathee Vishist name from the dropdown.");
+        if (!selectedVishist) return setError("The selected Vishist could not be found. Please choose another name.");
+        if (!cleanSubject) return setError("Enter the subject taught.");
+        if (!cleanTopic) return setError("Enter the topic taught.");
 
         setSubmitting(true);
         try {
             await markVishistAttendance({
                 vishistUserId: selectedId,
-                subject: subject.trim(),
-                topicTaught: topicTaught.trim(),
+                subject: cleanSubject,
+                topicTaught: cleanTopic,
                 date: today,
                 photoFile,
             });
             setMessage("Vishist attendance marked successfully.");
             resetForm();
-            loadRecords();
+            await loadRecords();
         } catch (err) {
             console.error("Mark Vishist attendance error:", err);
-            setError(err.response?.data?.message || "Unable to mark attendance");
+            setError(err.response?.data?.message || "Unable to mark attendance. Please try again.");
         } finally {
             setSubmitting(false);
         }
@@ -136,7 +142,7 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
                             value={subject}
                             onChange={(e) => setSubject(e.target.value)}
                             placeholder="e.g. Physics"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
                         />
                     </div>
                     <div>
@@ -146,13 +152,13 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
                             value={topicTaught}
                             onChange={(e) => setTopicTaught(e.target.value)}
                             placeholder="e.g. Newton's Laws of Motion"
-                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:outline-none focus:border-blue-500"
+                            className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-black placeholder:text-slate-400 focus:outline-none focus:border-blue-500"
                         />
                     </div>
                 </div>
 
                 <div>
-                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Photo</label>
+                    <label className="mb-1.5 block text-sm font-medium text-slate-700">Photo (optional)</label>
                     <div className="flex items-center gap-4">
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
                             {photoPreview ? (

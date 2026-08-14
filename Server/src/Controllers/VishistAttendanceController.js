@@ -18,7 +18,11 @@ exports.getVishistAttendance = wrap(
 
 exports.markVishistAttendance = wrap(
   async (req, res) => {
-    const { vishistUserId, subject, topicTaught, date } = req.body;
+    const vishistUserId = String(req.body.vishistUserId ?? "").trim();
+    const subject = String(req.body.subject ?? "").trim();
+    const topicTaught = String(req.body.topicTaught ?? "").trim();
+    const date = String(req.body.date ?? "").trim();
+
     if (!vishistUserId || !subject || !topicTaught || !date) {
       return fail(res, 400, "vishistUserId, subject, topicTaught and date are required");
     }
