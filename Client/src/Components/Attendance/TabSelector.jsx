@@ -40,6 +40,7 @@ export default function TabSelector({
   const roleOptions = [
     { value: "student", label: "Student" },
     { value: "sathee-mitra", label: mitraTabLabel },
+    { value: "sathee-vishist", label: "Sathee Vishist" },
   ];
 
   return (

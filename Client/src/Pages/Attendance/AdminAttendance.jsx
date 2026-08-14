@@ -7,6 +7,7 @@ import AttendanceToolbar from "../../Components/Attendance/AttendanceToolbar";
 import AttendanceTable from "../../Components/Attendance/AttendanceTable";
 import SatheeMitraAttendance from "../../Components/Attendance/SatheeMitraAttendance";
 import MyMitraAttendance from "../../Components/Attendance/MyMitraAttendance";
+import VishistAttendanceUpload from "../../Components/Attendance/VishistAttendanceUpload";
 import ApplyLeaveModal from "../../Components/Attendance/ApplyLeaveModal";
 import TodaysClassesCard from "../../Components/Attendance/TodaysClassesCard";
 import ClassSubjectAttendanceTables from "../../Components/Attendance/ClassSubjectAttendanceTables";
@@ -690,20 +691,18 @@ export default function AdminAttendance({
                 </button>
               </div>
 
-              <MyMitraAttendance
-                userId={userId}
-                userName={userName}
-                userEmail={userEmail}
-                userCentre={userCentre}
-                portalName={portalName}
-                selectedDate={selectedDate}
-                headingLabel={attendancePanel === "vishistAttendance" ? "Vishist Attendance" : "My Attendance"}
-                headingDescription={
-                  attendancePanel === "vishistAttendance"
-                    ? "Upload Sathee Vishist attendance for"
-                    : "Take a live arrival and departure photo for"
-                }
-              />
+              {attendancePanel === "vishistAttendance" ? (
+  <VishistAttendanceUpload vishistMitras={centreVishistMitras} portalName={portalName} />
+) : (
+  <MyMitraAttendance
+    userId={userId}
+    userName={userName}
+    userEmail={userEmail}
+    userCentre={userCentre}
+    portalName={portalName}
+    selectedDate={selectedDate}
+  />
+)}
             </div>
           ) : mitraPanel === "attendance" ? (
             <ClassSubjectAttendanceTables

@@ -16,6 +16,7 @@ const timetableRoutes = require("./Routes/TimetableRoutes");
 const leaveRequestRoutes = require("./Routes/LeaveRequestRoutes");
 const supportQueryRoutes = require("./Routes/SupportQueryRoutes");
 const testMarksRoutes = require("./Routes/TestMarksRoutes");
+const vishistAttendanceRoutes = require("./Routes/VishistAttendanceRoutes");
 
 const app = express();
 
@@ -46,6 +47,7 @@ app.use("/api/students", studentRoutes);
 app.use("/api/students/performance", studentPerformanceRoutes);
 app.use("/api/announcements", announcementRoutes);
 app.use("/api/mitra-attendance", mitraAttendanceRoutes);
+app.use("/api/vishist-attendance", vishistAttendanceRoutes);
 app.use("/api/student-attendance", studentAttendanceRoutes);
 app.use("/api/equipments", equipmentRoutes);
 app.use("/api/schedules", scheduleRoutes);
