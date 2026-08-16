@@ -68,4 +68,12 @@ const create = async ({ name, course, centre, testDate, createdBy = null }) => {
   return toApiTest(String(id), payload);
 };
 
-module.exports = { findByCourse, findById, getNextTestNumber, create };
+const removeById = async (id) => {
+  const ref = testsRef().doc(String(id));
+  const doc = await ref.get();
+  if (!doc.exists) return 0;
+  await ref.delete();
+  return 1;
+};
+
+module.exports = { findByCourse, findById, getNextTestNumber, create, removeById };

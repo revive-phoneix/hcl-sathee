@@ -12,6 +12,10 @@ export const createTest = async ({ name, course, centre, testDate }) => {
   return response.data.test;
 };
 
+export const deleteTest = async (id) => {
+  const response = await api.delete(`/api/test-marks/tests/${id}`);
+  return response.data;
+};
 
 export const saveTestMarks = async ({ testId, testType, studentId, course, centre, records, answerSheetFile }) => {
   const formData = new FormData();

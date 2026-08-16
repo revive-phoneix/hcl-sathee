@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchStudents } from "../../services/students";
-import { fetchTests, createTest, saveTestMarks } from "../../services/testMarks";
+import { fetchTests, createTest, deleteTest, saveTestMarks } from "../../services/testMarks";
 
 const COURSES = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
 const TEST_TYPES = [
@@ -16,6 +16,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [tests, setTests] = useState([]);
   const [testId, setTestId] = useState("");
   const [newTestName, setNewTestName] = useState("");
+  const [testMenuOpen, setTestMenuOpen] = useState(false);
   const [studentId, setStudentId] = useState("");
   const [file, setFile] = useState(null);
   const [rows, setRows] = useState([]); // [{ subject, marksObtained, totalMarks }]
@@ -47,6 +48,27 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     setTests((prev) => [...prev, created]);
     setTestId(created.id);
     setNewTestName("");
+    setTestMenuOpen(false);
+  };
+
+  const handleDeleteTest = async (id, name) => {
+    if (!id) return;
+    const confirmDelete = window.confirm(`Delete test "${name}"? This will remove the test and its saved subject marks.`);
+    if (!confirmDelete) return;
+
+    try {
+      await deleteTest(id);
+      setTests((prev) => prev.filter((test) => String(test.id) !== String(id)));
+      if (String(testId) === String(id)) {
+        setTestId("");
+        setRows([]);
+      }
+      setSaveMessage("");
+    } catch (err) {
+      setSaveMessage(err?.response?.data?.message || "Failed to delete test");
+    } finally {
+      setTestMenuOpen(false);
+    }
   };
 
   const handleStartManualEntry = () => {
@@ -56,6 +78,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     }
     setRows([{ subject: "", marksObtained: "", totalMarks: "" }]);
   };
+
+  const canUpload = Boolean(course && testId && studentId && file);
 
   const handleUpload = () => {
     if (!file || !studentId) return;
@@ -123,15 +147,51 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
 
-        <select
-          className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
-          value={testId}
-          onChange={(e) => setTestId(e.target.value)}
-          disabled={!course}
-        >
-          <option value="">Select test</option>
-          {tests.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        <div className="relative">
+          <button
+            type="button"
+            className="w-full rounded-xl border border-slate-300 bg-white p-2 text-left text-sm text-slate-900"
+            onClick={() => setTestMenuOpen((prev) => !prev)}
+            disabled={!course}
+          >
+            {tests.find((t) => String(t.id) === String(testId))?.name || "Select test"}
+          </button>
+
+          {testMenuOpen && course ? (
+            <div className="absolute left-0 right-0 z-20 mt-1 rounded-xl border border-slate-200 bg-white shadow-lg">
+              <div className="border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Select test
+              </div>
+              {tests.length === 0 ? (
+                <div className="px-3 py-3 text-sm text-slate-500">No tests found</div>
+              ) : (
+                tests.map((t) => (
+                  <div key={t.id} className="flex items-center justify-between gap-2 border-b border-slate-100 last:border-b-0">
+                    <button
+                      type="button"
+                      className="flex-1 px-3 py-2 text-left text-sm text-slate-700 hover:bg-slate-50"
+                      onClick={() => {
+                        setTestId(String(t.id));
+                        setRows([]);
+                        setSaveMessage("");
+                        setTestMenuOpen(false);
+                      }}
+                    >
+                      {t.name}
+                    </button>
+                    <button
+                      type="button"
+                      className="mr-2 rounded-md border border-red-200 bg-red-50 px-2 py-1 text-[11px] font-medium text-red-700 hover:bg-red-100"
+                      onClick={() => handleDeleteTest(t.id, t.name)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          ) : null}
+        </div>
 
         <div className="flex gap-2">
           <input
@@ -171,7 +231,9 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         />
         <button
-          className="rounded-xl bg-sky-600 px-4 py-2 text-xs font-medium text-white disabled:opacity-40"
+          className={`rounded-xl px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-40 ${
+            canUpload ? "bg-[#0b2e6f] hover:bg-[#08265d]" : "bg-sky-600 hover:bg-sky-700"
+          }`}
           onClick={handleUpload}
           disabled={!file || !studentId}
         >

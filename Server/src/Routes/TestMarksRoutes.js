@@ -4,6 +4,7 @@ const router = express.Router();
 const {
   listTests,
   createTest,
+  deleteTest,
   saveTestMarks,
   getCourseProgress,
 } = require("../Controllers/TestMarksController");
@@ -32,6 +33,7 @@ const uploadSingle = (req, res, next) => {
 
 router.get("/tests", authenticate, requireAdminOrMitra, listTests);
 router.post("/tests", authenticate, requireAdminOrMitra, createTest);
+router.delete("/tests/:id", authenticate, requireAdminOrMitra, deleteTest);
 router.post("/", authenticate, requireAdminOrMitra, uploadSingle, saveTestMarks);
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);

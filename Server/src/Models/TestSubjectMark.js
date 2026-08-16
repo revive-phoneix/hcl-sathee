@@ -60,6 +60,16 @@ const findByStudent = async (studentId) => {
   return snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
 };
 
+const deleteByTestId = async (testId) => {
+  const snap = await marksRef().where("testId", "==", testId).get();
+  if (snap.empty) return 0;
+
+  const batch = getDb().batch();
+  snap.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  return snap.docs.length;
+};
+
 const upsert = async ({
   testId,
   testType = "performance",

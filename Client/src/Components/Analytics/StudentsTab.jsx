@@ -3,15 +3,30 @@ import { fetchStudentPerformance } from "../../services/studentPerformance";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { average, getStudentProgressRates } from "../../utils/studentMetrics";
 import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
-import { performanceBadge, tableHeadRowClass, zebraRowClass } from "./analyticsUi";
+import { tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 
-const PASS_MARK = 40;
+const TEST_TYPE_OPTIONS = [
+  { value: "performance", label: "Performance Test (Weekly)" },
+  { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
+];
 
-const getPerformanceLabel = (avg) => {
-  if (avg >= 75) return "Excellent";
-  if (avg >= 65) return "Good";
-  if (avg >= 50) return "Average";
-  return "Needs Improvement";
+const TEST_TYPE_GRAPH_META = {
+  performance: {
+    title: "Performance Test (Weekly)",
+    subtitle: "Average weekly performance across the course",
+    labels: ["Week 1", "Week 2", "Week 3"],
+  },
+  "pre-mid": {
+    title: "Pre-Mid (Monthly)",
+    subtitle: "Average pre-mid performance across the course",
+    labels: ["Month 1", "Month 2", "Month 3"],
+  },
+  mid: {
+    title: "Mid (in Six Months)",
+    subtitle: "Average mid-test performance across the course",
+    labels: ["Mid 1", "Mid 2", "Mid 3"],
+  },
 };
 
 const round1 = (value) => Math.round(value * 10) / 10;
@@ -113,10 +128,72 @@ function StudentHighlightCard({ theme, entry }) {
   );
 }
 
+function GraphPreviewModal({ course, testType, onClose }) {
+  const meta = TEST_TYPE_GRAPH_META[testType];
+
+  if (!meta) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+      <div className="w-full max-w-4xl rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-blue-500">{course}</p>
+            <h3 className="mt-2 text-2xl font-bold text-slate-900">{meta.title}</h3>
+            <p className="mt-1 text-sm text-slate-500">{meta.subtitle}</p>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50"
+          >
+            Close
+          </button>
+        </div>
+
+        <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-slate-700">Average test percentage</p>
+              <p className="text-xs text-slate-400">No percentage exists yet. Values will be calculated later.</p>
+            </div>
+            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
+              Placeholder
+            </span>
+          </div>
+
+          <div className="flex h-56 items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+            {meta.labels.map((label, index) => (
+              <div key={label} className="flex flex-1 flex-col items-center gap-3">
+                <div className="flex h-40 w-full items-end justify-center rounded-t-xl bg-slate-100 p-2">
+                  <div
+                    className="w-full rounded-t-xl bg-gradient-to-t from-blue-500 via-cyan-400 to-sky-300 shadow-md transition-all duration-700 animate-pulse"
+                    style={{
+                      height: `${28 + ((index + 1) * 17) % 42}%`,
+                      opacity: 0.2 + index * 0.15,
+                    }}
+                  />
+                </div>
+                <div className="text-center">
+                  <p className="text-sm font-semibold text-slate-700">{label}</p>
+                  <p className="text-[11px] text-slate-400">No percentage exists</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function StudentsTab({ portalName }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedTestTypes, setSelectedTestTypes] = useState({});
+  const [activeGraph, setActiveGraph] = useState({ course: null, type: null });
 
   useEffect(() => {
     let isMounted = true;
@@ -176,10 +253,6 @@ export default function StudentsTab({ portalName }) {
         const avg = average(allScores);
         const highestMark = allScores.length ? Math.max(...allScores) : null;
         const lowestMark = allScores.length ? Math.min(...allScores) : null;
-        const passCount = studentAverages.filter((value) => value >= PASS_MARK).length;
-        const pass = studentAverages.length
-          ? Math.round((passCount / studentAverages.length) * 100)
-          : 0;
 
         return {
           Course: course,
@@ -187,8 +260,6 @@ export default function StudentsTab({ portalName }) {
           avg: avg == null ? "—" : round1(avg),
           highest: highestMark == null ? "—" : round1(highestMark),
           lowest: lowestMark == null ? "—" : round1(lowestMark),
-          pass,
-          performance: avg == null ? "—" : getPerformanceLabel(avg),
         };
       })
       .sort((a, b) => a.Course.localeCompare(b.Course));
@@ -229,8 +300,7 @@ export default function StudentsTab({ portalName }) {
                   ["Avg", "text-center px-4"],
                   ["Highest", "text-center px-4"],
                   ["Lowest", "text-center px-4"],
-                  ["Pass %", "text-center px-4"],
-                  ["Performance", "text-center px-6"],
+                  ["View Graph", "text-center px-6"],
                 ].map(([label, alignPad]) => (
                   <th
                     key={label}
@@ -253,15 +323,29 @@ export default function StudentsTab({ portalName }) {
                   <td className="px-4 py-4 text-center text-gray-700">{row.avg}</td>
                   <td className="px-4 py-4 text-center font-medium text-green-700">{row.highest}</td>
                   <td className="px-4 py-4 text-center font-medium text-red-600">{row.lowest}</td>
-                  <td className="px-4 py-4 text-center font-semibold text-gray-800">{row.pass}%</td>
                   <td className="px-6 py-4 text-center">
-                    {row.performance === "—" ? (
-                      <span className="text-gray-400">—</span>
-                    ) : (
-                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-semibold ${performanceBadge(row.performance)}`}>
-                        {row.performance}
-                      </span>
-                    )}
+                    <select
+                      value={selectedTestTypes[row.Course] || ""}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setSelectedTestTypes((prev) => ({
+                          ...prev,
+                          [row.Course]: nextValue,
+                        }));
+
+                        if (nextValue) {
+                          setActiveGraph({ course: row.Course, type: nextValue });
+                        }
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    >
+                      <option value="">Select Type</option>
+                      {TEST_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                 </tr>
               ))}
@@ -269,6 +353,14 @@ export default function StudentsTab({ portalName }) {
           </table>
         </div>
       </div>
+
+      {activeGraph.course && activeGraph.type ? (
+        <GraphPreviewModal
+          course={activeGraph.course}
+          testType={activeGraph.type}
+          onClose={() => setActiveGraph({ course: null, type: null })}
+        />
+      ) : null}
     </div>
   );
 }

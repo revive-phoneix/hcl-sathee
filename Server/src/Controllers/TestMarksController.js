@@ -73,6 +73,26 @@ const uploadAnswerSheet = async (file, testId, studentId) => {
   });
 };
 
+exports.deleteTest = wrap(
+  async (req, res) => {
+    const testId = String(req.params.id || "").trim();
+    if (!testId) return fail(res, 400, "testId is required");
+
+    const test = await Test.findById(testId);
+    if (!test) return fail(res, 404, "Test not found");
+    if (!assertCentreAccess(req, test.centre)) {
+      return fail(res, 403, "Centre access denied");
+    }
+
+    await TestSubjectMark.deleteByTestId(testId);
+    const deleted = await Test.removeById(testId);
+    if (!deleted) return fail(res, 404, "Test not found");
+
+    return ok(res, { message: "Test deleted", testId });
+  },
+  { label: "Delete Test Error", message: "Failed to delete test" }
+);
+
 exports.saveTestMarks = wrap(
   async (req, res) => {
     const { testId, testType = "performance", studentId, course = null, centre = null, records } = req.body || {};
