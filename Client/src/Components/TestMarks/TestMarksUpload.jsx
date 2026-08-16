@@ -115,6 +115,37 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       return;
     }
 
+    // Check for existing marks that would be overridden
+    const existingMarksForSubjects = [];
+    const studentTestMarks = Array.isArray(selectedStudent?.testMarks) ? selectedStudent.testMarks : [];
+
+    for (const row of rows) {
+      if (!row.subject) continue;
+
+      const existingMark = studentTestMarks.find(
+        (mark) =>
+          mark?.subject === row.subject &&
+          (mark?.testType || "performance") === testType
+      );
+
+      if (existingMark) {
+        existingMarksForSubjects.push(row.subject);
+      }
+    }
+
+    // If there are existing marks, ask for confirmation
+    if (existingMarksForSubjects.length > 0) {
+      const subjectList = existingMarksForSubjects.join(", ");
+      const confirmOverride = window.confirm(
+        `Test marks for ${subjectList} of ${selectedStudent?.name} already saved.\n\nDo you want to override?`
+      );
+
+      if (!confirmOverride) {
+        setSaveMessage("Save cancelled.");
+        return;
+      }
+    }
+
     setSaving(true);
     setSaveMessage("");
     try {
