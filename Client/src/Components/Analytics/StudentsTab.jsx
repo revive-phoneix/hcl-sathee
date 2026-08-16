@@ -140,24 +140,48 @@ function GraphPreviewModal({ course, testType, portalName, onClose }) {
 
   useEffect(() => {
     let isMounted = true;
+    const resolvedCourse = String(course || "").trim();
+    const resolvedType = String(testType || "").trim();
+
+    if (!resolvedCourse || !resolvedType || !meta) {
+      if (isMounted) {
+        setSlots([]);
+        setError("");
+        setLoading(false);
+      }
+      return undefined;
+    }
+
     setLoading(true);
     setError("");
-    fetchTestTypeProgress(course, testType, portalName)
-      .then((data) => isMounted && setSlots(data.slots || []))
-      .catch(() => isMounted && setError("Unable to load test progress"))
-      .finally(() => isMounted && setLoading(false));
+
+    fetchTestTypeProgress(resolvedCourse, resolvedType, portalName)
+      .then((data) => {
+        if (!isMounted) return;
+        const nextSlots = Array.isArray(data?.slots) ? data.slots : [];
+        setSlots(nextSlots);
+      })
+      .catch(() => {
+        if (!isMounted) return;
+        setError("Unable to load test progress");
+        setSlots([]);
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
     return () => {
       isMounted = false;
     };
-  }, [course, testType, portalName]);
+  }, [course, testType, portalName, meta]);
 
   if (!meta) return null;
 
-  const chartData = slots.map((slot) => ({
-    label: slot.label,
-    average: slot.average,
-    barValue: slot.average ?? 0,
-    studentCount: slot.studentCount,
+  const chartData = (Array.isArray(slots) ? slots : []).map((slot, index) => ({
+    label: slot?.label || meta.labels[index] || `Slot ${index + 1}`,
+    average: typeof slot?.average === "number" ? slot.average : null,
+    barValue: typeof slot?.average === "number" ? slot.average : 0,
+    studentCount: Number(slot?.studentCount) || 0,
   }));
 
   return (
@@ -191,6 +215,10 @@ function GraphPreviewModal({ course, testType, portalName, onClose }) {
               <div className="flex h-full items-center justify-center text-sm text-slate-400">Loading…</div>
             ) : error ? (
               <div className="flex h-full items-center justify-center text-sm text-red-500">{error}</div>
+            ) : !chartData.length ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">
+                No test data is available for this course and test type yet.
+              </div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} margin={{ top: 24, right: 8, left: -20, bottom: 0 }}>

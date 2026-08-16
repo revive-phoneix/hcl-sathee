@@ -7,6 +7,7 @@ const {
   deleteTest,
   saveTestMarks,
   getCourseProgress,
+  getTestTypeProgress,
 } = require("../Controllers/TestMarksController");
 const { authenticate, requireAdminOrMitra } = require("../Middleware/auth");
 
