@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { average, parsePercentValue, getProgressColor } from "../../utils/studentMetrics";
 import { resolveEnrolledSubjects } from "../../utils/courseSubjects";
 import { BarListChart, EmptyDataCard } from "../Analytics/AnalyticsCharts";
+import StudentPerformanceChart from "./StudentPerformanceChart";
 
 const formatOneDecimal = (value) => Math.round(value * 10) / 10;
 
@@ -128,6 +129,8 @@ export default function StudentAnalyticsPanel({ student }) {
         valueFormatter={(value) => value}
         xAxisLabel="Attendance %"
       />
+
+      <StudentPerformanceChart student={student} />
 
       <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
         <div className="mb-6">
