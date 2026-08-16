@@ -22,6 +22,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [rows, setRows] = useState([]); // [{ subject, marksObtained, totalMarks }]
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
+  const [rowErrors, setRowErrors] = useState({}); // Track validation errors per row
 
   useEffect(() => {
     fetchStudents().then(setStudents).catch(() => setStudents([]));
@@ -77,6 +78,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       return;
     }
     setRows([{ subject: "", marksObtained: "", totalMarks: "" }]);
+    setRowErrors({});
   };
 
   const canUpload = Boolean(course && testId && studentId && file);
@@ -88,10 +90,31 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
 
   const updateRow = (index, field, value) => {
     setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+
+    // Validate marks obtained doesn't exceed total marks
+    const obtained = field === "marksObtained" ? Number(value) || 0 : Number(rows[index]?.marksObtained) || 0;
+    const total = field === "totalMarks" ? Number(value) || 0 : Number(rows[index]?.totalMarks) || 0;
+
+    if (obtained > total && total > 0) {
+      setRowErrors((prev) => ({ ...prev, [index]: "Marks obtained cannot exceed total marks" }));
+    } else {
+      setRowErrors((prev) => {
+        const next = { ...prev };
+        delete next[index];
+        return next;
+      });
+    }
   };
 
   const handleSave = async () => {
     if (!testId || !studentId || !rows.length) return;
+
+    // Check for validation errors
+    if (Object.keys(rowErrors).length > 0) {
+      setSaveMessage("Please fix validation errors before saving.");
+      return;
+    }
+
     setSaving(true);
     setSaveMessage("");
     try {
@@ -173,6 +196,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                       onClick={() => {
                         setTestId(String(t.id));
                         setRows([]);
+                        setRowErrors({});
                         setSaveMessage("");
                         setTestMenuOpen(false);
                       }}
@@ -214,7 +238,11 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       <select
         className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         value={studentId}
-        onChange={(e) => { setStudentId(e.target.value); setRows([]); }}
+        onChange={(e) => {
+          setStudentId(e.target.value);
+          setRows([]);
+          setRowErrors({});
+        }}
         disabled={!course}
       >
         <option value="">Select student</option>
@@ -275,21 +303,24 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
               const marksObtained = Number(row.marksObtained) || 0;
               const totalMarks = Number(row.totalMarks) || 0;
               const percentage = totalMarks > 0 ? ((marksObtained / totalMarks) * 100).toFixed(1) : "—";
+              const hasError = rowErrors[i];
+              const isInvalid = marksObtained > totalMarks && totalMarks > 0;
 
               return (
                 <div key={i} className="rounded-xl border border-slate-300 bg-white p-4">
                   <p className="mb-3 text-sm font-semibold text-slate-900">{row.subject}</p>
                   <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                      <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
+                    <div className={`rounded-lg border ${isInvalid ? "border-red-300 bg-red-50" : "border-slate-200 bg-slate-50"} p-3`}>
+                      <label className={`block text-xs font-medium uppercase tracking-wide ${isInvalid ? "text-red-600" : "text-slate-500"}`}>
                         Marks Gained
                       </label>
                       <input
                         type="number"
-                        className="mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none text-slate-900"
+                        className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isInvalid ? "text-red-700" : "text-slate-900"}`}
                         value={row.marksObtained}
                         onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
                       />
+                      {hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
                     <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
                       <label className="block text-xs font-medium uppercase tracking-wide text-slate-500">
@@ -302,11 +333,11 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                         onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
                       />
                     </div>
-                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
-                      <label className="block text-xs font-medium uppercase tracking-wide text-emerald-700">
+                    <div className={`rounded-lg border ${isInvalid ? "border-red-200 bg-red-50" : "border-emerald-200 bg-emerald-50"} p-3`}>
+                      <label className={`block text-xs font-medium uppercase tracking-wide ${isInvalid ? "text-red-700" : "text-emerald-700"}`}>
                         Percentage
                       </label>
-                      <p className="mt-1 text-lg font-semibold text-emerald-900">
+                      <p className={`mt-1 text-lg font-semibold ${isInvalid ? "text-red-900" : "text-emerald-900"}`}>
                         {typeof percentage === "number" ? `${percentage}%` : percentage}
                       </p>
                     </div>
@@ -350,7 +381,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       <button
         className="w-full rounded-xl bg-slate-900 py-3 text-sm font-medium text-white disabled:opacity-40"
         onClick={handleSave}
-        disabled={!testId || !studentId || !rows.length || saving}
+        disabled={!testId || !studentId || !rows.length || saving || Object.keys(rowErrors).length > 0}
       >
         {saving ? "Saving…" : "Save Test Marks"}
       </button>
