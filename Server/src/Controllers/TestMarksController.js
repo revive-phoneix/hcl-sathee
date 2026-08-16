@@ -73,6 +73,66 @@ const uploadAnswerSheet = async (file, testId, studentId) => {
   });
 };
 
+const SLOT_LABELS = {
+  performance: ["Week 1", "Week 2", "Week 3"],
+  "pre-mid": ["Month 1", "Month 2", "Month 3"],
+  mid: ["Mid 1", "Mid 2", "Mid 3"],
+};
+
+exports.getTestTypeProgress = wrap(
+  async (req, res) => {
+    const course = String(req.query.course || "").trim().toUpperCase();
+    const testType = String(req.query.testType || "").trim();
+    const centre = req.query.centre || null;
+
+    if (!course || !SLOT_LABELS[testType]) {
+      return fail(res, 400, "Valid course and testType are required");
+    }
+
+    const [tests, marks] = await Promise.all([
+      Test.findByCourse(course, centre),
+      TestSubjectMark.findByCourse(course, centre),
+    ]);
+
+    const marksByTestId = {};
+    for (const mark of marks) {
+      if (!marksByTestId[mark.testId]) marksByTestId[mark.testId] = [];
+      marksByTestId[mark.testId].push(mark);
+    }
+
+    // A Test's testType is only known from marks saved against it.
+    const matchingTests = tests
+      .filter((t) => (marksByTestId[t.id] || []).some((m) => m.testType === testType))
+      .sort((a, b) => (a.testNumber || 0) - (b.testNumber || 0));
+
+    const labels = SLOT_LABELS[testType];
+    const slots = labels.map((label, index) => {
+      const test = matchingTests[index];
+      if (!test) return { label, average: null, studentCount: 0, testName: null };
+
+      const testMarks = (marksByTestId[test.id] || []).filter((m) => m.testType === testType);
+      const byStudent = {};
+      for (const m of testMarks) {
+        if (!byStudent[m.studentId]) byStudent[m.studentId] = [];
+        byStudent[m.studentId].push(Number(m.subjectPercentage) || 0);
+      }
+
+      const studentAverages = Object.values(byStudent).map(
+        (pcts) => pcts.reduce((sum, p) => sum + p, 0) / pcts.length
+      );
+
+      const average = studentAverages.length
+        ? Math.round((studentAverages.reduce((sum, p) => sum + p, 0) / studentAverages.length) * 10) / 10
+        : null;
+
+      return { label, average, studentCount: studentAverages.length, testName: test.name };
+    });
+
+    return ok(res, { course, testType, slots });
+  },
+  { label: "Test Type Progress Error", message: "Failed to load test type progress" }
+);
+
 exports.deleteTest = wrap(
   async (req, res) => {
     const testId = String(req.params.id || "").trim();

@@ -60,6 +60,16 @@ const findByStudent = async (studentId) => {
   return snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
 };
 
+const findByCourse = async (course, centre = null) => {
+  const snap = await marksRef().where("course", "==", String(course || "").trim().toUpperCase()).get();
+  let rows = snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
+  if (centre) {
+    const { matchesCentre } = require("../Utils/centreMatch");
+    rows = rows.filter((r) => matchesCentre(r.centre, centre));
+  }
+  return rows;
+};
+
 const deleteByTestId = async (testId) => {
   const snap = await marksRef().where("testId", "==", testId).get();
   if (snap.empty) return 0;
@@ -133,4 +143,6 @@ module.exports = {
   findByStudent,
   upsert,
   roundPct,
+  findByCourse,
+  deleteByTestId,
 };

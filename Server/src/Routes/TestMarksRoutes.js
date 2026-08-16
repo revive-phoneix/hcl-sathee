@@ -37,5 +37,5 @@ router.delete("/tests/:id", authenticate, requireAdminOrMitra, deleteTest);
 router.post("/", authenticate, requireAdminOrMitra, uploadSingle, saveTestMarks);
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);
-
+router.get("/test-type-progress", authenticate, requireAdminOrMitra, getTestTypeProgress);
 module.exports = router;

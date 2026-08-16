@@ -1,9 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { fetchStudentPerformance } from "../../services/studentPerformance";
+import { fetchTestTypeProgress } from "../../services/testMarks";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { average, getStudentProgressRates } from "../../utils/studentMetrics";
 import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 import { tableHeadRowClass, zebraRowClass } from "./analyticsUi";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList,
+} from "recharts";
 
 const TEST_TYPE_OPTIONS = [
   { value: "performance", label: "Performance Test (Weekly)" },
@@ -128,10 +132,33 @@ function StudentHighlightCard({ theme, entry }) {
   );
 }
 
-function GraphPreviewModal({ course, testType, onClose }) {
+function GraphPreviewModal({ course, testType, portalName, onClose }) {
   const meta = TEST_TYPE_GRAPH_META[testType];
+  const [slots, setSlots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
+    setError("");
+    fetchTestTypeProgress(course, testType, portalName)
+      .then((data) => isMounted && setSlots(data.slots || []))
+      .catch(() => isMounted && setError("Unable to load test progress"))
+      .finally(() => isMounted && setLoading(false));
+    return () => {
+      isMounted = false;
+    };
+  }, [course, testType, portalName]);
 
   if (!meta) return null;
+
+  const chartData = slots.map((slot) => ({
+    label: slot.label,
+    average: slot.average,
+    barValue: slot.average ?? 0,
+    studentCount: slot.studentCount,
+  }));
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
@@ -142,7 +169,6 @@ function GraphPreviewModal({ course, testType, onClose }) {
             <h3 className="mt-2 text-2xl font-bold text-slate-900">{meta.title}</h3>
             <p className="mt-1 text-sm text-slate-500">{meta.subtitle}</p>
           </div>
-
           <button
             type="button"
             onClick={onClose}
@@ -153,34 +179,60 @@ function GraphPreviewModal({ course, testType, onClose }) {
         </div>
 
         <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-5">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold text-slate-700">Average test percentage</p>
-              <p className="text-xs text-slate-400">No percentage exists yet. Values will be calculated later.</p>
-            </div>
-            <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-700">
-              Placeholder
-            </span>
+          <div className="mb-4">
+            <p className="text-sm font-semibold text-slate-700">Average test percentage</p>
+            <p className="text-xs text-slate-400">
+              Averaged across every enrolled student's marks for each test — updates automatically as marks are entered.
+            </p>
           </div>
 
-          <div className="flex h-56 items-end justify-between gap-4 rounded-2xl border border-slate-200 bg-white p-4">
-            {meta.labels.map((label, index) => (
-              <div key={label} className="flex flex-1 flex-col items-center gap-3">
-                <div className="flex h-40 w-full items-end justify-center rounded-t-xl bg-slate-100 p-2">
-                  <div
-                    className="w-full rounded-t-xl bg-gradient-to-t from-blue-500 via-cyan-400 to-sky-300 shadow-md transition-all duration-700 animate-pulse"
-                    style={{
-                      height: `${28 + ((index + 1) * 17) % 42}%`,
-                      opacity: 0.2 + index * 0.15,
+          <div className="h-64 rounded-2xl border border-slate-200 bg-white p-4">
+            {loading ? (
+              <div className="flex h-full items-center justify-center text-sm text-slate-400">Loading…</div>
+            ) : error ? (
+              <div className="flex h-full items-center justify-center text-sm text-red-500">{error}</div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{ top: 24, right: 8, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E2E8F0" />
+                  <XAxis dataKey="label" tick={{ fontSize: 12, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "#64748B" }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.length) return null;
+                      const d = payload[0].payload;
+                      return (
+                        <div className="rounded-xl border border-slate-200 bg-white p-3 text-xs shadow-lg">
+                          <p className="font-semibold text-slate-900">{d.label}</p>
+                          {d.average == null ? (
+                            <p className="mt-1 text-slate-400">No percentage exists yet</p>
+                          ) : (
+                            <>
+                              <p className="mt-1 text-slate-700">{d.average}% average</p>
+                              <p className="text-slate-400">
+                                {d.studentCount} student{d.studentCount === 1 ? "" : "s"}
+                              </p>
+                            </>
+                          )}
+                        </div>
+                      );
                     }}
+                    cursor={{ fill: "#EFF6FF" }}
                   />
-                </div>
-                <div className="text-center">
-                  <p className="text-sm font-semibold text-slate-700">{label}</p>
-                  <p className="text-[11px] text-slate-400">No percentage exists</p>
-                </div>
-              </div>
-            ))}
+                  <Bar dataKey="barValue" radius={[6, 6, 0, 0]} animationDuration={800} animationEasing="ease-out">
+                    {chartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.average == null ? "#E2E8F0" : "#3B82F6"} />
+                    ))}
+                    <LabelList
+                      dataKey="average"
+                      position="top"
+                      formatter={(value) => (value == null ? "No percentage exists" : `${value}%`)}
+                      style={{ fontSize: 11, fill: "#64748B" }}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </div>
       </div>
@@ -358,6 +410,7 @@ export default function StudentsTab({ portalName }) {
         <GraphPreviewModal
           course={activeGraph.course}
           testType={activeGraph.type}
+          portalName={portalName}
           onClose={() => setActiveGraph({ course: null, type: null })}
         />
       ) : null}

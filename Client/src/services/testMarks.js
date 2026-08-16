@@ -37,3 +37,10 @@ export const fetchCourseProgress = async (course, centre = "") => {
   });
   return response.data.timeline ?? [];
 };
+
+export const fetchTestTypeProgress = async (course, testType, centre) => {
+  const response = await api.get("/api/test-marks/test-type-progress", {
+    params: { course, testType, ...(centre ? { centre } : {}) },
+  });
+  return response.data;
+};
