@@ -35,6 +35,11 @@ export const updateUser = async (id, payload) => {
   return response.data.user;
 };
 
+export const updateCurrentUser = async (payload) => {
+  const response = await api.patch("/api/users/me", payload);
+  return response.data.user;
+};
+
 export const fetchAdminUsers = async () => {
   const response = await api.get("/api/users/admins");
   return response.data.users ?? [];

@@ -28,6 +28,7 @@ router.get("/admins", requireAdminOrPartner, getAdminUsers);
 router.get("/", requireAdminOrPartner, getUsers);
 router.post("/", requireAdmin, addUser);
 router.post("/:id/resend-invite", requireAdmin, resendInvite);
+router.patch("/me", updateCurrentUser);
 router.patch("/:id", requireAdmin, updateUser);
 router.delete("/:id", requireAdmin, deleteUser);
 

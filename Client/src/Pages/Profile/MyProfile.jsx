@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { MainLayout } from "../../Components/MainLayout";
-import { fetchCurrentUser, fetchUsers } from "../../services/users";
+import { fetchCurrentUser, fetchUsers, updateCurrentUser } from "../../services/users";
 import { getAuthPayload } from "../../utils/authToken";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+import { updateSession } from "../../utils/authSession";
 import { formatAvailableDays } from "../../utils/availableDays";
 import { getInitials } from "../../utils/studentMetrics";
 
@@ -43,6 +44,9 @@ export default function MyProfile({
   const [profile, setProfile] = useState(null);
   const [vishistMentors, setVishistMentors] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [draft, setDraft] = useState({ name: "", email: "", phone: "" });
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -88,6 +92,16 @@ export default function MyProfile({
   const role = profile?.role || userRole || "—";
   const centre = profile?.centre || userCentre || "—";
   const isMitra = String(role).toUpperCase().includes("MITRA");
+
+  useEffect(() => {
+    if (profile) {
+      setDraft({
+        name: profile.name || "",
+        email: profile.email || "",
+        phone: profile.phone || "",
+      });
+    }
+  }, [profile]);
 
   useEffect(() => {
     if (!isMitra) {
@@ -159,6 +173,36 @@ export default function MyProfile({
     [centre, email, isMitra, name, profile?.availableDays, profile?.created_at, profile?.isVishist, profile?.phone, role]
   );
 
+  const handleDraftChange = (field, value) => {
+    setDraft((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const handleSave = async () => {
+    try {
+      setSaving(true);
+      setError("");
+
+      const payload = {
+        name: draft.name.trim(),
+        email: draft.email.trim(),
+        phone: draft.phone.trim(),
+      };
+
+      const updated = await updateCurrentUser(payload);
+      setProfile((prev) => ({ ...prev, ...updated }));
+      updateSession({
+        name: updated?.name || payload.name,
+        email: updated?.email || payload.email,
+      });
+      setIsEditing(false);
+    } catch (err) {
+      console.error("Profile update error:", err);
+      setError(err?.response?.data?.message || "Unable to update your profile right now.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <MainLayout
       portalName={portalName}
@@ -189,12 +233,81 @@ export default function MyProfile({
           </div>
 
           <div className="border-b border-[#e3e8e6] px-5 py-4">
-            <p className="mb-4 text-[12px] font-semibold uppercase tracking-[0.03em] text-slate-500">
-              Account details
-            </p>
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <p className="text-[12px] font-semibold uppercase tracking-[0.03em] text-slate-500">
+                Account details
+              </p>
+              {!loading ? (
+                !isEditing ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsEditing(true)}
+                    className="rounded-lg bg-[#1f7a5b] px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#1a6d52]"
+                  >
+                    Edit profile
+                  </button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsEditing(false);
+                        setDraft({
+                          name: profile?.name || "",
+                          email: profile?.email || "",
+                          phone: profile?.phone || "",
+                        });
+                        setError("");
+                      }}
+                      className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSave}
+                      disabled={saving}
+                      className="rounded-lg bg-[#1f7a5b] px-3 py-2 text-xs font-medium text-white shadow-sm transition hover:bg-[#1a6d52] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {saving ? "Saving..." : "Save changes"}
+                    </button>
+                  </div>
+                )
+              ) : null}
+            </div>
 
             {loading ? (
               <p className="py-6 text-center text-sm text-slate-500">Loading profile…</p>
+            ) : isEditing ? (
+              <div className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
+                <label className="block">
+                  <span className="text-[12px] text-slate-500">Full Name</span>
+                  <input
+                    value={draft.name}
+                    onChange={(e) => handleDraftChange("name", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 transition focus:border-[#1f7a5b]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="text-[12px] text-slate-500">Email</span>
+                  <input
+                    type="email"
+                    value={draft.email}
+                    onChange={(e) => handleDraftChange("email", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 transition focus:border-[#1f7a5b]"
+                  />
+                </label>
+
+                <label className="block sm:col-span-2">
+                  <span className="text-[12px] text-slate-500">Phone</span>
+                  <input
+                    value={draft.phone}
+                    onChange={(e) => handleDraftChange("phone", e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 outline-none ring-0 transition focus:border-[#1f7a5b]"
+                  />
+                </label>
+              </div>
             ) : (
               <dl className="grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-2">
                 {rows.map((row) => (

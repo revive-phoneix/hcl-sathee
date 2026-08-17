@@ -184,6 +184,68 @@ exports.resendInvite = wrap(
   { label: "Resend Invite Error", message: "Failed to resend invite" }
 );
 
+exports.updateCurrentUser = wrap(
+  async (req, res) => {
+    const { name, email, phone } = req.body;
+    const current = await User.findById(req.user?.id);
+
+    if (!current) {
+      return fail(res, 404, "User not found");
+    }
+
+    const patch = {};
+
+    if (name != null) {
+      const trimmedName = String(name).trim();
+      if (!trimmedName) {
+        return fail(res, 400, "Name is required");
+      }
+      patch.name = trimmedName;
+    }
+
+    if (email != null) {
+      const normalizedEmail = String(email).trim().toLowerCase();
+      if (!normalizedEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+        return fail(res, 400, "Please enter a valid email address");
+      }
+
+      if (normalizedEmail !== current.email) {
+        const existing = await User.findByEmail(normalizedEmail);
+        if (existing && String(existing.id) !== String(req.user.id)) {
+          return fail(res, 409, "Email already exists");
+        }
+      }
+      patch.email = normalizedEmail;
+    }
+
+    if (phone != null) {
+      const normalizedPhone = normalizePhone10(phone);
+      if (!isValidPhone10(phone)) {
+        return fail(res, 400, "Phone number must be exactly 10 digits");
+      }
+
+      if (normalizedPhone !== current.phone) {
+        const existing = await User.findByPhone(normalizedPhone);
+        if (existing && String(existing.id) !== String(req.user.id)) {
+          return fail(res, 409, "Phone number already exists");
+        }
+      }
+      patch.phone = normalizedPhone;
+    }
+
+    if (!Object.keys(patch).length) {
+      return fail(res, 400, "No valid fields to update");
+    }
+
+    const updated = await User.update(req.user.id, patch);
+    return ok(res, {
+      message: "Profile updated successfully",
+      user: toPublicUser(updated),
+    });
+  },
+  { label: "Update Current User Error", message: "Failed to update profile" }
+);
+
 exports.updateUser = wrap(
   async (req, res) => {
     const { availableDays, name, phone, centre, isVishist } = req.body;
