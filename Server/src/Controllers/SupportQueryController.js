@@ -64,6 +64,18 @@ exports.getSupportQueries = wrap(
   }
 );
 
+exports.getMySupportQueries = wrap(
+  async (req, res) => {
+    const email = String(req.user?.email || "").trim().toLowerCase();
+    const queries = email ? await SupportQuery.findBySubmittedByEmail(email) : [];
+    return ok(res, { queries });
+  },
+  {
+    label: "Get My Support Queries Error",
+    message: "Failed to fetch your support queries",
+  }
+);
+
 exports.replyToSupportQuery = wrap(
   async (req, res) => {
     const { id } = req.params;

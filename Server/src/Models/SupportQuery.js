@@ -39,6 +39,14 @@ const findAll = async () => {
   return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
 };
 
+const findBySubmittedByEmail = async (email) => {
+  const normalized = String(email || "").trim().toLowerCase();
+  if (!normalized) return [];
+
+  const snap = await supportQueriesRef().where("submittedByEmail", "==", normalized).get();
+  return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
+};
+
 const findById = async (id) => {
   const ref = await findDocRefById(id);
   if (!ref) return null;
@@ -94,4 +102,4 @@ const addReply = async (id, { adminName, message }) => {
   return toApiSupportQuery(doc.id, doc.data());
 };
 
-module.exports = { findAll, findById, create, addReply };
+module.exports = { findAll, findBySubmittedByEmail, findById, create, addReply };

@@ -1,9 +1,19 @@
 import { useEffect, useState } from "react";
-import { MessageSquareText, SendHorizonal } from "lucide-react";
+import { MessageSquareText, SendHorizonal, ChevronDown, ChevronUp } from "lucide-react";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchAdminUsers } from "../../services/users";
 import api from "../../services/apiClient";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+
+const formatDate = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString("en-IN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+};
 
 export default function QueryAndSupport({
   portalName,
@@ -20,6 +30,9 @@ export default function QueryAndSupport({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [admins, setAdmins] = useState([]);
+  const [queries, setQueries] = useState([]);
+  const [expandedQueryIds, setExpandedQueryIds] = useState({});
+  const [loadingQueries, setLoadingQueries] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -38,6 +51,22 @@ export default function QueryAndSupport({
     };
   }, []);
 
+  useEffect(() => {
+    const loadMyQueries = async () => {
+      setLoadingQueries(true);
+      try {
+        const response = await api.get("/api/support-queries/mine");
+        setQueries(response.data.queries || []);
+      } catch (loadError) {
+        console.error("Failed to load your queries:", loadError);
+      } finally {
+        setLoadingQueries(false);
+      }
+    };
+
+    loadMyQueries();
+  }, []);
+
   const handleSubmit = async (event) => {
     event.preventDefault();
     setSubmitting(true);
@@ -45,11 +74,12 @@ export default function QueryAndSupport({
     setMessage("");
 
     try {
-      await api.post("/api/support-queries", {
+      const response = await api.post("/api/support-queries", {
         title,
         description,
       });
 
+      setQueries((prev) => [response.data.query, ...prev]);
       setMessage("Your query has been sent to the admins successfully.");
       setTitle("");
       setDescription("");
@@ -168,6 +198,79 @@ export default function QueryAndSupport({
               {error}
             </div>
           ) : null}
+
+          <div className="mt-8 rounded-3xl border border-slate-200 bg-slate-50 p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold text-slate-800">Your queries</h2>
+              <span className="text-xs text-slate-500">{queries.length} submitted</span>
+            </div>
+
+            {loadingQueries ? (
+              <div className="text-sm text-slate-500">Loading your queries...</div>
+            ) : queries.length === 0 ? (
+              <div className="text-sm text-slate-500">No queries submitted yet.</div>
+            ) : (
+              <div className="space-y-3">
+                {queries.map((query) => {
+                  const isExpanded = Boolean(expandedQueryIds[query.id]);
+                  const replies = Array.isArray(query.replies) ? query.replies : [];
+
+                  return (
+                    <div key={query.id} className="rounded-2xl border border-slate-200 bg-white p-4">
+                      <button
+                        type="button"
+                        className="flex w-full items-center justify-between gap-3 text-left"
+                        onClick={() =>
+                          setExpandedQueryIds((prev) => ({
+                            ...prev,
+                            [query.id]: !isExpanded,
+                          }))
+                        }
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-800">{query.title}</p>
+                          <p className="mt-1 text-xs text-slate-500">{formatDate(query.created_at)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-700">
+                            {replies.length} reply{replies.length === 1 ? "" : "ies"}
+                          </span>
+                          {isExpanded ? <ChevronUp size={18} className="text-slate-600" /> : <ChevronDown size={18} className="text-slate-600" />}
+                        </div>
+                      </button>
+
+                      {isExpanded ? (
+                        <div className="mt-4 space-y-3">
+                          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                            <p className="font-medium text-slate-800">Your message</p>
+                            <p className="mt-2 whitespace-pre-wrap">{query.description || "No description provided."}</p>
+                          </div>
+
+                          {replies.length === 0 ? (
+                            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-500">
+                              No admin replies yet.
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              {replies.map((reply) => (
+                                <div key={reply.id || `${query.id}-${reply.created_at}`} className="rounded-xl border border-sky-200 bg-sky-50 p-3">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <p className="text-sm font-semibold text-sky-800">{reply.adminName || "Admin"}</p>
+                                    <span className="text-[11px] text-slate-500">{formatDate(reply.created_at)}</span>
+                                  </div>
+                                  <p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{reply.message}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </MainLayout>
