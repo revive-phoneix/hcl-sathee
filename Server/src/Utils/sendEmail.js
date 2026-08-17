@@ -107,7 +107,6 @@ async function sendWelcomeEmail(to, name, role) {
     </div>
   `;
 
-  // Keep subject ASCII-safe for MIME headers.
   const subject = "Welcome to HCL SATHEE - Create Your Password";
   const gmail = await getGmailClient();
   const raw = createMessage(from, to, subject, text, html);
@@ -121,6 +120,44 @@ async function sendWelcomeEmail(to, name, role) {
   return res.data;
 }
 
+async function sendSupportQueryEmail(to, { partnerName, title, description }) {
+  const from = String(process.env.EMAIL_USER || "").trim();
+  const subject = "New partner query submitted";
+  const text = [
+    "Hello Admin,",
+    "",
+    `A new query has been submitted by ${partnerName}.`,
+    "",
+    `Title: ${title}`,
+    "",
+    `Description: ${description}`,
+    "",
+    "Please log in to the admin panel to view and reply to the query.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 600px; margin: auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%); padding: 28px; color: white;">
+          <h2 style="margin:0; font-size: 24px;">New Partner Query</h2>
+        </div>
+        <div style="padding: 28px; background: white;">
+          <p style="margin: 0 0 12px;"><strong>Submitted by:</strong> ${partnerName}</p>
+          <p style="margin: 0 0 12px;"><strong>Title:</strong> ${title}</p>
+          <p style="margin: 0 0 18px;"><strong>Description:</strong></p>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; white-space: pre-wrap;">${description}</div>
+          <p style="margin: 20px 0 0;">Please log in to the admin portal to review and reply.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const gmail = await getGmailClient();
+  const raw = createMessage(from, to, subject, text, html);
+  await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+}
+
 module.exports = {
   sendWelcomeEmail,
+  sendSupportQueryEmail,
 };

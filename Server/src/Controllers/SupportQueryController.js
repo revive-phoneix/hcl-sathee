@@ -3,6 +3,7 @@ const User = require("../Models/User");
 const SupportQuery = require("../Models/SupportQuery");
 const { isAdminRole } = require("../Utils/centreMatch");
 const { sendToTokens } = require("../Utils/pushNotifications");
+const { sendSupportQueryEmail } = require("../Utils/sendEmail");
 const { buildSupportQueryNotificationPayload } = require("../Utils/supportQueries");
 
 exports.createSupportQuery = wrap(
@@ -40,6 +41,24 @@ exports.createSupportQuery = wrap(
     });
 
     await sendToTokens(tokens, payload);
+
+    const adminEmails = admins
+      .map((u) => String(u.email || "").trim())
+      .filter(Boolean);
+
+    await Promise.all(
+      adminEmails.map(async (email) => {
+        try {
+          await sendSupportQueryEmail(email, {
+            partnerName: req.user?.name || req.user?.email || "Partner user",
+            title,
+            description,
+          });
+        } catch (emailErr) {
+          console.error("Support query email failed:", emailErr.message || emailErr);
+        }
+      })
+    );
 
     return ok(res, 201, {
       message: "Your query has been submitted successfully. Admins have been notified.",

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { MessageSquareText, SendHorizonal, ChevronDown, ChevronUp } from "lucide-react";
+import { MessageSquareText, SendHorizonal, ChevronDown, ChevronUp, Mail } from "lucide-react";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchAdminUsers } from "../../services/users";
 import api from "../../services/apiClient";
@@ -175,12 +175,37 @@ export default function QueryAndSupport({
                   <p className="mt-3 text-slate-500">Loading admin contacts…</p>
                 ) : (
                   <div className="mt-3 space-y-3">
-                    {admins.map((admin) => (
-                      <div key={admin.id} className="rounded-2xl border border-slate-200 p-3 bg-slate-50">
-                        <p className="font-semibold text-slate-900">{admin.name || "Admin"}</p>
-                        <p className="mt-1 text-slate-600 break-all">{admin.email || "No email provided"}</p>
-                      </div>
-                    ))}
+                    {admins.map((admin) => {
+                      const email = admin.email || "";
+                      const gmailLink = email
+                        ? `https://mail.google.com/mail/?view=cm&fs=1&to=${encodeURIComponent(email)}&su=${encodeURIComponent(title || "Query from HCL Partner")}&body=${encodeURIComponent(
+                            `Hello ${admin.name || "Admin"},\n\n${description ? `I need help with:\n${description}\n\n` : ""}Regards,\n${userName || "Partner User"}\n${userEmail || ""}`
+                          )}`
+                        : "";
+
+                      return (
+                        <div key={admin.id} className="rounded-2xl border border-slate-200 p-3 bg-slate-50">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="font-semibold text-slate-900">{admin.name || "Admin"}</p>
+                              <p className="mt-1 text-slate-600 break-all">{email || "No email provided"}</p>
+                            </div>
+                            {email ? (
+                              <a
+                                href={gmailLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-2 rounded-xl bg-red-600 px-3 py-2 text-xs font-medium text-white shadow-sm hover:bg-red-700"
+                                title={`Send email to ${email}`}
+                              >
+                                <Mail size={14} />
+                                Gmail
+                              </a>
+                            ) : null}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 )}
               </div>
