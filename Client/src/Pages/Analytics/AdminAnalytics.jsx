@@ -3,7 +3,6 @@ import StudentsTab from "../../Components/Analytics/StudentsTab";
 import TeachersTab from "../../Components/Analytics/TeachersTab";
 import MentorDetailsModal from "../../Components/Analytics/MentorDetailsModal";
 import UtilitiesSection from "../../Components/Analytics/UtilitiesSection";
-import PortalAnalyticsGraphs from "../../Components/Analytics/PortalAnalyticsGraphs";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchUsers, updateUser } from "../../services/users";
 import { fetchMitraAttendance } from "../../services/mitraAttendance";
@@ -67,7 +66,6 @@ const replaceMentor = (list, replacement) =>
 
 const ANALYTICS_TABS = [
   { key: "students", label: "Students" },
-  { key: "graphs", label: "Graphs" },
   { key: "teachers", label: "Mentors" },
 ];
 
@@ -224,8 +222,6 @@ export default function AdminAnalytics({
 
         {activeTab === "students" ? (
           <StudentsTab portalName={portalName} />
-        ) : activeTab === "graphs" ? (
-          <PortalAnalyticsGraphs portalName={portalName} />
         ) : (
           <TeachersTab
             mentors={regularMentors}
