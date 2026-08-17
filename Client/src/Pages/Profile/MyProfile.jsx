@@ -92,6 +92,8 @@ export default function MyProfile({
   const role = profile?.role || userRole || "—";
   const centre = profile?.centre || userCentre || "—";
   const isMitra = String(role).toUpperCase().includes("MITRA");
+  const isPartner = String(role).toUpperCase().includes("PARTNER");
+  const isMitraProfile = isMitra;
 
   useEffect(() => {
     if (profile) {
@@ -220,13 +222,29 @@ export default function MyProfile({
         ) : null}
 
         <div className="overflow-hidden rounded-2xl border border-[#dfeae7] bg-[#f4f7f6] shadow-sm">
-          <div className="flex items-center gap-4 bg-[#e7f7ee] px-6 py-5 text-[#1d5f48]">
-            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-[#cfeedd] text-lg font-semibold text-[#1d5f48]">
+          <div
+            className={[
+              "flex items-center gap-4 px-6 py-5",
+              isPartner ? "bg-[#f2f5fb] text-[#1f3d7a]" : "bg-[#e7f7ee] text-[#1d5f48]",
+            ].join(" ")}
+          >
+            <div
+              className={[
+                "flex h-14 w-14 items-center justify-center rounded-lg text-lg font-semibold",
+                isPartner ? "bg-[#dde8ff] text-[#244985]" : "bg-[#cfeedd] text-[#1d5f48]",
+              ].join(" ")}
+            >
               {getInitials(name, "U")}
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-[17px] font-medium leading-none text-[#1d5f48]">{name}</p>
-              <p className="mt-2 text-[13px] text-[#476c5e]">
+              <p className={[
+                "text-[17px] font-medium leading-none",
+                isPartner ? "text-[#1f3d7a]" : "text-[#1d5f48]",
+              ].join(" ")}>{name}</p>
+              <p className={[
+                "mt-2 text-[13px]",
+                isPartner ? "text-[#536d9b]" : "text-[#476c5e]",
+              ].join(" ")}>
                 {role} &middot; {centre}
               </p>
             </div>
@@ -322,7 +340,7 @@ export default function MyProfile({
             )}
           </div>
 
-          {isMitra ? (
+          {isMitraProfile ? (
             <div className="px-5 py-4">
               <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.03em] text-slate-500">
                 Sathee Vishist mentors
@@ -369,6 +387,13 @@ export default function MyProfile({
                   })}
                 </div>
               )}
+            </div>
+          ) : null}
+
+          {isPartner ? (
+            <div className="mx-5 mb-5 flex items-center gap-2 rounded-lg bg-[#edf3ff] px-3 py-2 text-[12px] text-[#244985]">
+              <span aria-hidden="true">🔒</span>
+              <p className="m-0">Access limited to {centre} only</p>
             </div>
           ) : null}
         </div>
