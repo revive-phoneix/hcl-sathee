@@ -6,9 +6,11 @@ import StudentToolbar from "../../Components/Student/StudentToolbar";
 import StudentTable from "../../Components/Student/StudentTable";
 import NewStudent from "../../Components/Student/NewStudent";
 import StudentDetailsModal from "../../Components/Student/StudentDetailsModal";
+import TableSortControls from "../../Components/common/TableSortControls";
 import { fetchStudents, createStudent, updateStudent, removeStudent } from "../../services/students";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { AVATAR_COLORS, getInitials } from "../../utils/studentMetrics";
+import { sortTableRows } from "../../utils/tableSort";
 
 const PAGE_SIZE = 8;
 
@@ -24,6 +26,8 @@ export default function Student({
 }) {
   const [search, setSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("All Courses");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [showNewStudent, setShowNewStudent] = useState(false);
   const [showStudentDetails, setShowStudentDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
@@ -150,10 +154,15 @@ export default function Student({
     });
   }, [search, courseFilter, students, portalName]);
 
-  const totalStudents = filtered.length;
+  const sortedStudents = useMemo(
+    () => sortTableRows(filtered, { sortBy, direction: sortDirection }),
+    [filtered, sortBy, sortDirection]
+  );
+
+  const totalStudents = sortedStudents.length;
   const totalPages = Math.max(1, Math.ceil(totalStudents / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
-  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+  const paginated = sortedStudents.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
   const startCount = totalStudents === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
   const endCount = Math.min(currentPage * PAGE_SIZE, totalStudents);
 
@@ -207,6 +216,15 @@ export default function Student({
               {studentsError}
             </div>
           ) : null}
+
+          <div style={{ padding: "12px 20px 0", display: "flex", justifyContent: "flex-end" }}>
+            <TableSortControls
+              value={sortDirection}
+              onChange={setSortDirection}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+            />
+          </div>
 
           <StudentTable
             paginated={paginated}

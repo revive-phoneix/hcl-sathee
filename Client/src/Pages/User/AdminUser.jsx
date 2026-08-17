@@ -4,12 +4,14 @@ import { Shield, GraduationCap, HeartHandshake } from "lucide-react";
 import UserFilter from "../../Components/User/UserFilter";
 import UserToolbar from "../../Components/User/UserToolbar";
 import UserTable from "../../Components/User/UserTable";
+import TableSortControls from "../../Components/common/TableSortControls";
 import { MainLayout } from "../../Components/MainLayout";
 import { createUser, fetchUsers, removeUser, resendInvite } from "../../services/users";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { getInitials } from "../../utils/studentMetrics";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
+import { sortTableRows } from "../../utils/tableSort";
 
 const ROLE_FILTERS = ["All Users", "ADMIN", "SATHEE MITRA", "HCL PARTNER"];
 
@@ -34,6 +36,8 @@ const normalizeUser = (user) => ({
 export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout }) {
   const [activeFilter, setActiveFilter] = useState("All Users");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [submittingUser, setSubmittingUser] = useState(false);
@@ -82,6 +86,11 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
       return matchesRole && matchesSearch;
     });
   }, [visibleUsers, activeFilter, search]);
+
+  const sortedUsers = useMemo(
+    () => sortTableRows(filtered, { sortBy, direction: sortDirection }),
+    [filtered, sortBy, sortDirection]
+  );
 
   const roleCount = (role) =>
     role === "All Users"
@@ -187,6 +196,15 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
           portalName={portalName}
         />
 
+        <div className="flex justify-end">
+          <TableSortControls
+            value={sortDirection}
+            onChange={setSortDirection}
+            sortBy={sortBy}
+            onSortByChange={setSortBy}
+          />
+        </div>
+
         {usersError && (
           <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
             <p>{usersError}</p>
@@ -215,7 +233,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
         )}
 
         <UserTable
-          users={filtered}
+          users={sortedUsers}
           allUsersCount={roleCount("All Users")}
           roleBadge={roleBadge}
           avatarColor={avatarColor}

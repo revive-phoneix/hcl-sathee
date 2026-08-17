@@ -120,6 +120,20 @@ const readInitialSession = () => {
   return session;
 };
 
+const getFocusableFields = (form) => {
+  if (!form) return [];
+
+  return Array.from(
+    form.querySelectorAll(
+      'input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )
+  ).filter((element) => {
+    if (!(element instanceof HTMLElement)) return false;
+    const style = window.getComputedStyle(element);
+    return style.visibility !== "hidden" && style.display !== "none";
+  });
+};
+
 const AppContent = () => {
   const location = useLocation();
   const navigate = useNavigate();
@@ -158,6 +172,45 @@ const AppContent = () => {
       }
       return prev;
     });
+  }, []);
+
+  useEffect(() => {
+    const handleFormEnterNavigation = (event) => {
+      if (event.key !== "Enter" || event.shiftKey || event.altKey || event.ctrlKey || event.metaKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (target.isContentEditable) return;
+
+      const form = target.closest("form");
+      if (!form) return;
+
+      const focusableFields = getFocusableFields(form);
+      const currentIndex = focusableFields.indexOf(target);
+      if (currentIndex === -1) return;
+
+      event.preventDefault();
+
+      const nextField = focusableFields[currentIndex + 1];
+      if (nextField) {
+        nextField.focus();
+        if (typeof nextField.select === "function") {
+          nextField.select();
+        }
+        return;
+      }
+
+      if (typeof form.requestSubmit === "function") {
+        form.requestSubmit();
+      } else {
+        form.submit();
+      }
+    };
+
+    document.addEventListener("keydown", handleFormEnterNavigation);
+    return () => document.removeEventListener("keydown", handleFormEnterNavigation);
   }, []);
 
   const isAdmin = canEnterAdminDashboard(userRole);

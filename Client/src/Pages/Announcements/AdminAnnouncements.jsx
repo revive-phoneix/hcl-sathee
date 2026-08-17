@@ -11,11 +11,13 @@ import {
   updateAnnouncement,
 } from "../../services/announcements";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+import TableSortControls from "../../Components/common/TableSortControls";
 import {
   getCanonicalCentreKey,
   getCentreValueFromPortal,
   matchesPortalCentre,
 } from "../../utils/portalMapping";
+import { sortTableRows } from "../../utils/tableSort";
 
 const categoryOptions = [
   "All Courses",
@@ -47,6 +49,8 @@ export default function AdminAnnouncements({
   const [editId, setEditId] = useState(null);
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All Courses");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [deleteConfirmId, setDeleteConfirmId] = useState(null);
   const [viewId, setViewId] = useState(null);
 
@@ -98,6 +102,11 @@ export default function AdminAnnouncements({
       );
     });
   }, [centreAnnouncements, search, filterCategory]);
+
+  const sortedAnnouncements = useMemo(
+    () => sortTableRows(filtered, { sortBy, direction: sortDirection }),
+    [filtered, sortBy, sortDirection]
+  );
 
   const handleSubmit = async (data) => {
     setSubmitting(true);
@@ -225,6 +234,15 @@ export default function AdminAnnouncements({
             categoryOptions={categoryOptions}
           />
 
+          <div className="flex justify-end mb-4">
+            <TableSortControls
+              value={sortDirection}
+              onChange={setSortDirection}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+            />
+          </div>
+
           <div className="flex justify-between items-center mb-4 text-sm text-slate-500">
             <div>
               Showing{" "}
@@ -251,7 +269,7 @@ export default function AdminAnnouncements({
             </div>
           ) : (
             <div className="space-y-4">
-              {filtered.map((ann) => (
+              {sortedAnnouncements.map((ann) => (
                 <AnnouncementCard
                   key={ann.id}
                   announcement={ann}

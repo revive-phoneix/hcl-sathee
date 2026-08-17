@@ -3,7 +3,9 @@ import { CalendarDays, Search, User } from "lucide-react";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchLeaveRequests, updateLeaveRequestStatus } from "../../services/leaveRequests";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+import TableSortControls from "../../Components/common/TableSortControls";
 import { matchesPortalCentre } from "../../utils/portalMapping";
+import { sortTableRows } from "../../utils/tableSort";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -34,6 +36,8 @@ export default function AdminLeaveRequests({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [search, setSearch] = useState("");
+  const [sortBy, setSortBy] = useState("name");
+  const [sortDirection, setSortDirection] = useState("asc");
   const [busyId, setBusyId] = useState(null);
 
   const loadLeaveRequests = useCallback(async () => {
@@ -82,6 +86,11 @@ export default function AdminLeaveRequests({
       return fields.includes(q);
     });
   }, [centreLeaveRequests, search]);
+
+  const sortedLeaveRequests = useMemo(
+    () => sortTableRows(filtered, { sortBy, direction: sortDirection }),
+    [filtered, sortBy, sortDirection]
+  );
 
   const handleReview = async (id, status) => {
     setBusyId(id);
@@ -149,10 +158,16 @@ export default function AdminLeaveRequests({
             </div>
           ) : null}
 
-          <div className="flex items-center justify-between mb-4 text-sm text-slate-500">
+          <div className="flex items-center justify-between gap-4 mb-4 text-sm text-slate-500">
             <div>
               Showing <span className="font-semibold text-sky-600">{filtered.length}</span> of {centreLeaveRequests.length} requests
             </div>
+            <TableSortControls
+              value={sortDirection}
+              onChange={setSortDirection}
+              sortBy={sortBy}
+              onSortByChange={setSortBy}
+            />
           </div>
 
           {loading ? (
@@ -171,7 +186,7 @@ export default function AdminLeaveRequests({
             </div>
           ) : (
             <div className="grid gap-4">
-              {filtered.map((leave) => {
+              {sortedLeaveRequests.map((leave) => {
                 const status = String(leave.status || "pending").toLowerCase();
                 const statusClass =
                   statusClasses[status] || statusClasses.pending;
