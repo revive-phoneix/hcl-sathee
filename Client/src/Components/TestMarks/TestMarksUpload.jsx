@@ -249,6 +249,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           value={testType}
           onChange={(e) => {
             setTestType(e.target.value);
+            setNewTestName("");
             setTestId("");
             setRows([]);
             setRowErrors({});
@@ -269,7 +270,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
             const newCourse = e.target.value;
             setCourse(newCourse);
             setTests([]); // Clear tests immediately to prevent cross-course contamination
-            setTestType("");
+            setNewTestName("");
             setTestId("");
             setRows([]);
             setRowErrors({});
@@ -351,7 +352,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         value={studentId}
         onChange={(e) => {
           setStudentId(e.target.value);
-          setTestId("");
+          setNewTestName("");
           setRows([]);
           setRowErrors({});
           setSaveMessage("");
