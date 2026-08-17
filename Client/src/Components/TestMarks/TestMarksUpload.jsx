@@ -11,7 +11,7 @@ const TEST_TYPES = [
 
 export default function TestMarksUpload({ mitraCentre = "" }) {
   const [students, setStudents] = useState([]);
-  const [testType, setTestType] = useState("performance");
+  const [testType, setTestType] = useState("");
   const [course, setCourse] = useState("");
   const [tests, setTests] = useState([]);
   const [testId, setTestId] = useState("");
@@ -31,9 +31,20 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   useEffect(() => {
     if (!course) {
       setTests([]);
+      setTestId("");
+      setTestMenuOpen(false);
       return;
     }
-    fetchTests(course, mitraCentre).then(setTests).catch(() => setTests([]));
+
+    setTestId("");
+    setRows([]);
+    setRowErrors({});
+    setSaveMessage("");
+    setTestMenuOpen(false);
+
+    fetchTests(course, mitraCentre)
+      .then(setTests)
+      .catch(() => setTests([]));
   }, [course, mitraCentre]);
 
   const courseStudents = useMemo(
@@ -44,8 +55,13 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const selectedStudent = courseStudents.find((s) => String(s.id) === String(studentId));
 
   const handleCreateTest = async () => {
-    if (!course) return;
-    const created = await createTest({ name: newTestName, course, centre: mitraCentre });
+    if (!course || !testType) return;
+    const created = await createTest({
+      name: newTestName,
+      course,
+      centre: mitraCentre,
+      testType,
+    });
     setTests((prev) => [...prev, created]);
     setTestId(created.id);
     setNewTestName("");
@@ -81,7 +97,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     setRowErrors({});
   };
 
-  const canUpload = Boolean(course && testId && studentId && file);
+  const canUpload = Boolean(course && testType && testId && studentId && file);
 
   const handleUpload = () => {
     if (!file || !studentId) return;
@@ -118,7 +134,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const handleSave = async () => {
-    if (!testId || !studentId || !rows.length) return;
+    if (!testType || !testId || !studentId || !rows.length) return;
 
     // Check for validation errors
     if (Object.keys(rowErrors).length > 0) {
@@ -196,8 +212,16 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         <select
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={testType}
-          onChange={(e) => setTestType(e.target.value)}
+          onChange={(e) => {
+            setTestType(e.target.value);
+            setTestId("");
+            setRows([]);
+            setRowErrors({});
+            setSaveMessage("");
+            setTestMenuOpen(false);
+          }}
         >
+          <option value="">Select Type</option>
           {TEST_TYPES.map((item) => (
             <option key={item.value} value={item.value}>{item.label}</option>
           ))}
@@ -206,7 +230,15 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         <select
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
-          onChange={(e) => { setCourse(e.target.value); setTestId(""); setRows([]); }}
+          onChange={(e) => {
+            setCourse(e.target.value);
+            setTestType("");
+            setTestId("");
+            setRows([]);
+            setRowErrors({});
+            setSaveMessage("");
+            setTestMenuOpen(false);
+          }}
         >
           <option value="">Select course</option>
           {COURSES.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -217,12 +249,12 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
             type="button"
             className="w-full rounded-xl border border-slate-300 bg-white p-2 text-left text-sm text-slate-900"
             onClick={() => setTestMenuOpen((prev) => !prev)}
-            disabled={!course}
+            disabled={!course || !testType}
           >
             {tests.find((t) => String(t.id) === String(testId))?.name || "Select test"}
           </button>
 
-          {testMenuOpen && course ? (
+          {testMenuOpen && course && testType ? (
             <div className="absolute left-0 right-0 z-20 mt-1 rounded-xl border border-slate-200 bg-white shadow-lg">
               <div className="border-b border-slate-200 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Select test
@@ -282,10 +314,13 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         value={studentId}
         onChange={(e) => {
           setStudentId(e.target.value);
+          setTestId("");
           setRows([]);
           setRowErrors({});
+          setSaveMessage("");
+          setTestMenuOpen(false);
         }}
-        disabled={!course}
+        disabled={!course || !testType}
       >
         <option value="">Select student</option>
         {courseStudents.map((s) => (
