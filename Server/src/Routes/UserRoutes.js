@@ -5,6 +5,7 @@ const {
   getMe,
   addUser,
   updateUser,
+  updateCurrentUser,
   deleteUser,
   saveFcmToken,
   resendInvite,

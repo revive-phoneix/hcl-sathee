@@ -345,9 +345,6 @@ export default function MyProfile({
               <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.03em] text-slate-500">
                 Sathee Vishist mentors
               </p>
-              <p className="mb-4 text-[12px] text-slate-500">
-                Visiting mentors don't have portal access &mdash; managed here on their behalf.
-              </p>
 
               {vishistMentors.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
@@ -390,12 +387,6 @@ export default function MyProfile({
             </div>
           ) : null}
 
-          {isPartner ? (
-            <div className="mx-5 mb-5 flex items-center gap-2 rounded-lg bg-[#edf3ff] px-3 py-2 text-[12px] text-[#244985]">
-              <span aria-hidden="true">🔒</span>
-              <p className="m-0">Access limited to {centre} only</p>
-            </div>
-          ) : null}
         </div>
       </div>
     </MainLayout>
