@@ -71,16 +71,36 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
 
   const handleCreateTest = async () => {
     if (!course || !testType) return;
-    const created = await createTest({
-      name: newTestName,
-      course,
-      centre: mitraCentre,
-      testType,
-    });
-    setTests((prev) => [...prev, created]);
-    setTestId(created.id);
-    setNewTestName("");
-    setTestMenuOpen(false);
+    try {
+      const created = await createTest({
+        name: newTestName,
+        course,
+        centre: mitraCentre,
+        testType,
+      });
+      
+      // Verify test was created with correct course and refetch to ensure consistency
+      if (created && String(created.course).toUpperCase() === String(course).toUpperCase()) {
+        setTestId(created.id);
+        setNewTestName("");
+        setTestMenuOpen(false);
+        setSaveMessage("");
+        
+        // Refetch tests to ensure they're properly filtered by course
+        try {
+          const refreshedTests = await fetchTests(course, mitraCentre);
+          setTests(refreshedTests);
+        } catch (err) {
+          console.error("Failed to refetch tests:", err);
+          // Fallback: just use the created test
+          setTests((prev) => [...prev, created]);
+        }
+      } else {
+        setSaveMessage("Error: Test was not created with the correct course. Please try again.");
+      }
+    } catch (err) {
+      setSaveMessage(err?.response?.data?.message || "Failed to create test");
+    }
   };
 
   const handleDeleteTest = async (id, name) => {
@@ -246,7 +266,9 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           className="rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
           value={course}
           onChange={(e) => {
-            setCourse(e.target.value);
+            const newCourse = e.target.value;
+            setCourse(newCourse);
+            setTests([]); // Clear tests immediately to prevent cross-course contamination
             setTestType("");
             setTestId("");
             setRows([]);

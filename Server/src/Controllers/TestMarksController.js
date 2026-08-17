@@ -15,7 +15,7 @@ const assertCentreAccess = (req, centre) => {
 
 exports.listTests = wrap(
   async (req, res) => {
-    const course = String(req.query.course || "").trim();
+    const course = String(req.query.course || "").trim().toUpperCase();
     if (!course) return fail(res, 400, "course is required");
 
     const centre = isAdminRole(req.user?.role) ? req.query.centre || null : req.user?.centre || null;
