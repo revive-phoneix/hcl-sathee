@@ -24,6 +24,21 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [saveMessage, setSaveMessage] = useState("");
   const [rowErrors, setRowErrors] = useState({}); // Track validation errors per row
 
+  // Load persisted course selection on mount
+  useEffect(() => {
+    const savedCourse = localStorage.getItem("testMarks_course");
+    if (savedCourse && COURSES.includes(savedCourse)) {
+      setCourse(savedCourse);
+    }
+  }, []);
+
+  // Persist course selection to localStorage
+  useEffect(() => {
+    if (course) {
+      localStorage.setItem("testMarks_course", course);
+    }
+  }, [course]);
+
   useEffect(() => {
     fetchStudents().then(setStudents).catch(() => setStudents([]));
   }, []);
