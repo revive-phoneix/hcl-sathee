@@ -12,7 +12,6 @@ import {
 const TEST_TYPE_OPTIONS = [
   { value: "performance", label: "Performance Test (Weekly)" },
   { value: "pre-mid", label: "Pre-Mid (Monthly)" },
-  { value: "mid", label: "Mid (in Six Months)" },
 ];
 
 const TEST_TYPE_GRAPH_META = {
@@ -25,11 +24,6 @@ const TEST_TYPE_GRAPH_META = {
     title: "Pre-Mid (Monthly)",
     subtitle: "Average pre-mid performance across the course",
     labels: ["Month 1", "Month 2", "Month 3"],
-  },
-  mid: {
-    title: "Mid (in Six Months)",
-    subtitle: "Average mid-test performance across the course",
-    labels: ["Mid 1", "Mid 2", "Mid 3"],
   },
 };
 
@@ -272,8 +266,7 @@ export default function StudentsTab({ portalName }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [selectedTestTypes, setSelectedTestTypes] = useState({});
-  const [activeGraph, setActiveGraph] = useState({ course: null, type: null });
+  const [activeGraph, setActiveGraph] = useState({ course: null });
 
   useEffect(() => {
     let isMounted = true;
@@ -404,28 +397,13 @@ export default function StudentsTab({ portalName }) {
                   <td className="px-4 py-4 text-center font-medium text-green-700">{row.highest}</td>
                   <td className="px-4 py-4 text-center font-medium text-red-600">{row.lowest}</td>
                   <td className="px-6 py-4 text-center">
-                    <select
-                      value={selectedTestTypes[row.Course] || ""}
-                      onChange={(e) => {
-                        const nextValue = e.target.value;
-                        setSelectedTestTypes((prev) => ({
-                          ...prev,
-                          [row.Course]: nextValue,
-                        }));
-
-                        if (nextValue) {
-                          setActiveGraph({ course: row.Course, type: nextValue });
-                        }
-                      }}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+                    <button
+                      type="button"
+                      onClick={() => setActiveGraph({ course: row.Course })}
+                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
                     >
-                      <option value="">Select Type</option>
-                      {TEST_TYPE_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                      View Graph
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -434,12 +412,12 @@ export default function StudentsTab({ portalName }) {
         </div>
       </div>
 
-      {activeGraph.course && activeGraph.type ? (
+      {activeGraph.course ? (
         <GraphPreviewModal
           course={activeGraph.course}
-          testType={activeGraph.type}
+          testType="performance"
           portalName={portalName}
-          onClose={() => setActiveGraph({ course: null, type: null })}
+          onClose={() => setActiveGraph({ course: null })}
         />
       ) : null}
     </div>

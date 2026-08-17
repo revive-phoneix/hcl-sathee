@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   BarChart,
   Bar,
@@ -12,29 +12,19 @@ import {
 } from "recharts";
 
 const PERFORMANCE_CONFIG = {
-  performance: {
-    title: "Weekly Performance Tests",
-    subtitle: "Test performance across weeks (Week 1, 2, 3)",
-    labels: ["Week 1", "Week 2", "Week 3"],
-  },
-  "pre-mid": {
-    title: "Pre-Mid Tests (Monthly)",
-    subtitle: "Test performance across months (Month 1, 2, 3)",
-    labels: ["Month 1", "Month 2", "Month 3"],
-  },
+  title: "Weekly Performance Tests",
+  subtitle: "Test performance across weeks (Week 1, 2, 3)",
+  labels: ["Week 1", "Week 2", "Week 3"],
 };
 
 export default function StudentPerformanceChart({ student }) {
-  const [selectedTestType, setSelectedTestType] = useState("performance");
-
-  const config = PERFORMANCE_CONFIG[selectedTestType];
+  const config = PERFORMANCE_CONFIG;
 
   const chartData = useMemo(() => {
     if (!student || !config) return [];
 
-    // Filter test marks by test type
     const filteredMarks = (Array.isArray(student.testMarks) ? student.testMarks : []).filter(
-      (mark) => (mark?.testType || "performance") === selectedTestType
+      (mark) => (mark?.testType || "performance") === "performance"
     );
 
     // Group by test and calculate performance
@@ -79,7 +69,7 @@ export default function StudentPerformanceChart({ student }) {
         barValue: rounded,
       };
     });
-  }, [student, selectedTestType, config]);
+  }, [student, config]);
 
   if (!student) return null;
 
@@ -90,23 +80,6 @@ export default function StudentPerformanceChart({ student }) {
           <div>
             <h2 className="text-lg font-bold text-slate-900">{config.title}</h2>
             <p className="mt-1 text-sm text-slate-500">{config.subtitle}</p>
-          </div>
-
-          <div className="flex gap-2">
-            {Object.entries(PERFORMANCE_CONFIG).map(([key, val]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setSelectedTestType(key)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium transition ${
-                  selectedTestType === key
-                    ? "bg-blue-600 text-white shadow-sm"
-                    : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                }`}
-              >
-                {key === "performance" ? "Weekly" : "Monthly"}
-              </button>
-            ))}
           </div>
         </div>
       </div>
