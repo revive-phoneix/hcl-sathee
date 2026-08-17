@@ -17,6 +17,7 @@ const TEST_TYPE_OPTIONS = [
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {
   const [isEditing, setIsEditing] = useState(false);
   const [showAnalytics, setShowAnalytics] = useState(false);
+  const [selectedTestType, setSelectedTestType] = useState("performance");
   const [formData, setFormData] = useState(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -39,6 +40,7 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
         attendance,
         qualifications: { ...(student.qualifications || {}) },
       });
+      setSelectedTestType("performance");
       setIsEditing(false);
       setShowAnalytics(false);
       setError("");
@@ -67,9 +69,9 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
     if (!formData?.testMarks) return [];
     return formData.testMarks.filter((mark) => {
       if (!mark || !mark.subject) return false;
-      return (mark.testType || "performance") === "performance";
+      return (mark.testType || "performance") === selectedTestType;
     });
-  }, [formData]);
+  }, [formData, selectedTestType]);
 
   const selectedPerformanceMarks = useMemo(() => {
     return filteredTestMarks.reduce((acc, mark) => {
@@ -338,22 +340,29 @@ export default function StudentDetailsModal({ student, open, onClose, onSave, re
                 <p style={{ margin: "0 0 12px", color: "#64748b", fontSize: 13 }}>
                   Auto-updated from tests/exams — not editable.
                 </p>
-                <div style={{ marginBottom: 16 }}>
-                  <span style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    background: "#dbeafe",
-                    color: "#1d4ed8",
-                    borderRadius: 8,
-                    padding: "8px 14px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                  }}>
-                    Performance Test (Weekly)
-                  </span>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+                  {TEST_TYPE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => setSelectedTestType(option.value)}
+                      style={{
+                        background: selectedTestType === option.value ? "#1e40af" : "#e2e8f0",
+                        color: selectedTestType === option.value ? "#fff" : "#0f172a",
+                        border: "none",
+                        borderRadius: 8,
+                        padding: "10px 14px",
+                        cursor: "pointer",
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
                 </div>
                 <div style={{ marginBottom: 10, color: "#475569", fontSize: 13 }}>
-                  Showing marks for <strong>Performance Test (Weekly)</strong>.
+                  Showing marks for <strong>{TEST_TYPE_OPTIONS.find((item) => item.value === selectedTestType)?.label}</strong>.
                 </div>
 
                 {/* Overall Performance */}

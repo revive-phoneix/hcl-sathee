@@ -266,7 +266,8 @@ export default function StudentsTab({ portalName }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeGraph, setActiveGraph] = useState({ course: null });
+  const [selectedTestTypes, setSelectedTestTypes] = useState({});
+  const [activeGraph, setActiveGraph] = useState({ course: null, type: null });
 
   useEffect(() => {
     let isMounted = true;
@@ -397,13 +398,28 @@ export default function StudentsTab({ portalName }) {
                   <td className="px-4 py-4 text-center font-medium text-green-700">{row.highest}</td>
                   <td className="px-4 py-4 text-center font-medium text-red-600">{row.lowest}</td>
                   <td className="px-6 py-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => setActiveGraph({ course: row.Course })}
-                      className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100"
+                    <select
+                      value={selectedTestTypes[row.Course] || ""}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setSelectedTestTypes((prev) => ({
+                          ...prev,
+                          [row.Course]: nextValue,
+                        }));
+
+                        if (nextValue) {
+                          setActiveGraph({ course: row.Course, type: nextValue });
+                        }
+                      }}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
                     >
-                      View Graph
-                    </button>
+                      <option value="">Select Type</option>
+                      {TEST_TYPE_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                 </tr>
               ))}
@@ -412,12 +428,12 @@ export default function StudentsTab({ portalName }) {
         </div>
       </div>
 
-      {activeGraph.course ? (
+      {activeGraph.course && activeGraph.type ? (
         <GraphPreviewModal
           course={activeGraph.course}
-          testType="performance"
+          testType={activeGraph.type}
           portalName={portalName}
-          onClose={() => setActiveGraph({ course: null })}
+          onClose={() => setActiveGraph({ course: null, type: null })}
         />
       ) : null}
     </div>
