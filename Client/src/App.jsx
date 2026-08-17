@@ -26,6 +26,7 @@ import SM_Analytics from "./Pages/Analytics/SM_Analytics";
 import MyProfile from "./Pages/Profile/MyProfile";
 import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
 import QueryAndSupport from "./Pages/Support/QueryAndSupport";
+import AdminQueries from "./Pages/Support/AdminQueries";
 import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
 import SM_TestMarks from "./Pages/TestMarks/SM_TestMarks";
 import {
@@ -45,6 +46,7 @@ const ADMIN_PATH_TO_NAV = {
   "/users": 3,
   "/students": 4,
   "/announcements": 5,
+  "/queries": 6,
 };
 
 const ADMIN_NAV_PATHS = [
@@ -54,6 +56,7 @@ const ADMIN_NAV_PATHS = [
   "/users",
   "/students",
   "/announcements",
+  "/queries",
 ];
 
 const PARTNER_PATH_TO_NAV = {
@@ -224,6 +227,7 @@ const AppContent = () => {
     { icon: Users, label: "Users & Roles" },
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
+    { icon: MessageSquareText, label: "Queries" },
   ];
 
   const partnerNavItems = [
@@ -415,6 +419,10 @@ const AppContent = () => {
         <Route
           path="/announcements"
           element={<AdminAnnouncements {...adminLayout} userName={userName} />}
+        />
+        <Route
+          path="/queries"
+          element={<AdminQueries {...adminLayout} userName={userName} />}
         />
 
         <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
