@@ -139,20 +139,22 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   };
 
   const updateRow = (index, field, value) => {
-    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: value } : row)));
+    const nextValue = String(value).trim();
+    setRows((prev) => prev.map((row, i) => (i === index ? { ...row, [field]: nextValue } : row)));
 
     // Validate marks
-    const obtained = field === "marksObtained" ? Number(value) || 0 : Number(rows[index]?.marksObtained) || 0;
-    const total = field === "totalMarks" ? Number(value) || 0 : Number(rows[index]?.totalMarks) || 0;
+    const obtained = field === "marksObtained" ? Number(nextValue) || 0 : Number(rows[index]?.marksObtained) || 0;
+    const total = field === "totalMarks" ? Number(nextValue) || 0 : Number(rows[index]?.totalMarks) || 0;
 
     let error = null;
 
-    // Check if total marks is 0
-    if (total === 0) {
+    if (obtained < 0) {
+      error = "Marks obtained cannot be negative";
+    } else if (total < 0) {
+      error = "Total marks cannot be negative";
+    } else if (total === 0) {
       error = "Total marks cannot be 0";
-    }
-    // Check if marks obtained exceeds total marks
-    else if (obtained > total) {
+    } else if (obtained > total) {
       error = "Marks obtained cannot exceed total marks";
     }
 
@@ -176,7 +178,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       return;
     }
 
-    // Check for existing marks that would be overridden
+    // Only ask to override when the same selected test already has saved subject marks.
+    // If the chosen test is different, it should be treated as a separate weekly/monthly entry.
     const existingMarksForSubjects = [];
     const studentTestMarks = Array.isArray(selectedStudent?.testMarks) ? selectedStudent.testMarks : [];
 
@@ -186,7 +189,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       const existingMark = studentTestMarks.find(
         (mark) =>
           mark?.subject === row.subject &&
-          (mark?.testType || "performance") === testType
+          (mark?.testType || "performance") === testType &&
+          String(mark?.testId) === String(testId)
       );
 
       if (existingMark) {
@@ -194,11 +198,11 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       }
     }
 
-    // If there are existing marks, ask for confirmation
     if (existingMarksForSubjects.length > 0) {
+      const selectedTestName = tests.find((t) => String(t.id) === String(testId))?.name || "this test";
       const subjectList = existingMarksForSubjects.join(", ");
       const confirmOverride = window.confirm(
-        `Test marks for ${subjectList} of ${selectedStudent?.name} already saved.\n\nDo you want to override?`
+        `Marks for ${subjectList} in the selected test "${selectedTestName}" already exist for ${selectedStudent?.name}.\n\nDo you want to override them?`
       );
 
       if (!confirmOverride) {
@@ -432,9 +436,12 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                       </label>
                       <input
                         type="number"
+                        min="0"
+                        step="1"
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isMarksExceeded ? "text-red-700" : "text-slate-900"}`}
                         value={row.marksObtained}
                         onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
+                        onWheel={(e) => e.preventDefault()}
                       />
                       {isMarksExceeded && hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
@@ -444,9 +451,12 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                       </label>
                       <input
                         type="number"
+                        min="0"
+                        step="1"
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isTotalZero ? "text-red-700" : "text-slate-900"}`}
                         value={row.totalMarks}
                         onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
+                        onWheel={(e) => e.preventDefault()}
                       />
                       {isTotalZero && hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
