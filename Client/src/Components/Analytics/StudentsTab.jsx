@@ -819,21 +819,32 @@ export default function StudentsTab({ portalName }) {
                     )}
                   </div>
 
-                  {student.progress && student.progress.delta != null ? (
-                    <div className="border-t border-slate-200 bg-rose-100 px-5 py-4">
-                      <div className="flex items-center justify-between gap-4 text-base font-bold text-rose-700">
-                        <span>
-                          Progress: {student.progress.fromTitle} → {student.progress.toTitle}
-                        </span>
-                        <span>
-                          {student.progress.fromValue != null ? `${student.progress.fromValue.toFixed(1)}%` : "—"}
-                          <span className="mx-2">→</span>
-                          {student.progress.toValue != null ? `${student.progress.toValue.toFixed(1)}%` : "—"}
-                          <span className="ml-2">({student.progress.delta > 0 ? "+" : ""}{student.progress.delta.toFixed(1)}%)</span>
-                        </span>
+                  {student.progress && student.progress.delta != null ? (() => {
+                    const isPositive = student.progress.delta > 0;
+                    const isNegative = student.progress.delta < 0;
+                    const toneClass = isPositive
+                      ? "bg-green-100 border-green-200 text-green-700"
+                      : isNegative
+                        ? "bg-red-100 border-red-200 text-red-700"
+                        : "bg-slate-100 border-slate-200 text-slate-700";
+                    const valueClass = isPositive ? "text-green-700" : isNegative ? "text-red-700" : "text-slate-700";
+
+                    return (
+                      <div className={`border-t border-slate-200 ${toneClass} px-5 py-4`}>
+                        <div className="flex items-center justify-between gap-4 text-base font-bold">
+                          <span>
+                            Progress: {student.progress.fromTitle} → {student.progress.toTitle}
+                          </span>
+                          <span className={valueClass}>
+                            {student.progress.fromValue != null ? `${student.progress.fromValue.toFixed(1)}%` : "—"}
+                            <span className="mx-2">→</span>
+                            {student.progress.toValue != null ? `${student.progress.toValue.toFixed(1)}%` : "—"}
+                            <span className="ml-2">({student.progress.delta > 0 ? "+" : ""}{student.progress.delta.toFixed(1)}%)</span>
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ) : null}
+                    );
+                  })() : null}
                 </div>
               ))}
             </div>
