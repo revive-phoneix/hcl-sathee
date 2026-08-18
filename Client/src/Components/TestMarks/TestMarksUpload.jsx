@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchStudents } from "../../services/students";
 import { fetchTests, createTest, deleteTest, saveTestMarks } from "../../services/testMarks";
 
@@ -22,6 +22,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   const [saving, setSaving] = useState(false);
   const [saveMessage, setSaveMessage] = useState("");
   const [rowErrors, setRowErrors] = useState({}); // Track validation errors per row
+  const fileInputRef = useRef(null);
 
   // Load persisted course selection on mount
   useEffect(() => {
@@ -131,11 +132,19 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     setRowErrors({});
   };
 
-  const canUpload = Boolean(course && testType && testId && studentId && file);
+  const uploadReady = Boolean(course && testType && testId && studentId);
 
   const handleUpload = () => {
-    if (!file || !studentId) return;
-    setSaveMessage("Answer sheet file selected and will be saved when you save test marks.");
+    if (!uploadReady) return;
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files?.[0] || null;
+    setFile(selectedFile);
+    if (selectedFile) {
+      setSaveMessage("Answer sheet file selected and will be saved when you save test marks.");
+    }
   };
 
   const updateRow = (index, field, value) => {
@@ -368,17 +377,32 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
       </select>
 
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-        <input
-          type="file"
-          accept="application/pdf,image/*,.doc,.docx"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-          className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
-        />
+        <div className="flex w-full items-center gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900">
+          <span className="min-w-0 flex-1 truncate text-slate-500">
+            {file ? file.name : "Choose File No file chosen"}
+          </span>
+          <button
+            type="button"
+            className="shrink-0 rounded-lg bg-sky-100 px-3 py-2 text-xs font-medium text-sky-700 transition-colors hover:bg-sky-200"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!uploadReady}
+          >
+            Browse
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="application/pdf,image/*,.doc,.docx"
+            onChange={handleFileChange}
+            className="hidden"
+          />
+        </div>
+
         <button
-          className={`rounded-xl px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-40 ${canUpload ? "bg-[#0b2e6f] hover:bg-[#08265d]" : "bg-sky-600 hover:bg-sky-700"
-            }`}
+          type="button"
+          className={`rounded-xl px-4 py-2 text-xs font-medium text-white transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-50 ${uploadReady ? "bg-[#0b2e6f] hover:bg-[#08265d]" : "bg-sky-600 hover:bg-sky-700"}`}
           onClick={handleUpload}
-          disabled={!file || !studentId}
+          disabled={!uploadReady}
         >
           Upload
         </button>
