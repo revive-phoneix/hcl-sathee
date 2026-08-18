@@ -77,14 +77,14 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
         centre: mitraCentre,
         testType,
       });
-      
+
       // Verify test was created with correct course and refetch to ensure consistency
       if (created && String(created.course).toUpperCase() === String(course).toUpperCase()) {
         setTestId(created.id);
         setNewTestName("");
         setTestMenuOpen(false);
         setSaveMessage("");
-        
+
         // Refetch tests to ensure they're properly filtered by course
         try {
           const refreshedTests = await fetchTests(course, mitraCentre);
@@ -148,10 +148,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
 
     let error = null;
 
-    if (obtained < 0) {
-      error = "Marks obtained cannot be negative";
-    } else if (total < 0) {
-      error = "Total marks cannot be negative";
+    if (obtained < 0 || total < 0) {
+      error = "Marks cannot be negative";
     } else if (total === 0) {
       error = "Total marks cannot be 0";
     } else if (obtained > total) {
@@ -377,9 +375,8 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
           className="w-full rounded-xl border border-slate-300 bg-white p-2 text-sm text-slate-900"
         />
         <button
-          className={`rounded-xl px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-40 ${
-            canUpload ? "bg-[#0b2e6f] hover:bg-[#08265d]" : "bg-sky-600 hover:bg-sky-700"
-          }`}
+          className={`rounded-xl px-4 py-2 text-xs font-medium text-white transition-colors disabled:opacity-40 ${canUpload ? "bg-[#0b2e6f] hover:bg-[#08265d]" : "bg-sky-600 hover:bg-sky-700"
+            }`}
           onClick={handleUpload}
           disabled={!file || !studentId}
         >
@@ -437,11 +434,11 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                       <input
                         type="number"
                         min="0"
-                        step="1"
+                        onWheel={(e) => e.target.blur()}
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isMarksExceeded ? "text-red-700" : "text-slate-900"}`}
                         value={row.marksObtained}
                         onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
-                        onWheel={(e) => e.preventDefault()}
+                        
                       />
                       {isMarksExceeded && hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
@@ -456,7 +453,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isTotalZero ? "text-red-700" : "text-slate-900"}`}
                         value={row.totalMarks}
                         onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
-                        onWheel={(e) => e.preventDefault()}
+                        onWheel={(e) => e.target.blur()}
                       />
                       {isTotalZero && hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
@@ -492,12 +489,12 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
               <p className="mt-1 text-2xl font-bold text-white">
                 {rows.length > 0
                   ? (
-                      rows.reduce((sum, r) => {
-                        const obtained = Number(r.marksObtained) || 0;
-                        const total = Number(r.totalMarks) || 0;
-                        return sum + (total > 0 ? (obtained / total) * 100 : 0);
-                      }, 0) / rows.length
-                    ).toFixed(1) + "%"
+                    rows.reduce((sum, r) => {
+                      const obtained = Number(r.marksObtained) || 0;
+                      const total = Number(r.totalMarks) || 0;
+                      return sum + (total > 0 ? (obtained / total) * 100 : 0);
+                    }, 0) / rows.length
+                  ).toFixed(1) + "%"
                   : "—"}
               </p>
             </div>
