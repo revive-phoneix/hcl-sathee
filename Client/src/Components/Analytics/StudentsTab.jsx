@@ -497,17 +497,23 @@ export default function StudentsTab({ portalName }) {
           };
         });
 
-        const lastTwo = tests.slice(-2);
-        const progress =
-          lastTwo.length === 2
-            ? {
-                fromTitle: lastTwo[0].title,
-                toTitle: lastTwo[1].title,
-                fromValue: lastTwo[0].averageScore,
-                toValue: lastTwo[1].averageScore,
-                delta: lastTwo[1].averageScore == null || lastTwo[0].averageScore == null ? null : round1(lastTwo[1].averageScore - lastTwo[0].averageScore),
-              }
-            : null;
+        const progress = tests.slice(1).map((nextTest, index) => {
+          const prevTest = tests[index];
+          if (!prevTest || !nextTest) return null;
+
+          const delta =
+            nextTest.averageScore == null || prevTest.averageScore == null
+              ? null
+              : round1(nextTest.averageScore - prevTest.averageScore);
+
+          return {
+            fromTitle: prevTest.title,
+            toTitle: nextTest.title,
+            fromValue: prevTest.averageScore,
+            toValue: nextTest.averageScore,
+            delta,
+          };
+        }).filter(Boolean);
 
         return {
           id: student.id,
@@ -819,32 +825,36 @@ export default function StudentsTab({ portalName }) {
                     )}
                   </div>
 
-                  {student.progress && student.progress.delta != null ? (() => {
-                    const isPositive = student.progress.delta > 0;
-                    const isNegative = student.progress.delta < 0;
-                    const toneClass = isPositive
-                      ? "bg-green-100 border-green-200 text-green-700"
-                      : isNegative
-                        ? "bg-red-100 border-red-200 text-red-700"
-                        : "bg-slate-100 border-slate-200 text-slate-700";
-                    const valueClass = isPositive ? "text-green-700" : isNegative ? "text-red-700" : "text-slate-700";
+                  {student.progress?.length ? (
+                    <div className="space-y-2 border-t border-slate-200 bg-slate-50 px-5 py-3">
+                      {student.progress.map((item, index) => {
+                        const isPositive = item.delta > 0;
+                        const isNegative = item.delta < 0;
+                        const toneClass = isPositive
+                          ? "bg-green-100 border-green-200 text-green-700"
+                          : isNegative
+                            ? "bg-red-100 border-red-200 text-red-700"
+                            : "bg-slate-100 border-slate-200 text-slate-700";
+                        const valueClass = isPositive ? "text-green-700" : isNegative ? "text-red-700" : "text-slate-700";
 
-                    return (
-                      <div className={`border-t border-slate-200 ${toneClass} px-5 py-4`}>
-                        <div className="flex items-center justify-between gap-4 text-base font-bold">
-                          <span>
-                            Progress: {student.progress.fromTitle} → {student.progress.toTitle}
-                          </span>
-                          <span className={valueClass}>
-                            {student.progress.fromValue != null ? `${student.progress.fromValue.toFixed(1)}%` : "—"}
-                            <span className="mx-2">→</span>
-                            {student.progress.toValue != null ? `${student.progress.toValue.toFixed(1)}%` : "—"}
-                            <span className="ml-2">({student.progress.delta > 0 ? "+" : ""}{student.progress.delta.toFixed(1)}%)</span>
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  })() : null}
+                        return (
+                          <div key={`${item.fromTitle}-${item.toTitle}-${index}`} className={`rounded-xl border ${toneClass} px-4 py-3`}>
+                            <div className="flex items-center justify-between gap-4 text-base font-bold">
+                              <span>
+                                Progress: {item.fromTitle} → {item.toTitle}
+                              </span>
+                              <span className={valueClass}>
+                                {item.fromValue != null ? `${item.fromValue.toFixed(1)}%` : "—"}
+                                <span className="mx-2">→</span>
+                                {item.toValue != null ? `${item.toValue.toFixed(1)}%` : "—"}
+                                <span className="ml-2">({item.delta == null ? "—" : `${item.delta > 0 ? "+" : ""}${item.delta.toFixed(1)}%`})</span>
+                              </span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
