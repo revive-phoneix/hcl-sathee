@@ -268,6 +268,23 @@ const AppContent = () => {
     navigate("/", { replace: true });
   };
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      clearSession();
+      setIsLoggedIn(false);
+      setUserName("");
+      setUserEmail("");
+      setUserId(null);
+      setUserCentre(null);
+      setUserRole("");
+      setSelectedPortal("");
+      navigate("/", { replace: true });
+    };
+
+    window.addEventListener("auth:unauthorized", handleUnauthorized);
+    return () => window.removeEventListener("auth:unauthorized", handleUnauthorized);
+  }, [navigate]);
+
   const handleAdminNavChange = (index) => {
     const path = ADMIN_NAV_PATHS[index];
     if (path) navigate(path);

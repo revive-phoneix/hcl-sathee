@@ -56,6 +56,16 @@ app.use("/api/leave-requests", leaveRequestRoutes);
 app.use("/api/support-queries", supportQueryRoutes);
 app.use("/api/test-marks", testMarksRoutes);
 
+app.use((err, _req, res, _next) => {
+  const isPayloadTooLarge = err?.type === "entity.too.large";
+  const message =
+    err instanceof require("multer").MulterError || isPayloadTooLarge
+      ? err.message || "Request payload is too large"
+      : err?.message || "Internal server error";
+  const status = isPayloadTooLarge ? 413 : err?.status || err?.statusCode || 500;
+  res.status(status).json({ success: false, message });
+});
+
 try {
   initFirebase();
   const PORT = process.env.PORT || 5000;

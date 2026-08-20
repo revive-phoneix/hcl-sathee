@@ -29,6 +29,7 @@ api.interceptors.response.use(
   (error) => {
     if (error.response?.status === 401) {
       clearSession();
+      window.dispatchEvent(new Event("auth:unauthorized"));
     }
     return Promise.reject(error);
   }

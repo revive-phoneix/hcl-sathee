@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Camera, ImageOff, Check } from "lucide-react";
 import { fetchVishistAttendance, markVishistAttendance, approveVishistAttendance } from "../../services/vishistAttendance";
 
@@ -22,6 +22,7 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
     const [records, setRecords] = useState([]);
     const [loadingRecords, setLoadingRecords] = useState(true);
     const [approvingId, setApprovingId] = useState(null);
+    const previewUrlRef = useRef(null);
 
     const handleApprove = async (id) => {
         setApprovingId(id);
@@ -57,8 +58,10 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0] || null;
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = file ? URL.createObjectURL(file) : null;
         setPhotoFile(file);
-        setPhotoPreview(file ? URL.createObjectURL(file) : null);
+        setPhotoPreview(previewUrlRef.current);
     };
 
     const resetForm = () => {
@@ -67,9 +70,15 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
         setTopicTaught("");
         setPhotoFile(null);
         setPhotoPreview(null);
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
         setError("");
         setMessage("");
     };
+
+    useEffect(() => () => {
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    }, []);
 
     const handleSubmit = async (e) => {
         e.preventDefault();

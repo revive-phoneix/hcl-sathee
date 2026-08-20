@@ -35,7 +35,11 @@ const toPublicUser = (user) => {
 
 exports.getUsers = wrap(
   async (req, res) => {
-    let users = await User.findAll();
+    const usersPage = await User.findAll({
+      limit: req.query.limit,
+      cursor: req.query.cursor,
+    });
+    let users = usersPage;
 
     if (isAdminRole(req.user?.role)) {
       users = users;
@@ -47,16 +51,20 @@ exports.getUsers = wrap(
       users = [];
     }
 
-    return ok(res, { users: users.map(toPublicUser) });
+    return ok(res, { users: users.map(toPublicUser), nextCursor: usersPage.nextCursor });
   },
   { label: "Get Users Error", message: "Failed to fetch users" }
 );
 
 exports.getAdminUsers = wrap(
   async (req, res) => {
-    const users = await User.findAll();
+    const usersPage = await User.findAll({
+      limit: req.query.limit,
+      cursor: req.query.cursor,
+    });
+    const users = usersPage;
     const admins = users.filter((user) => isAdminRole(user.role));
-    return ok(res, { users: admins.map(toPublicUser) });
+    return ok(res, { users: admins.map(toPublicUser), nextCursor: usersPage.nextCursor });
   },
   { label: "Get Admin Users Error", message: "Failed to fetch admin users" }
 );
@@ -108,23 +116,24 @@ exports.addUser = wrap(
     if (!VALID_CENTRES.includes(normalizedCentre)) {
       return fail(res, 400, "Invalid centre selected");
     }
-    if (await User.findByEmail(normalizedEmail)) {
-      return fail(res, 409, "Email already exists");
+    let createdUser;
+    try {
+      createdUser = await User.create({
+        name: name.trim(),
+        email: normalizedEmail,
+        phone: normalizedPhone,
+        role,
+        centre: normalizedCentre,
+        availableDays: isMitra(role) ? normalizedDays : [],
+        ...(isMitra(role) ? { isVishist: Boolean(isVishist) } : {}),
+        password: null,
+      });
+    } catch (error) {
+      if (error.code === "DUPLICATE_EMAIL" || error.code === "DUPLICATE_PHONE") {
+        return fail(res, 409, error.message);
+      }
+      throw error;
     }
-    if (await User.findByPhone(normalizedPhone)) {
-      return fail(res, 409, "Phone number already exists");
-    }
-
-    const createdUser = await User.create({
-      name: name.trim(),
-      email: normalizedEmail,
-      phone: normalizedPhone,
-      role,
-      centre: normalizedCentre,
-      availableDays: isMitra(role) ? normalizedDays : [],
-      ...(isMitra(role) ? { isVishist: Boolean(isVishist) } : {}),
-      password: null,
-    });
 
     let emailSent = false;
     let emailError = null;

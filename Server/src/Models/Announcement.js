@@ -52,9 +52,20 @@ const toApiAnnouncement = (docId, data) => ({
   updated_at: toDate(data.updated_at),
 });
 
-const findAll = async () => {
-  const snap = await announcementsRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApiAnnouncement(doc.id, doc.data()));
+const findAll = async ({ limit = 200, cursor } = {}) => {
+  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
+  let query = announcementsRef().orderBy("created_at", "desc").limit(pageLimit);
+  if (cursor) {
+    const cursorDoc = await announcementsRef().doc(String(cursor)).get();
+    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+  }
+  const snap = await query.get();
+  const announcements = snap.docs.map((doc) => toApiAnnouncement(doc.id, doc.data()));
+  Object.defineProperty(announcements, "nextCursor", {
+    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
+    enumerable: false,
+  });
+  return announcements;
 };
 
 const findById = async (id) => {

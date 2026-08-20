@@ -61,9 +61,20 @@ const toApiStudent = (docId, data) => ({
   updated_at: toDate(data.updated_at),
 });
 
-const findAll = async () => {
-  const snap = await studentsRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApiStudent(doc.id, doc.data()));
+const findAll = async ({ limit = 200, cursor } = {}) => {
+  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
+  let query = studentsRef().orderBy("created_at", "desc").limit(pageLimit);
+  if (cursor) {
+    const cursorDoc = await studentsRef().doc(String(cursor)).get();
+    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+  }
+  const snap = await query.get();
+  const students = snap.docs.map((doc) => toApiStudent(doc.id, doc.data()));
+  Object.defineProperty(students, "nextCursor", {
+    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
+    enumerable: false,
+  });
+  return students;
 };
 
 const findById = async (id) => {

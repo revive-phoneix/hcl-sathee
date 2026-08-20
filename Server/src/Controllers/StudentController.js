@@ -140,7 +140,11 @@ const seedSubjectRecords = async (studentId, subjects, marksInput = {}, attendan
 
 exports.getStudents = wrap(
   async (req, res) => {
-    const students = filterByUserCentre(await Student.findAll(), req.user);
+    const studentsPage = await Student.findAll({
+      limit: req.query.limit,
+      cursor: req.query.cursor,
+    });
+    const students = filterByUserCentre(studentsPage, req.user);
 
     // Per-student subject rows only — never scan entire performance/attendance collections.
     const enriched = await Promise.all(
@@ -155,7 +159,7 @@ exports.getStudents = wrap(
       })
     );
 
-    return ok(res, { students: enriched });
+    return ok(res, { students: enriched, nextCursor: studentsPage.nextCursor });
   },
   { label: "Get Students Error", message: "Failed to fetch students" }
 );

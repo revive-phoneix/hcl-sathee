@@ -112,10 +112,21 @@ const backfillMissingIsVishist = async () => {
   }
 };
 
-const findAll = async () => {
+const findAll = async ({ limit = 200, cursor } = {}) => {
   await backfillMissingIsVishist();
-  const snap = await usersRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApiUser(doc.id, doc.data()));
+  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
+  let query = usersRef().orderBy("created_at", "desc").limit(pageLimit);
+  if (cursor) {
+    const cursorDoc = await usersRef().doc(String(cursor)).get();
+    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
+  }
+  const snap = await query.get();
+  const users = snap.docs.map((doc) => toApiUser(doc.id, doc.data()));
+  Object.defineProperty(users, "nextCursor", {
+    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
+    enumerable: false,
+  });
+  return users;
 };
 
 const findByEmail = async (email) => {
@@ -163,7 +174,33 @@ const create = async (data) => {
     payload.isVishist = Boolean(normalizeIsVishist(role, data.isVishist));
   }
 
-  await usersRef().doc(String(id)).set(payload);
+  const db = getDb();
+  const userRef = usersRef().doc(String(id));
+  const emailLockRef = db.collection("_unique_user_fields").doc(`email:${data.email}`);
+  const phoneLockRef = db.collection("_unique_user_fields").doc(`phone:${data.phone}`);
+
+  await db.runTransaction(async (transaction) => {
+    const [emailLock, phoneLock, emailUser, phoneUser] = await Promise.all([
+      transaction.get(emailLockRef),
+      transaction.get(phoneLockRef),
+      transaction.get(usersRef().where("email", "==", data.email).limit(1)),
+      transaction.get(usersRef().where("phone", "==", data.phone).limit(1)),
+    ]);
+    if (emailLock.exists || !emailUser.empty) {
+      const error = new Error("Email already exists");
+      error.code = "DUPLICATE_EMAIL";
+      throw error;
+    }
+    if (phoneLock.exists || !phoneUser.empty) {
+      const error = new Error("Phone number already exists");
+      error.code = "DUPLICATE_PHONE";
+      throw error;
+    }
+
+    transaction.create(emailLockRef, { userId: id, value: data.email });
+    transaction.create(phoneLockRef, { userId: id, value: data.phone });
+    transaction.create(userRef, payload);
+  });
   return toApiUser(String(id), payload);
 };
 

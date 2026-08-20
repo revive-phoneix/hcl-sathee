@@ -2,7 +2,7 @@ const jwt = require("jsonwebtoken");
 
 const generateInviteToken = ({ name, email, role }) =>
   jwt.sign({ name, email, role, purpose: "invite" }, process.env.JWT_SECRET, {
-    expiresIn: "10m",
+    expiresIn: "24h",
   });
 
 const verifyInviteToken = (token) => {

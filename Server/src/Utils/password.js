@@ -16,8 +16,7 @@ const verifyPassword = async (plainPassword, storedPassword) => {
       needsRehash: false,
     };
   }
-  const valid = String(plainPassword) === stored;
-  return { valid, needsRehash: valid };
+  return { valid: false, needsRehash: false };
 };
 
 const PASSWORD_POLICY_MESSAGE =

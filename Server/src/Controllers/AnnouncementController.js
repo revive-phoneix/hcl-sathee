@@ -53,11 +53,12 @@ const filterAnnouncementsForUser = (items, user) => {
 
 exports.getAnnouncements = wrap(
   async (req, res) => {
-    const announcements = filterAnnouncementsForUser(
-      await Announcement.findAll(),
-      req.user
-    );
-    return ok(res, { announcements });
+    const announcementsPage = await Announcement.findAll({
+      limit: req.query.limit,
+      cursor: req.query.cursor,
+    });
+    const announcements = filterAnnouncementsForUser(announcementsPage, req.user);
+    return ok(res, { announcements, nextCursor: announcementsPage.nextCursor });
   },
   { label: "Get Announcements Error", message: "Failed to fetch announcements" }
 );
