@@ -519,3 +519,35 @@ exports.getAttendanceSummary = wrap(
   },
   { label: "Attendance Summary Error", message: "Failed to load attendance summary" }
 );
+
+exports.getAttendanceRange = wrap(
+  async (req, res) => {
+    const from = toDateOnly(req.query.from || req.query.date) || null;
+    const to = toDateOnly(req.query.to || req.query.date) || from;
+    const centre = req.query.centre || null;
+
+    if (!from || !to) {
+      return fail(res, 400, "from and to dates are required");
+    }
+
+    const allStudents = await Student.findAll();
+    const centreStudents = centre
+      ? allStudents.filter((s) => matchesCentre(s.centre, centre))
+      : allStudents;
+    const totalStudents = centreStudents.length;
+    const days = [];
+
+    for (const date of enumerateDates(from, to)) {
+      const records = await DailySubjectAttendance.findByDate(date, centre);
+      const presentIds = new Set(
+        records.filter((r) => r.status === "present").map((r) => String(r.studentId))
+      );
+      const presentCount = presentIds.size;
+      const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
+      days.push({ date, presentCount, totalStudents, percentage });
+    }
+
+    return ok(res, { days });
+  },
+  { label: "Attendance Range Error", message: "Failed to load attendance range" }
+);

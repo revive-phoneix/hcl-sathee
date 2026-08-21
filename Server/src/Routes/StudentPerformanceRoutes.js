@@ -8,6 +8,7 @@ const {
   getDailySubjectAttendance,
   saveDailySubjectAttendance,
   getAttendanceSummary,
+  getAttendanceRange,
 } = require("../Controllers/StudentPerformanceController");
 const {
   authenticate,
@@ -37,6 +38,7 @@ router.get(
   requireAdminOrPartner,
   getDailySubjectAttendance
 );
+router.get("/attendance-range", authenticate, requireAdminOrPartner, getAttendanceRange);
 router.get("/attendance-summary", authenticate, requireAdminOrPartner, getAttendanceSummary);
 router.post(
   "/daily-attendance",

@@ -15,7 +15,7 @@ import { fetchUsers } from "../../services/users";
 import { applyLeaveRequest, fetchMyLeaveRequests } from "../../services/leaveRequests";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { fetchStudents } from "../../services/students";
-import { fetchStudentAttendanceRange } from "../../services/studentAttendance";
+import api from "../../services/apiClient";
 import { matchesPortalCentre } from "../../utils/portalMapping";
 import {
   downloadAttendanceSvg,
@@ -122,23 +122,6 @@ const buildRow = (label, percent) => {
         ? "—"
         : `${Math.round(percent)}%`,
   };
-};
-
-const centrePercentForDate = (date, studentIds, recordsByStudentDate) => {
-  if (!studentIds.length) return null;
-
-  let sum = 0;
-  let hasAnyRecord = false;
-  for (const studentId of studentIds) {
-    const rec = recordsByStudentDate.get(`${studentId}_${date}`);
-    if (rec) {
-      hasAnyRecord = true;
-      sum += Number(rec.dailyAttendancePercentage) || 0;
-    }
-  }
-
-  if (!hasAnyRecord) return null;
-  return sum / studentIds.length;
 };
 
 const averageOfPercents = (percents) => {
@@ -351,10 +334,10 @@ export default function AdminAttendance({
     ];
   }, [userId, userName, userEmail, userCentre, portalName]);
 
-  const recordsByStudentDate = useMemo(() => {
+  const attendancePercentByDate = useMemo(() => {
     const map = new Map();
-    for (const record of attendanceRecords) {
-      map.set(`${String(record.studentId)}_${record.date}`, record);
+    for (const day of attendanceRecords) {
+      map.set(day.date, Number(day.percentage) || 0);
     }
     return map;
   }, [attendanceRecords]);
@@ -394,20 +377,14 @@ export default function AdminAttendance({
         const day = new Date(monday);
         day.setDate(monday.getDate() + index);
         const date = toInputDate(day);
-        const percent = centrePercentForDate(
-          date,
-          centreStudentIds,
-          recordsByStudentDate
-        );
+        const percent = attendancePercentByDate.get(date) ?? null;
         return buildRow(label, percent);
       });
     }
 
     if (activeType === "weekly") {
       return getWeeksInMonth(selectedDate).map((week) => {
-        const dayPercents = week.dates.map((date) =>
-          centrePercentForDate(date, centreStudentIds, recordsByStudentDate)
-        );
+        const dayPercents = week.dates.map((date) => attendancePercentByDate.get(date) ?? null);
         return buildRow(week.label, averageOfPercents(dayPercents));
       });
     }
@@ -418,9 +395,7 @@ export default function AdminAttendance({
         const from = toInputDate(new Date(year, monthIndex, 1));
         const to = toInputDate(new Date(year, monthIndex + 1, 0));
         const dates = eachDateInclusive(from, to);
-        const dayPercents = dates.map((date) =>
-          centrePercentForDate(date, centreStudentIds, recordsByStudentDate)
-        );
+        const dayPercents = dates.map((date) => attendancePercentByDate.get(date) ?? null);
         return buildRow(label, averageOfPercents(dayPercents));
       });
     }
@@ -432,8 +407,7 @@ export default function AdminAttendance({
     appliedType,
     activeTab,
     selectedDate,
-    centreStudentIds,
-    recordsByStudentDate,
+    attendancePercentByDate,
   ]);
 
   const filtered = useMemo(() => {
@@ -470,8 +444,14 @@ export default function AdminAttendance({
       else if (appliedType === "weekly") range = getMonthRange(selectedDate);
       else range = getYearRange(selectedDate);
 
-      const records = await fetchStudentAttendanceRange(range.from, range.to);
-      setAttendanceRecords(records);
+      const response = await api.get("/api/students/performance/attendance-range", {
+        params: {
+          from: range.from,
+          to: range.to,
+          ...(appliedCentre ? { centre: appliedCentre } : {}),
+        },
+      });
+      setAttendanceRecords(response.data.days ?? []);
     } catch (err) {
       console.error("Load student attendance error:", err);
       setError(
