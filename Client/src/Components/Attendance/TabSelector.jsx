@@ -40,14 +40,24 @@ export default function TabSelector({
   const roleOptions = [
     { value: "student", label: "Student" },
     { value: "sathee-mitra", label: mitraTabLabel },
-    { value: "sathee-vishist", label: "Sathee Vishist" },
+    ...(typeValue === "daily" || !typeValue
+      ? [{ value: "sathee-vishist", label: "Sathee Vishist" }]
+      : []),
   ];
 
   return (
     <div className="flex flex-wrap items-center gap-2 mb-5">
       <select
         value={typeValue}
-        onChange={(e) => setActiveTab(e.target.value || "")}
+        onChange={(e) => {
+          const nextType = e.target.value || "";
+          setActiveTab(nextType);
+          if (nextType === "weekly" || nextType === "monthly") {
+            setSelectedRole?.((currentRole) =>
+              currentRole === "sathee-vishist" ? "" : currentRole
+            );
+          }
+        }}
         className={selectClass}
         aria-label="Select attendance type"
       >

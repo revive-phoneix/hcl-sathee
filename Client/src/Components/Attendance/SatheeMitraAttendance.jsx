@@ -28,22 +28,83 @@ const parseInputDate = (dateStr) => {
   return Number.isNaN(d.getTime()) ? new Date() : d;
 };
 
-const getWeekRange = (dateStr) => {
-  const d = parseInputDate(dateStr);
-  const day = d.getDay();
-  const mondayOffset = day === 0 ? -6 : 1 - day;
+const startOfWeek = (date) => {
+  const d = parseInputDate(date);
+  const mondayOffset = d.getDay() === 0 ? -6 : 1 - d.getDay();
   const monday = new Date(d);
   monday.setDate(d.getDate() + mondayOffset);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  return { from: toInputDate(monday), to: toInputDate(sunday) };
+  monday.setHours(0, 0, 0, 0);
+  return monday;
 };
 
-const getMonthRange = (dateStr) => {
+const getLastPeriods = (dateStr, type, count = 5) => {
   const d = parseInputDate(dateStr);
-  const from = new Date(d.getFullYear(), d.getMonth(), 1);
-  const to = new Date(d.getFullYear(), d.getMonth() + 1, 0);
-  return { from: toInputDate(from), to: toInputDate(to) };
+
+  if (type === "weekly") {
+    const currentWeekStart = startOfWeek(d);
+    const firstWeekStart = new Date(currentWeekStart);
+    firstWeekStart.setDate(currentWeekStart.getDate() - (count - 1) * 7);
+
+    const periods = [];
+    for (let i = 0; i < count; i += 1) {
+      const fromDate = new Date(firstWeekStart);
+      fromDate.setDate(firstWeekStart.getDate() + i * 7);
+
+      const toDate = new Date(fromDate);
+      toDate.setDate(fromDate.getDate() + 6);
+
+      periods.push({
+        from: toInputDate(fromDate),
+        to: toInputDate(toDate),
+        label: `W${i + 1}`,
+        shortLabel: `W${i + 1}`,
+      });
+    }
+
+    return {
+      from: toInputDate(firstWeekStart),
+      to: toInputDate(currentWeekStart),
+      periods,
+    };
+  }
+
+  const firstMonth = new Date(d.getFullYear(), d.getMonth() - (count - 1), 1);
+  const periods = [];
+  for (let i = 0; i < count; i += 1) {
+    const fromDate = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + i, 1);
+    const toDate = new Date(fromDate.getFullYear(), fromDate.getMonth() + 1, 0);
+
+    periods.push({
+      from: toInputDate(fromDate),
+      to: toInputDate(toDate),
+      label: fromDate.toLocaleDateString("en-IN", { month: "short", year: "numeric" }),
+      shortLabel: fromDate.toLocaleDateString("en-IN", { month: "short" }),
+    });
+  }
+
+  return {
+    from: toInputDate(firstMonth),
+    to: toInputDate(new Date(d.getFullYear(), d.getMonth() + 1, 0)),
+    periods,
+  };
+};
+
+const getPeriodAverage = (entries, from, to, fieldKey) => {
+  const filtered = entries.filter((entry) => {
+    if (!entry.date) return false;
+    return entry.date >= from && entry.date <= to;
+  });
+
+  const values = filtered
+    .map((entry) => Number(entry[fieldKey]))
+    .filter((value) => Number.isFinite(value));
+
+  if (!values.length) {
+    return null;
+  }
+
+  const average = values.reduce((sum, value) => sum + value, 0) / values.length;
+  return Math.round(average);
 };
 
 const getYearRange = (dateStr) => {
@@ -125,12 +186,12 @@ export default function SatheeMitraAttendance({
         if (activeTab === "daily") {
           recordsData = await fetchMitraAttendance(dateToUse);
         } else if (activeTab === "weekly") {
-          const range = getWeekRange(dateToUse);
+          const range = getLastPeriods(dateToUse, "weekly", 5);
           if (range.from && range.to) {
             recordsData = await fetchMitraAttendanceRange(range.from, range.to);
           }
         } else if (activeTab === "monthly") {
-          const range = getMonthRange(dateToUse);
+          const range = getLastPeriods(dateToUse, "monthly", 5);
           if (range.from && range.to) {
             recordsData = await fetchMitraAttendanceRange(range.from, range.to);
           }
@@ -170,6 +231,36 @@ export default function SatheeMitraAttendance({
     const entries = recordsByUser[String(userId)] || [];
     if (activeTab === "daily") {
       return entries[0] || EMPTY_RECORD;
+    }
+
+    if (activeTab === "weekly" || activeTab === "monthly") {
+      const periodConfig = getLastPeriods(selectedDate || toInputDate(), activeTab, 5);
+      const periodSummary = periodConfig.periods.map((period) => {
+        const value = getPeriodAverage(
+          entries,
+          period.from,
+          period.to,
+          activeTab === "weekly" ? "weeklyAttendancePercentage" : "monthlyAttendancePercentage"
+        );
+
+        const { statusKey, statusLabel } = percentStatusMeta(value);
+
+        return {
+          ...period,
+          value,
+          statusKey,
+          statusLabel,
+        };
+      });
+
+      const latestPeriod = periodSummary[periodSummary.length - 1] || null;
+      return {
+        ...EMPTY_RECORD,
+        dailyAttendancePercentage: latestPeriod?.value ?? null,
+        statusKey: latestPeriod?.statusKey || "none",
+        statusLabel: latestPeriod?.statusLabel || "—",
+        periodSummary,
+      };
     }
 
     const validPercents = entries
@@ -223,7 +314,10 @@ export default function SatheeMitraAttendance({
   };
 
   const busy = loading || loadingRecords;
-  const colSpan = canApprove ? 7 : 6;
+  const isPercentView = activeTab === "weekly" || activeTab === "monthly";
+  const colSpan = canApprove
+    ? isPercentView ? 6 : 7
+    : isPercentView ? 5 : 6;
 
   return (
     <div>
@@ -246,12 +340,20 @@ export default function SatheeMitraAttendance({
               <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Centre
               </th>
-              <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Arrival
-              </th>
-              <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
-                Departure
-              </th>
+              {isPercentView ? (
+                <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                  {activeTab === "weekly" ? "Last 5 Weeks" : "Last 5 Months"}
+                </th>
+              ) : (
+                <>
+                  <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Arrival
+                  </th>
+                  <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Departure
+                  </th>
+                </>
+              )}
               <th className="px-5 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Status
               </th>
@@ -294,12 +396,34 @@ export default function SatheeMitraAttendance({
                     <td className="px-5 py-4 text-sm text-gray-700 align-middle">
                       {mitra.centre || "—"}
                     </td>
-                    <td className="px-5 py-4 align-middle">
-                      <TimeCell label="Arrival" time={record.arrivalTime} />
-                    </td>
-                    <td className="px-5 py-4 align-middle">
-                      <TimeCell label="Departure" time={record.departureTime} />
-                    </td>
+                    {isPercentView ? (
+                      <td className="px-5 py-4 align-middle">
+                        <div className="flex flex-wrap gap-2">
+                          {(record.periodSummary || []).map((period) => (
+                            <div
+                              key={`${mitra.id}-${period.from}`}
+                              className="min-w-[92px] rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-2 text-left"
+                            >
+                              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                                {period.shortLabel}
+                              </div>
+                              <div className="mt-1 text-sm font-semibold text-slate-800">
+                                {period.value == null ? "—" : `${period.value}%`}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+                    ) : (
+                      <>
+                        <td className="px-5 py-4 align-middle">
+                          <TimeCell label="Arrival" time={record.arrivalTime} />
+                        </td>
+                        <td className="px-5 py-4 align-middle">
+                          <TimeCell label="Departure" time={record.departureTime} />
+                        </td>
+                      </>
+                    )}
                     <td className="px-5 py-4 text-center align-middle">
                       {activeTab === "daily" ? (
                         record.approved ? (

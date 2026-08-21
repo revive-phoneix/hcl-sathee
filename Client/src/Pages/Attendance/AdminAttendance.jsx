@@ -292,6 +292,7 @@ export default function AdminAttendance({
     appliedCentre === centreScope &&
     appliedRole === selectedRole;
   const isMitraView = viewReady && appliedRole === "sathee-mitra";
+  const isVishistView = viewReady && appliedRole === "sathee-vishist";
   const filtersReady = viewReady;
 
   const centreStudents = useMemo(
@@ -370,6 +371,22 @@ export default function AdminAttendance({
 
     const activeType = appliedType || activeTab;
 
+    if (isVishistView) {
+      if (activeType !== "daily") return [];
+
+      const assignedDays = new Set(
+        centreVishistMitras.flatMap((mentor) =>
+          Array.isArray(mentor.availableDays)
+            ? mentor.availableDays.map((day) => String(day).toLowerCase())
+            : []
+        )
+      );
+
+      return WEEKDAYS.filter((day) => assignedDays.has(day.toLowerCase())).map((day) =>
+        buildRow(day, 0)
+      );
+    }
+
     if (activeType === "daily") {
       const { from } = getWeekRange(selectedDate);
       const monday = new Date(`${from}T00:00:00`);
@@ -403,11 +420,13 @@ export default function AdminAttendance({
     return [];
   }, [
     isMitraView,
+    isVishistView,
     filtersReady,
     appliedType,
     activeTab,
     selectedDate,
     attendancePercentByDate,
+    centreVishistMitras,
   ]);
 
   const filtered = useMemo(() => {
@@ -847,6 +866,15 @@ export default function AdminAttendance({
               activeTab={appliedType}
               canApprove={!readOnly && !mitraSelfUpload}
             />
+          ) : isVishistView && appliedType !== "daily" ? (
+            <div className="px-6 py-16 text-center">
+              <p className="text-sm font-medium text-gray-700">
+                Weekly and monthly attendance is not available for Sathee Vishist.
+              </p>
+              <p className="mt-1 text-xs text-gray-400">
+                Select Daily to view the allotted attendance days.
+              </p>
+            </div>
           ) : (
             <AttendanceTable
               filtered={filtered}
