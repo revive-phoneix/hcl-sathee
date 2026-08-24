@@ -14,6 +14,7 @@ const formatPostedOn = (value) => {
 
 const normalizeAnnouncement = (announcement) => ({
   ...announcement,
+  createdAt: announcement.created_at || announcement.createdAt || announcement.postedOn,
   postedOn: formatPostedOn(announcement.created_at || announcement.postedOn),
 });
 
