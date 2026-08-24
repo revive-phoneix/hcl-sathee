@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const { uploadConcurrencyLimiter } = require("../Utils/uploadConcurrency");
 const router = express.Router();
 const {
   listTests,
@@ -35,7 +36,7 @@ const uploadSingle = (req, res, next) => {
 router.get("/tests", authenticate, requireAdminOrMitra, listTests);
 router.post("/tests", authenticate, requireAdminOrMitra, createTest);
 router.delete("/tests/:id", authenticate, requireAdminOrMitra, deleteTest);
-router.post("/", authenticate, requireAdminOrMitra, uploadSingle, saveTestMarks);
+router.post("/", authenticate, requireAdminOrMitra, uploadConcurrencyLimiter, uploadSingle, saveTestMarks);
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);
 router.get("/test-type-progress", authenticate, requireAdminOrMitra, getTestTypeProgress);

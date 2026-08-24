@@ -84,6 +84,29 @@ const findById = async (id) => {
   return toApiStudent(doc.id, doc.data());
 };
 
+const findByIds = async (ids = []) => {
+  const uniqueIds = [
+    ...new Set(
+      ids
+        .filter((id) => id != null && id !== "")
+        .map((id) => String(id))
+    ),
+  ];
+
+  if (!uniqueIds.length) return [];
+
+  const studentsById = new Map();
+  for (let index = 0; index < uniqueIds.length; index += 30) {
+    const chunk = uniqueIds.slice(index, index + 30);
+    const snap = await studentsRef().where("__name__", "in", chunk).get();
+    for (const doc of snap.docs) {
+      studentsById.set(String(doc.id), toApiStudent(doc.id, doc.data()));
+    }
+  }
+
+  return uniqueIds.map((id) => studentsById.get(String(id))).filter(Boolean);
+};
+
 const findByEmail = async (email) => {
   const normalized = email.trim().toLowerCase();
   const snap = await studentsRef().where("email", "==", normalized).limit(1).get();
@@ -147,41 +170,12 @@ const destroy = async (id) => {
   return 1;
 };
 
-const importFromMysql = async (row) => {
-  const id = row.id;
-  const payload = {
-    id,
-    studentId: row.studentId,
-    enrollmentNo: row.enrollmentNo ?? null,
-    name: row.name,
-    gender: row.gender,
-    email: String(row.email || "").trim().toLowerCase(),
-    phone: row.phone ?? null,
-    centre: row.centre ?? null,
-    course: row.course ?? null,
-    category: row.category ?? null,
-    address: row.address ?? null,
-    parents: parseObjectField(row.parents),
-    subjects: parseSubjectsField(row.subjects),
-    marks: parseObjectField(row.marks),
-    attendance: parseObjectField(row.attendance),
-    qualifications: parseObjectField(row.qualifications),
-    avatarColor: row.avatarColor ?? null,
-    initials: row.initials ?? null,
-    created_at: toDate(row.created_at) || new Date(),
-    updated_at: toDate(row.updated_at) || new Date(),
-  };
-
-  await studentsRef().doc(String(id)).set(payload);
-  return toApiStudent(String(id), payload);
-};
-
 module.exports = {
   findAll,
   findById,
+  findByIds,
   findByEmail,
   create,
   update,
   destroy,
-  importFromMysql,
 };

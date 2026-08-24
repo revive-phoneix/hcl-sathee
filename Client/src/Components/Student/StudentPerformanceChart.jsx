@@ -22,6 +22,11 @@ const PERFORMANCE_CONFIG = {
     subtitle: "Test performance across months (Month 1, 2, 3)",
     labels: ["Month 1", "Month 2", "Month 3"],
   },
+  mid: {
+    title: "Mid Tests (in Six Months)",
+    subtitle: "Test performance across mid tests (Mid 1, 2, 3)",
+    labels: ["Mid 1", "Mid 2", "Mid 3"],
+  },
 };
 
 export default function StudentPerformanceChart({ student }) {
@@ -92,7 +97,7 @@ export default function StudentPerformanceChart({ student }) {
           </div>
 
           <div className="flex gap-2">
-            {Object.entries(PERFORMANCE_CONFIG).map(([key, val]) => (
+            {Object.entries(PERFORMANCE_CONFIG).map(([key]) => (
               <button
                 key={key}
                 type="button"
@@ -103,7 +108,7 @@ export default function StudentPerformanceChart({ student }) {
                     : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
                 }`}
               >
-                {key === "performance" ? "Weekly" : "Monthly"}
+                {key === "performance" ? "Weekly" : key === "pre-mid" ? "Monthly" : "Mid"}
               </button>
             ))}
           </div>

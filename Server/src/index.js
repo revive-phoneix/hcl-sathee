@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
 const { initFirebase } = require("./config/firebase");
@@ -19,6 +21,29 @@ const vishistAttendanceRoutes = require("./Routes/VishistAttendanceRoutes");
 
 const app = express();
 
+const apiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 100,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    const { fail } = require("./Utils/httpResponse");
+    return fail(res, 429, "Too many requests, please try again later");
+  },
+});
+
+const mutationRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    const { fail } = require("./Utils/httpResponse");
+    return fail(res, 429, "Too many requests, please try again later");
+  },
+});
+
+app.use(helmet());
 app.use(
   cors({
     origin: [
@@ -32,6 +57,15 @@ app.use(
 );
 // Allow SVG timetable dataUrls / large schedule payloads
 app.use(express.json({ limit: "3mb" }));
+
+app.use("/api/students/performance/attendance-range", apiRateLimiter);
+app.use("/api/students/performance/attendance-summary", apiRateLimiter);
+app.use((req, res, next) => {
+  if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
+    return mutationRateLimiter(req, res, next);
+  }
+  return next();
+});
 
 app.get("/", (_req, res) => {
   res.json({
@@ -53,6 +87,14 @@ app.use("/api/timetables", timetableRoutes);
 app.use("/api/leave-requests", leaveRequestRoutes);
 app.use("/api/support-queries", supportQueryRoutes);
 app.use("/api/test-marks", testMarksRoutes);
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
 
 app.use((err, _req, res, _next) => {
   const isPayloadTooLarge = err?.type === "entity.too.large";

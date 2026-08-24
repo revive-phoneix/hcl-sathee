@@ -213,30 +213,6 @@ const destroy = async (id) => {
   return 1;
 };
 
-const importFromMysql = async (row) => {
-  const id = row.id;
-  const payload = {
-    id,
-    title: row.title,
-    description: row.description,
-    category: row.category || "General",
-    priority: row.priority || "Medium",
-    postedBy: row.postedBy || "Admin",
-    centre: row.centre ?? null,
-    otherCentres: null,
-    "other-centres": null,
-    attachmentName: row.attachmentName ?? null,
-    attachmentUrl: row.attachmentUrl ?? null,
-    attachmentType: row.attachmentType ?? null,
-    attachmentPath: row.attachmentPath ?? null,
-    created_at: toDate(row.created_at) || new Date(),
-    updated_at: toDate(row.updated_at) || new Date(),
-  };
-
-  await announcementsRef().doc(String(id)).set(payload);
-  return toApiAnnouncement(String(id), payload);
-};
-
 module.exports = {
   findAll,
   findById,
@@ -244,5 +220,4 @@ module.exports = {
   update,
   destroy,
   uploadAttachment,
-  importFromMysql,
 };

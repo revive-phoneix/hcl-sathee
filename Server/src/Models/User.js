@@ -248,29 +248,6 @@ const destroy = async (id) => {
   return 1;
 };
 
-const importFromMysql = async (row) => {
-  const id = row.id;
-  const payload = {
-    id,
-    name: row.name,
-    email: row.email.trim().toLowerCase(),
-    password: row.password == null ? null : String(row.password),
-    phone: row.phone ?? null,
-    role: row.role,
-    centre: row.centre ?? null,
-    availableDays: normalizeAvailableDays(row.availableDays),
-    created_at: toDate(row.created_at) || new Date(),
-    updated_at: toDate(row.updated_at) || new Date(),
-  };
-
-  if (isMitraRole(row.role)) {
-    payload.isVishist = Boolean(normalizeIsVishist(row.role, row.isVishist));
-  }
-
-  await usersRef().doc(String(id)).set(payload);
-  return toApiUser(String(id), payload);
-};
-
 const addFcmToken = async (id, token) => {
   const ref = await findDocRefById(id);
   if (!ref || !token) return null;
@@ -302,7 +279,6 @@ module.exports = {
   create,
   update,
   destroy,
-  importFromMysql,
   addFcmToken,
   removeFcmToken,
   backfillMissingIsVishist,

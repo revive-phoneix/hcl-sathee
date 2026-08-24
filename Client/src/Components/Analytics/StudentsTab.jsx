@@ -13,6 +13,7 @@ import {
 const TEST_TYPE_OPTIONS = [
   { value: "performance", label: "Performance Test (Weekly)" },
   { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
 ];
 
 const TEST_TYPE_GRAPH_META = {
@@ -25,6 +26,11 @@ const TEST_TYPE_GRAPH_META = {
     title: "Pre-Mid (Monthly)",
     subtitle: "Average pre-mid performance across the course",
     labels: ["Month 1", "Month 2", "Month 3"],
+  },
+  mid: {
+    title: "Mid (in Six Months)",
+    subtitle: "Average mid performance across the course",
+    labels: ["Mid 1", "Mid 2", "Mid 3"],
   },
 };
 

@@ -6,6 +6,7 @@ const COURSES = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
 const TEST_TYPES = [
   { value: "performance", label: "Performance Test (Weekly)" },
   { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
 ];
 
 export default function TestMarksUpload({ mitraCentre = "" }) {

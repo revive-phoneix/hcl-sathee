@@ -12,6 +12,7 @@ import StudentAnalyticsPanel from "./StudentAnalyticsPanel";
 const TEST_TYPE_OPTIONS = [
   { value: "performance", label: "Performance Test (Weekly)" },
   { value: "pre-mid", label: "Pre-Mid (Monthly)" },
+  { value: "mid", label: "Mid (in Six Months)" },
 ];
 
 export default function StudentDetailsModal({ student, open, onClose, onSave, readOnly = false }) {

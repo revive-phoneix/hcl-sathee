@@ -339,6 +339,24 @@ exports.saveDailySubjectAttendance = wrap(
     const saved = [];
     const errors = [];
     const touchedPairs = new Map();
+    const studentIds = [
+      ...new Set(
+        attendanceRecords
+          .map((row) => row?.studentId)
+          .filter((studentId) => studentId != null && studentId !== "")
+          .map((studentId) => String(studentId))
+      ),
+    ];
+    const studentsById = new Map(
+      (await Promise.all(
+        Array.from({ length: Math.ceil(studentIds.length / 30) }, (_, index) =>
+          studentIds.slice(index * 30, index * 30 + 30)
+        ).filter((chunk) => chunk.length)
+          .map((chunk) => Student.findByIds(chunk)))
+      )
+        .flat()
+        .map((student) => [String(student.id), student])
+    );
 
     for (const row of attendanceRecords) {
       const studentId = row?.studentId;
@@ -347,7 +365,7 @@ exports.saveDailySubjectAttendance = wrap(
         continue;
       }
 
-      const student = await Student.findById(studentId);
+      const student = studentsById.get(String(studentId));
       if (!student) {
         errors.push({ studentId, message: "Student not found" });
         continue;
@@ -535,17 +553,24 @@ exports.getAttendanceRange = wrap(
       ? allStudents.filter((s) => matchesCentre(s.centre, centre))
       : allStudents;
     const totalStudents = centreStudents.length;
-    const days = [];
 
-    for (const date of enumerateDates(from, to)) {
-      const records = await DailySubjectAttendance.findByDate(date, centre);
+    const records = await DailySubjectAttendance.findByDateRange(from, to, centre);
+    const recordsByDate = new Map();
+    for (const row of records) {
+      const dateKey = row.date;
+      if (!recordsByDate.has(dateKey)) recordsByDate.set(dateKey, []);
+      recordsByDate.get(dateKey).push(row);
+    }
+
+    const days = enumerateDates(from, to).map((date) => {
+      const dayRecords = recordsByDate.get(date) || [];
       const presentIds = new Set(
-        records.filter((r) => r.status === "present").map((r) => String(r.studentId))
+        dayRecords.filter((r) => r.status === "present").map((r) => String(r.studentId))
       );
       const presentCount = presentIds.size;
       const percentage = totalStudents > 0 ? Math.round((presentCount / totalStudents) * 100) : 0;
-      days.push({ date, presentCount, totalStudents, percentage });
-    }
+      return { date, presentCount, totalStudents, percentage };
+    });
 
     return ok(res, { days });
   },

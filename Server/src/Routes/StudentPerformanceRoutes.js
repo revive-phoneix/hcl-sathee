@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const { uploadConcurrencyLimiter } = require("../Utils/uploadConcurrency");
 const router = express.Router();
 const {
   getStudentsWithPerformance,
@@ -44,6 +45,7 @@ router.post(
   "/daily-attendance",
   authenticate,
   requireAdminOrMitra,
+  uploadConcurrencyLimiter,
   (req, res, next) => {
     upload.single("photo")(req, res, (err) => {
       if (err) {

@@ -53,6 +53,12 @@ const toApiLog = (docId, data) => ({
   updated_at: toDate(data.updated_at),
 });
 
+const filterByCentre = (rows, centre) => {
+  if (!centre) return rows;
+  const { matchesCentre } = require("../Utils/centreMatch");
+  return rows.filter((row) => matchesCentre(row.centre, centre));
+};
+
 const findByDateSubjectTime = async ({ date, subject, time = "", centre = null }) => {
   const dateOnly = toDateOnly(date);
   if (!dateOnly || !subject) return [];
@@ -67,27 +73,14 @@ const findByDateSubjectTime = async ({ date, subject, time = "", centre = null }
   }
 
   const snap = await query.get();
-  let rows = snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
-
-  if (centre) {
-    const { matchesCentre } = require("../Utils/centreMatch");
-    rows = rows.filter((row) => matchesCentre(row.centre, centre));
-  }
-
-  return rows;
+  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
 };
 const findByDate = async (date, centre = null) => {
   const dateOnly = toDateOnly(date);
   if (!dateOnly) return [];
 
   const snap = await logsRef().where("date", "==", dateOnly).get();
-  let rows = snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
-
-  if (centre) {
-    const { matchesCentre } = require("../Utils/centreMatch");
-    rows = rows.filter((row) => matchesCentre(row.centre, centre));
-  }
-  return rows;
+  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
 };
 
 const findByDateRange = async (fromDate, toDateArg, centre = null) => {
@@ -96,13 +89,7 @@ const findByDateRange = async (fromDate, toDateArg, centre = null) => {
   if (!from || !to) return [];
 
   const snap = await logsRef().where("date", ">=", from).where("date", "<=", to).get();
-  let rows = snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
-
-  if (centre) {
-    const { matchesCentre } = require("../Utils/centreMatch");
-    rows = rows.filter((row) => matchesCentre(row.centre, centre));
-  }
-  return rows;
+  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
 };
 
 const findByStudentAndSubject = async (studentId, subject) => {

@@ -53,12 +53,10 @@ const buildAttendanceTable = ({
   };
 };
 
-export const downloadAttendanceXlsx = (options) => {
-  const table = buildAttendanceTable(options);
-  downloadTableXlsx(table);
-};
+const downloadAttendance = (download, options) => download(buildAttendanceTable(options));
 
-export const downloadAttendanceSvg = (options) => {
-  const table = buildAttendanceTable(options);
-  downloadTableSvg(table);
-};
+export const downloadAttendanceXlsx = (options) =>
+  downloadAttendance(downloadTableXlsx, options);
+
+export const downloadAttendanceSvg = (options) =>
+  downloadAttendance(downloadTableSvg, options);

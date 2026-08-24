@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const { uploadConcurrencyLimiter } = require("../Utils/uploadConcurrency");
 const router = express.Router();
 const {
   getAnnouncements,
@@ -47,10 +48,10 @@ const withOptionalAttachment = (handler) => (req, res, next) => {
 };
 
 router.get("/", authenticate, requireAdminOrPartner, getAnnouncements);
-router.post("/", authenticate, requireAdmin, withOptionalAttachment(addAnnouncement));
+router.post("/", authenticate, requireAdmin, uploadConcurrencyLimiter, withOptionalAttachment(addAnnouncement));
 // POST preferred for multipart updates (some hosts mishandle PUT + FormData)
-router.post("/:id", authenticate, requireAdmin, withOptionalAttachment(updateAnnouncement));
-router.put("/:id", authenticate, requireAdmin, withOptionalAttachment(updateAnnouncement));
+router.post("/:id", authenticate, requireAdmin, uploadConcurrencyLimiter, withOptionalAttachment(updateAnnouncement));
+router.put("/:id", authenticate, requireAdmin, uploadConcurrencyLimiter, withOptionalAttachment(updateAnnouncement));
 router.delete("/:id", authenticate, requireAdmin, deleteAnnouncement);
 
 module.exports = router;

@@ -1,5 +1,6 @@
 const express = require("express");
 const multer = require("multer");
+const { uploadConcurrencyLimiter } = require("../Utils/uploadConcurrency");
 const {
   getMitraAttendance,
   uploadMitraPhoto,
@@ -28,7 +29,7 @@ const upload = multer({
 router.get("/", authenticate, requireAdminOrPartner, getMitraAttendance);
 router.patch("/:userId/approve", authenticate, requireAdmin, approveMitraAttendance);
 
-router.post("/upload", authenticate, requireSatheeMitra, (req, res, next) => {
+router.post("/upload", authenticate, requireSatheeMitra, uploadConcurrencyLimiter, (req, res, next) => {
   upload.single("photo")(req, res, (err) => {
     if (err) {
       return res.status(400).json({
