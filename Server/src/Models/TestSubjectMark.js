@@ -17,7 +17,12 @@ const slugPart = (value) =>
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "") || "subject";
 
-const buildDocId = (testId, studentId, subject) =>
+const normalizeTestType = (testType) => String(testType || "performance").trim().toLowerCase();
+
+const buildDocId = (testId, studentId, subject, testType = "performance") =>
+  `${testId}_${studentId}_${normalizeTestType(testType)}_${slugPart(subject)}`;
+
+const buildLegacyDocId = (testId, studentId, subject) =>
   `${testId}_${studentId}_${slugPart(subject)}`;
 
 const toApiMark = (docId, data) => ({
@@ -101,9 +106,21 @@ const upsert = async ({
     throw new Error("testId, studentId, and subject are required");
   }
 
-  const docId = buildDocId(testId, studentId, subjectName);
-  const ref = marksRef().doc(docId);
-  const existing = await ref.get();
+  const normalizedTestType = normalizeTestType(testType);
+  const docId = buildDocId(testId, studentId, subjectName, normalizedTestType);
+  let persistedDocId = docId;
+  let ref = marksRef().doc(docId);
+  let existing = await ref.get();
+
+  if (!existing.exists && normalizedTestType === "performance") {
+    const legacyRef = marksRef().doc(buildLegacyDocId(testId, studentId, subjectName));
+    const legacy = await legacyRef.get();
+    if (legacy.exists && normalizeTestType(legacy.data().testType) === "performance") {
+      ref = legacyRef;
+      persistedDocId = buildLegacyDocId(testId, studentId, subjectName);
+      existing = legacy;
+    }
+  }
   const now = new Date();
 
   const obtained = Math.max(0, Number(marksObtained) || 0);
@@ -111,13 +128,13 @@ const upsert = async ({
 
   const base = existing.exists
     ? existing.data()
-    : { id: docId, testId, studentId: Number(studentId) || studentId, created_at: now };
+    : { id: persistedDocId, testId, studentId: Number(studentId) || studentId, created_at: now };
 
   const payload = {
     ...base,
-    id: docId,
+    id: persistedDocId,
     testId,
-    testType,
+    testType: normalizedTestType,
     studentId: Number(studentId) || studentId,
     course: course || base.course || null,
     centre: centre || base.centre || null,
