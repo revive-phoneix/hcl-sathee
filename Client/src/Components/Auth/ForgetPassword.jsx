@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AuthAlerts,
@@ -11,21 +11,29 @@ import {
   btnSecondaryClass,
   getAuthErrorMessage,
   inputClass,
-  lockedInputClass,
 } from "./authUi";
 import { validatePasswordPolicy } from "../../utils/passwordPolicy";
 
 export default function ForgetPassword() {
   const navigate = useNavigate();
-  const [step, setStep] = useState("lookup");
-  const [lookupEmail, setLookupEmail] = useState("");
-  const [account, setAccount] = useState({ name: "", email: "", role: "" });
+  const [step, setStep] = useState("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [resetToken, setResetToken] = useState("");
   const [loading, setLoading] = useState(false);
   const [statusText, setStatusText] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  useEffect(() => {
+    if (resendCooldown > 0) {
+      const timer = setTimeout(() => setResendCooldown(resendCooldown - 1), 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [resendCooldown]);
 
   const resetAlerts = () => {
     setError("");
@@ -45,30 +53,44 @@ export default function ForgetPassword() {
     }
   };
 
-  const handleLookup = (e) => {
+  const handleRequestOtp = (e) => {
     e.preventDefault();
     resetAlerts();
-    if (!lookupEmail.trim()) return setError("Enter your email address.");
+    if (!email.trim()) return setError("Enter your email address.");
 
     run(async () => {
-      const { data } = await authPost(
-        "/api/auth/forgot-password/lookup",
-        { email: lookupEmail.trim() },
+      await authPost(
+        "/api/auth/forgot-password/request-otp",
+        { email: email.trim() },
         setStatusText,
-        "Looking up account…"
+        "Sending verification code…"
       );
-      const user = data?.user;
-      setAccount({
-        name: user?.name || "",
-        email: user?.email || lookupEmail.trim().toLowerCase(),
-        role: user?.role || "",
-      });
-      setStep("reset");
       setStatusText("");
+      setStep("otp");
+      setResendCooldown(30);
     });
   };
 
-  const handleReset = (e) => {
+  const handleVerifyOtp = (e) => {
+    e.preventDefault();
+    resetAlerts();
+    if (!otp.trim()) return setError("Enter your 6-digit verification code.");
+    if (!/^\d{6}$/.test(otp.trim())) return setError("Verification code must be 6 digits.");
+
+    run(async () => {
+      const { data } = await authPost(
+        "/api/auth/forgot-password/verify-otp",
+        { email: email.trim(), otp: otp.trim() },
+        setStatusText,
+        "Verifying code…"
+      );
+      setStatusText("");
+      setResetToken(data?.resetToken || "");
+      setStep("reset");
+    });
+  };
+
+  const handleResetPassword = (e) => {
     e.preventDefault();
     resetAlerts();
     const policy = validatePasswordPolicy(password);
@@ -78,7 +100,7 @@ export default function ForgetPassword() {
     run(async () => {
       await authPost(
         "/api/auth/forgot-password/reset",
-        { ...account, password },
+        { resetToken, password },
         setStatusText,
         "Updating password…"
       );
@@ -89,10 +111,7 @@ export default function ForgetPassword() {
           navigate("/", {
             replace: true,
             state: {
-              loginPrefill: {
-                name: account.name.trim(),
-                email: account.email.trim().toLowerCase(),
-              },
+              loginPrefill: { email: email.trim().toLowerCase() },
             },
           }),
         1200
@@ -100,22 +119,41 @@ export default function ForgetPassword() {
     });
   };
 
+  const handleResendOtp = (e) => {
+    e.preventDefault();
+    if (resendCooldown > 0) return;
+    resetAlerts();
+
+    run(async () => {
+      await authPost(
+        "/api/auth/forgot-password/request-otp",
+        { email: email.trim() },
+        setStatusText,
+        "Resending verification code…"
+      );
+      setStatusText("");
+      setResendCooldown(30);
+    });
+  };
+
   return (
     <AuthCard
       title="Forgot Password"
       subtitle={
-        step === "lookup"
+        step === "email"
           ? "Enter your account email to continue."
-          : "Confirm your account details and set a new password."
+          : step === "otp"
+          ? "Enter the 6-digit code sent to your email."
+          : "Create a new password."
       }
     >
-      {step === "lookup" ? (
-        <form onSubmit={handleLookup} className="mt-6 space-y-4">
+      {step === "email" ? (
+        <form onSubmit={handleRequestOtp} className="mt-6 space-y-4">
           <Field label="Email">
             <input
               type="email"
-              value={lookupEmail}
-              onChange={(e) => setLookupEmail(e.target.value)}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               className={inputClass}
               placeholder="name@example.com"
               required
@@ -123,23 +161,59 @@ export default function ForgetPassword() {
           </Field>
           <AuthAlerts statusText={statusText} error={error} />
           <button type="submit" disabled={loading} className={btnPrimaryClass}>
-            {loading ? statusText || "Finding account…" : "Continue"}
+            {loading ? statusText || "Sending…" : "Continue"}
           </button>
           <button type="button" onClick={() => navigate("/")} className={btnSecondaryClass}>
             Back to Sign In
           </button>
         </form>
+      ) : step === "otp" ? (
+        <form onSubmit={handleVerifyOtp} className="mt-6 space-y-4">
+          <Field label="Verification Code">
+            <input
+              type="text"
+              value={otp}
+              onChange={(e) => setOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+              className={inputClass}
+              placeholder="000000"
+              maxLength="6"
+              required
+            />
+            <p className="text-sm text-gray-500 mt-2">
+              We sent a 6-digit code to {email}. This code expires in 10 minutes.
+            </p>
+          </Field>
+          <AuthAlerts statusText={statusText} error={error} />
+          <button type="submit" disabled={loading} className={btnPrimaryClass}>
+            {loading ? statusText || "Verifying…" : "Verify Code"}
+          </button>
+          <button
+            type="button"
+            onClick={handleResendOtp}
+            disabled={resendCooldown > 0 || loading}
+            className={`w-full py-2 px-4 text-center rounded-lg font-medium transition ${
+              resendCooldown > 0 || loading
+                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                : "bg-gray-100 text-gray-700 hover:bg-gray-200"
+            }`}
+          >
+            {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : "Resend Code"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setStep("email");
+              setOtp("");
+              setEmail("");
+              resetAlerts();
+            }}
+            className={btnSecondaryClass}
+          >
+            Use a different email
+          </button>
+        </form>
       ) : (
-        <form onSubmit={handleReset} className="mt-6 space-y-4">
-          {[
-            ["Name", account.name],
-            ["Email", account.email],
-            ["Role", account.role],
-          ].map(([label, value]) => (
-            <Field key={label} label={label}>
-              <input type="text" value={value} readOnly className={lockedInputClass} />
-            </Field>
-          ))}
+        <form onSubmit={handleResetPassword} className="mt-6 space-y-4">
           <Field label="New Password">
             <PasswordField
               value={password}
@@ -158,19 +232,22 @@ export default function ForgetPassword() {
           </Field>
           <AuthAlerts statusText={statusText} error={error} message={message} />
           <button type="submit" disabled={loading} className={btnPrimaryClass}>
-            {loading ? statusText || "Updating Password…" : "Update Password"}
+            {loading ? statusText || "Updating…" : "Update Password"}
           </button>
           <button
             type="button"
             onClick={() => {
-              setStep("lookup");
+              setStep("email");
+              setEmail("");
+              setOtp("");
               setPassword("");
               setConfirmPassword("");
+              setResetToken("");
               resetAlerts();
             }}
             className={btnSecondaryClass}
           >
-            Use a different email
+            Back to Email
           </button>
         </form>
       )}

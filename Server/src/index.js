@@ -55,8 +55,10 @@ app.use(
     credentials: true,
   })
 );
-// Allow SVG timetable dataUrls / large schedule payloads
-app.use(express.json({ limit: "3mb" }));
+// 3mb limit for timetable and schedule PUT endpoints with large SVG dataUrls/rows
+app.use(["/api/timetables", "/api/schedules"], express.json({ limit: "3mb" }));
+// Default 1mb limit for all other routes
+app.use(express.json({ limit: "1mb" }));
 
 app.use("/api/students/performance/attendance-range", apiRateLimiter);
 app.use("/api/students/performance/attendance-summary", apiRateLimiter);

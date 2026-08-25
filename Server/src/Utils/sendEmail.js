@@ -157,7 +157,49 @@ async function sendSupportQueryEmail(to, { partnerName, title, description }) {
   await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
 }
 
+async function sendPasswordResetOtpEmail(to, name, otp) {
+  const from = String(process.env.EMAIL_USER || "").trim();
+  const subject = "Your SATHEE password reset code";
+  const text = `Hello ${name},\n\nYour password reset code is: ${otp}\n\nThis code will expire in 10 minutes.\n\nIf you didn't request this password reset, please ignore this email.\n\nBest regards,\nHCL SATHEE Team`;
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 600px; margin: auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%); padding: 28px; color: white; text-align: center;">
+          <h2 style="margin:0; font-size: 24px;">Password Reset Code</h2>
+        </div>
+        <div style="padding: 28px; background: white;">
+          <p style="margin: 0 0 16px;">Hi <strong>${name}</strong>,</p>
+          <p style="margin: 0 0 20px;">We received a request to reset your SATHEE account password. Use the code below to proceed.</p>
+          
+          <div style="background: #f3f4f6; border: 2px solid #2563eb; border-radius: 10px; padding: 20px; text-align: center; margin: 24px 0;">
+            <p style="margin: 0; font-size: 14px; color: #6b7280;">Your verification code:</p>
+            <p style="margin: 8px 0 0; font-size: 32px; font-weight: bold; letter-spacing: 4px; color: #2563eb; font-family: 'Courier New', monospace;">${otp}</p>
+          </div>
+          
+          <p style="margin: 0 0 16px; font-size: 14px; color: #6b7280;">This code will expire in <strong>10 minutes</strong>.</p>
+          
+          <div style="padding: 16px; background: #fef3c7; border-left: 4px solid #f59e0b; border-radius: 4px; margin: 20px 0;">
+            <p style="margin: 0; font-size: 14px; color: #92400e;"><strong>Security tip:</strong> If you didn't request a password reset, please ignore this email. Your account is secure.</p>
+          </div>
+          
+          <p style="margin: 20px 0 0;">Best regards,<br><strong>HCL SATHEE Team</strong></p>
+        </div>
+        
+        <div style="padding: 16px 28px; background: #f8fafc; color: #64748b; text-align: center; font-size: 13px;">
+          <p style="margin: 0;">HCL SATHEE Portal • Powered by HCL</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const gmail = await getGmailClient();
+  const raw = createMessage(from, to, subject, text, html);
+  await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+}
+
 module.exports = {
   sendWelcomeEmail,
   sendSupportQueryEmail,
+  sendPasswordResetOtpEmail,
 };

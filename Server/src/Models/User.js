@@ -268,6 +268,67 @@ const removeFcmToken = async (id, token) => {
   });
 };
 
+/**
+ * Set password reset OTP for a user
+ * Resets attempts counter to 0
+ */
+const setPasswordResetOtp = async (id, { otpHash, expiresAt }) => {
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+  await ref.update({
+    otpHash: otpHash || null,
+    otpExpiresAt: expiresAt || null,
+    otpAttempts: 0,
+    updated_at: new Date(),
+  });
+};
+
+/**
+ * Get password reset OTP data for a user
+ */
+const getPasswordResetOtp = async (id) => {
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+  const doc = await ref.get();
+  const data = doc.data() || {};
+  return {
+    otpHash: data.otpHash || null,
+    otpExpiresAt: data.otpExpiresAt || null,
+    otpAttempts: data.otpAttempts || 0,
+  };
+};
+
+/**
+ * Increment OTP attempt counter for a user
+ */
+const incrementOtpAttempts = async (id) => {
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+  const doc = await ref.get();
+  const data = doc.data() || {};
+  const newAttempts = (data.otpAttempts || 0) + 1;
+  await ref.update({
+    otpAttempts: newAttempts,
+    updated_at: new Date(),
+  });
+  return newAttempts;
+};
+
+/**
+ * Clear password reset OTP data for a user
+ * Call after successful reset or when max attempts exceeded
+ */
+const clearPasswordResetOtp = async (id) => {
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+  await ref.update({
+    otpHash: FieldValue.delete(),
+    otpExpiresAt: FieldValue.delete(),
+    otpAttempts: FieldValue.delete(),
+    updated_at: new Date(),
+  });
+};
+
 module.exports = {
   WEEKDAYS,
   normalizeAvailableDays,
@@ -281,5 +342,9 @@ module.exports = {
   destroy,
   addFcmToken,
   removeFcmToken,
+  setPasswordResetOtp,
+  getPasswordResetOtp,
+  incrementOtpAttempts,
+  clearPasswordResetOtp,
   backfillMissingIsVishist,
 };

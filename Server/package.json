@@ -5,7 +5,7 @@
   "main": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "node tests/mitraAttendance.test.js && node tests/supportQueries.test.js",
     "dev": "nodemon src/index.js"
   },
   "keywords": [],
@@ -29,12 +29,8 @@
     "mammoth": "^1.8.0",
     "morgan": "^1.11.0",
     "multer": "^2.2.0",
-    "mysql2": "^3.22.6",
     "nodemon": "^3.1.14",
     "pdf-parse": "^1.1.4",
-    "pg": "^8.22.0",
-    "pg-hstore": "^2.3.4",
-    "sequelize": "^6.37.8",
     "uuid": "^14.0.1"
   }
 }
