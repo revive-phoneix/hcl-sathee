@@ -5,6 +5,7 @@ const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
   VALID_CENTRES,
   filterByUserCentre,
+  matchesCentre,
   isAdminRole,
   isHclPartnerRole,
   isSatheeMitraRole,
@@ -78,6 +79,32 @@ exports.getMe = wrap(
     return ok(res, { user: toPublicUser(user) });
   },
   { label: "Get Me Error", message: "Failed to fetch current user" }
+);
+
+exports.getVishistMentors = wrap(
+  async (req, res) => {
+    const allUsers = await User.findAll();
+    const isAdmin = isAdminRole(req.user?.role);
+    const centre = isAdmin ? req.query.centre || null : req.user?.centre;
+
+    let mentors = allUsers.filter(
+      (u) => isSatheeMitraRole(u.role) && Boolean(u.isVishist)
+    );
+    if (centre) {
+      mentors = mentors.filter((u) => matchesCentre(u.centre, centre));
+    }
+
+    return ok(res, {
+      mentors: mentors.map((u) => ({
+        id: u.id,
+        name: u.name,
+        email: u.email,
+        centre: u.centre,
+        availableDays: u.availableDays || [],
+      })),
+    });
+  },
+  { label: "Get Vishist Mentors Error", message: "Failed to fetch Vishist mentors" }
 );
 
 exports.saveFcmToken = wrap(

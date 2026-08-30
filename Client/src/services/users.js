@@ -5,6 +5,11 @@ export const fetchUsers = async () => {
   return response.data.users ?? [];
 };
 
+export const fetchVishistMentors = async () => {
+  const response = await api.get("/api/users/vishist");
+  return response.data.mentors ?? [];
+};
+
 export const fetchCurrentUser = async () => {
   const response = await api.get("/api/users/me");
   return response.data.user;

@@ -691,7 +691,7 @@ export default function AdminAttendance({
               </div>
 
               {attendancePanel === "vishistAttendance" ? (
-  <VishistAttendanceUpload vishistMitras={centreVishistMitras} portalName={portalName} />
+  <VishistAttendanceUpload portalName={portalName} />
 ) : (
   <MyMitraAttendance
     userId={userId}

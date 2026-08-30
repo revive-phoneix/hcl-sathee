@@ -3,6 +3,7 @@ const {
   getUsers,
   getAdminUsers,
   getMe,
+  getVishistMentors,
   addUser,
   updateUser,
   updateCurrentUser,
@@ -22,6 +23,10 @@ router.use(authenticate);
 
 router.get("/me", getMe);
 router.patch("/me/fcm-token", saveFcmToken);
+
+// Any authenticated user may fetch Vishist mentors; the handler enforces
+// centre-scoping per role (admins may pass ?centre=, others are locked to their own).
+router.get("/vishist", getVishistMentors);
 
 // Partners may list Sathee Mitra in their centre (for attendance view).
 // Create/update/delete remain admin-only.

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Camera, ImageOff, Check } from "lucide-react";
 import { fetchVishistAttendance, markVishistAttendance, approveVishistAttendance } from "../../services/vishistAttendance";
+import { fetchVishistMentors } from "../../services/users";
 
 const toInputDate = (date = new Date()) => {
     const year = date.getFullYear();
@@ -9,8 +10,9 @@ const toInputDate = (date = new Date()) => {
     return `${year}-${month}-${day}`;
 };
 
-export default function VishistAttendanceUpload({ vishistMitras = [], portalName }) {
+export default function VishistAttendanceUpload({ portalName }) {
     const today = toInputDate();
+    const [vishistMitras, setVishistMitras] = useState([]);
     const [selectedId, setSelectedId] = useState("");
     const [subject, setSubject] = useState("");
     const [topicTaught, setTopicTaught] = useState("");
@@ -55,6 +57,12 @@ export default function VishistAttendanceUpload({ vishistMitras = [], portalName
         loadRecords();
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [today, portalName]);
+
+    useEffect(() => {
+        fetchVishistMentors()
+            .then(setVishistMitras)
+            .catch((err) => console.error("Load Vishist mentors error:", err));
+    }, []);
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0] || null;
