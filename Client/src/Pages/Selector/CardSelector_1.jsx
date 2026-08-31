@@ -19,8 +19,18 @@ function LogoIcon({ src, alt }) {
   );
 }
 
-export default function DashboardSelect({ openHCLSathee, userRole }) {
+// SATHEE web app entry point. Swap for the real URL after deployment/domain.
+const SATHEE_APP_URL = "http://localhost:5174/";
+
+export default function DashboardSelect({ openHCLSathee, userRole, userCentre }) {
   const isAdmin = String(userRole || "").trim().toUpperCase() === "ADMIN";
+
+  const openSatheeApp = () => {
+    const url = new URL(SATHEE_APP_URL);
+    if (userRole) url.searchParams.set("role", userRole);
+    if (userCentre) url.searchParams.set("centre", userCentre);
+    window.open(url.toString(), "_blank", "noopener,noreferrer");
+  };
 
   const [customDashboards, setCustomDashboards] = useState(() => getCustomDashboards());
   const [modalOpen, setModalOpen] = useState(false);
@@ -49,8 +59,7 @@ export default function DashboardSelect({ openHCLSathee, userRole }) {
       subtitle: "Go to the official SATHEE learning portal",
       icon: (size) => <LogoIcon src={SatheeLogo} alt="SATHEE" size={size} />,
       buttonText: "Visit SATHEE",
-      onClick: () =>
-        window.open("https://sathee.iitk.ac.in/", "_blank", "noopener,noreferrer"),
+      onClick: openSatheeApp,
       badge: "External",
     },
   ];
