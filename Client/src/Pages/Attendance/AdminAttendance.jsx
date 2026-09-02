@@ -227,6 +227,7 @@ export default function AdminAttendance({
   userEmail = "",
   userId = null,
   userCentre = null,
+  isCustomCentre = false,
 }) {
   const navigate = useNavigate();
   const isAdminView = !readOnly;
@@ -436,17 +437,31 @@ export default function AdminAttendance({
   }, [tableRows, search]);
 
   const loadMitras = useCallback(
-    () => fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch Sathee Mitra error"),
-    []
+    () => {
+      if (isCustomCentre) {
+        setMitras([]);
+        setLoadingMitras(false);
+        return;
+      }
+      fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch Sathee Mitra error");
+    },
+    [isCustomCentre]
   );
 
   const loadStudents = useCallback(
-    () => fetchList(fetchStudents, setStudents, setLoadingStudents, "Fetch students error"),
-    []
+    () => {
+      if (isCustomCentre) {
+        setStudents([]);
+        setLoadingStudents(false);
+        return;
+      }
+      fetchList(fetchStudents, setStudents, setLoadingStudents, "Fetch students error");
+    },
+    [isCustomCentre]
   );
 
   const loadAttendance = useCallback(async () => {
-    if (!viewReady || appliedRole !== "student" || !selectedDate) {
+    if (isCustomCentre || !viewReady || appliedRole !== "student" || !selectedDate) {
       setAttendanceRecords([]);
       return;
     }
@@ -480,7 +495,7 @@ export default function AdminAttendance({
     } finally {
       setLoadingAttendance(false);
     }
-  }, [viewReady, appliedRole, appliedType, appliedCentre, selectedDate, centreFilterEnabled]);
+  }, [isCustomCentre, viewReady, appliedRole, appliedType, appliedCentre, selectedDate, centreFilterEnabled]);
 
   useEffect(() => {
     if (mitraTabEnabled) loadMitras();
@@ -493,6 +508,13 @@ export default function AdminAttendance({
 
   useEffect(() => {
     if (!mitraSelfUpload || mitraPanel !== "requests") return;
+
+    if (isCustomCentre) {
+      setMyRequests([]);
+      setLoadingMyRequests(false);
+      setMyRequestsError("");
+      return;
+    }
 
     let isMounted = true;
     setLoadingMyRequests(true);
@@ -516,7 +538,7 @@ export default function AdminAttendance({
     return () => {
       isMounted = false;
     };
-  }, [mitraSelfUpload, mitraPanel]);
+  }, [mitraSelfUpload, mitraPanel, isCustomCentre]);
 
   const handleApplyLeave = async (payload) => {
     setSubmittingLeave(true);
@@ -662,7 +684,7 @@ export default function AdminAttendance({
               </div>
             </div>
 
-            {mitraPanel === "attendance" ? <TodaysClassesCard portalName={portalName} /> : null}
+            {mitraPanel === "attendance" ? <TodaysClassesCard portalName={portalName} isCustomCentre={isCustomCentre} /> : null}
           </div>
         ) : null}
 
@@ -691,7 +713,7 @@ export default function AdminAttendance({
               </div>
 
               {attendancePanel === "vishistAttendance" ? (
-  <VishistAttendanceUpload portalName={portalName} />
+  <VishistAttendanceUpload portalName={portalName} isCustomCentre={isCustomCentre} />
 ) : (
   <MyMitraAttendance
     userId={userId}
@@ -700,6 +722,7 @@ export default function AdminAttendance({
     userCentre={userCentre}
     portalName={portalName}
     selectedDate={selectedDate}
+    isCustomCentre={isCustomCentre}
   />
 )}
             </div>
@@ -709,6 +732,7 @@ export default function AdminAttendance({
               userCentre={userCentre}
               students={centreStudents}
               studentsLoading={loadingStudents}
+              isCustomCentre={isCustomCentre}
             />
           ) : (
             <div className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
@@ -865,6 +889,7 @@ export default function AdminAttendance({
               selectedDate={selectedDate}
               activeTab={appliedType}
               canApprove={!readOnly && !mitraSelfUpload}
+              isCustomCentre={isCustomCentre}
             />
           ) : isVishistView && appliedType !== "daily" ? (
             <div className="px-6 py-16 text-center">

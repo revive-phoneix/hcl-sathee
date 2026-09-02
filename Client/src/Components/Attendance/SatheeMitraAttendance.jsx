@@ -154,6 +154,7 @@ export default function SatheeMitraAttendance({
   selectedDate,
   activeTab = "daily",
   canApprove = false,
+  isCustomCentre = false,
 }) {
   const [records, setRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(false);
@@ -177,7 +178,12 @@ export default function SatheeMitraAttendance({
 
     const loadRecords = async () => {
       const dateToUse = selectedDate || toInputDate();
-      if (!dateToUse) return;
+      if (isCustomCentre || !dateToUse) {
+        setRecords([]);
+        setLoadingRecords(false);
+        return;
+      }
+
       setLoadingRecords(true);
       setError("");
 
@@ -215,7 +221,7 @@ export default function SatheeMitraAttendance({
     return () => {
       isMounted = false;
     };
-  }, [selectedDate, activeTab]);
+  }, [selectedDate, activeTab, isCustomCentre]);
 
   const recordsByUser = useMemo(() => {
     const map = {};

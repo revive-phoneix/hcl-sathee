@@ -10,7 +10,7 @@ const toInputDate = (date = new Date()) => {
     return `${year}-${month}-${day}`;
 };
 
-export default function VishistAttendanceUpload({ portalName }) {
+export default function VishistAttendanceUpload({ portalName, isCustomCentre = false }) {
     const today = toInputDate();
     const [vishistMitras, setVishistMitras] = useState([]);
     const [selectedId, setSelectedId] = useState("");
@@ -42,6 +42,12 @@ export default function VishistAttendanceUpload({ portalName }) {
     const selectedVishist = vishistMitras.find((m) => String(m.id) === String(selectedId)) || null;
 
     const loadRecords = async () => {
+        if (isCustomCentre) {
+            setRecords([]);
+            setLoadingRecords(false);
+            return;
+        }
+
         setLoadingRecords(true);
         try {
             const data = await fetchVishistAttendance(today, portalName);
@@ -56,13 +62,18 @@ export default function VishistAttendanceUpload({ portalName }) {
     useEffect(() => {
         loadRecords();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [today, portalName]);
+    }, [today, portalName, isCustomCentre]);
 
     useEffect(() => {
+        if (isCustomCentre) {
+            setVishistMitras([]);
+            return;
+        }
+
         fetchVishistMentors()
             .then(setVishistMitras)
             .catch((err) => console.error("Load Vishist mentors error:", err));
-    }, []);
+    }, [isCustomCentre]);
 
     const handleFileChange = (e) => {
         const file = e.target.files?.[0] || null;

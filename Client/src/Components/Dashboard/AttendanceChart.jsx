@@ -12,7 +12,7 @@ const periodOptions = [
 
 const COLORS = { present: "#3B82F6", absent: "#CBD5E1" };
 
-export function AttendanceChart({ portalName }) {
+export function AttendanceChart({ portalName, isCustomCentre = false }) {
   const [selectedPeriod, setSelectedPeriod] = useState("daily");
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,6 +24,12 @@ export function AttendanceChart({ portalName }) {
     let isMounted = true;
 
     const load = async () => {
+      if (isCustomCentre) {
+        setSummary(null);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -44,7 +50,7 @@ export function AttendanceChart({ portalName }) {
     return () => {
       isMounted = false;
     };
-  }, [selectedPeriod, centre]);
+  }, [selectedPeriod, centre, isCustomCentre]);
 
   const chartData = summary
     ? [

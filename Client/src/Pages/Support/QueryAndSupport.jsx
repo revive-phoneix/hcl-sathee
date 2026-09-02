@@ -23,6 +23,7 @@ export default function QueryAndSupport({
   activeNav,
   onNavChange,
   onLogout,
+  isCustomCentre = false,
 }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -35,6 +36,11 @@ export default function QueryAndSupport({
   const [loadingQueries, setLoadingQueries] = useState(false);
 
   useEffect(() => {
+    if (isCustomCentre) {
+      setAdmins([]);
+      return;
+    }
+
     let active = true;
     const loadAdmins = async () => {
       try {
@@ -49,9 +55,15 @@ export default function QueryAndSupport({
     return () => {
       active = false;
     };
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
+    if (isCustomCentre) {
+      setQueries([]);
+      setLoadingQueries(false);
+      return;
+    }
+
     const loadMyQueries = async () => {
       setLoadingQueries(true);
       try {
@@ -65,7 +77,7 @@ export default function QueryAndSupport({
     };
 
     loadMyQueries();
-  }, []);
+  }, [isCustomCentre]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();

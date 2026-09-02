@@ -40,6 +40,7 @@ export default function MyProfile({
   userId = null,
   userCentre = null,
   userRole = "",
+  isCustomCentre = false,
 }) {
   const [profile, setProfile] = useState(null);
   const [vishistMentors, setVishistMentors] = useState([]);
@@ -106,7 +107,7 @@ export default function MyProfile({
   }, [profile]);
 
   useEffect(() => {
-    if (!isMitra) {
+    if (!isMitra || isCustomCentre) {
       setVishistMentors([]);
       return;
     }
@@ -144,7 +145,7 @@ export default function MyProfile({
     return () => {
       cancelled = true;
     };
-  }, [isMitra, profile?.id, userId, profile?.centre, userCentre]);
+  }, [isMitra, profile?.id, userId, profile?.centre, userCentre, isCustomCentre]);
 
   const rows = useMemo(
     () => [

@@ -9,7 +9,7 @@ const TEST_TYPES = [
   { value: "mid", label: "Mid (in Six Months)" },
 ];
 
-export default function TestMarksUpload({ mitraCentre = "" }) {
+export default function TestMarksUpload({ mitraCentre = "", isCustomCentre = false }) {
   const [students, setStudents] = useState([]);
   const [testType, setTestType] = useState("");
   const [course, setCourse] = useState("");
@@ -41,11 +41,15 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
   }, [course]);
 
   useEffect(() => {
+    if (isCustomCentre) {
+      setStudents([]);
+      return;
+    }
     fetchStudents().then(setStudents).catch(() => setStudents([]));
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
-    if (!course) {
+    if (!course || isCustomCentre) {
       setTests([]);
       setTestId("");
       setTestMenuOpen(false);
@@ -61,7 +65,7 @@ export default function TestMarksUpload({ mitraCentre = "" }) {
     fetchTests(course, mitraCentre)
       .then(setTests)
       .catch(() => setTests([]));
-  }, [course, mitraCentre]);
+  }, [course, mitraCentre, isCustomCentre]);
 
   const courseStudents = useMemo(
     () => students.filter((s) => (s.course || "").toUpperCase().includes(course)),

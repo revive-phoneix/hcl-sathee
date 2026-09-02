@@ -428,6 +428,7 @@ export default function ClassSubjectAttendanceTables({
   userCentre = null,
   students = [],
   studentsLoading = false,
+  isCustomCentre = false,
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -446,6 +447,12 @@ export default function ClassSubjectAttendanceTables({
     let cancelled = false;
 
     const load = async () => {
+      if (isCustomCentre) {
+        setTimetable(null);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -469,7 +476,7 @@ export default function ClassSubjectAttendanceTables({
     return () => {
       cancelled = true;
     };
-  }, [portalName]);
+  }, [portalName, isCustomCentre]);
 
   useEffect(() => {
     setSelectedSubject("");

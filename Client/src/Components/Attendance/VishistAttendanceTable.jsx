@@ -2,13 +2,20 @@ import { useEffect, useState } from "react";
 import { ImageOff } from "lucide-react";
 import { fetchVishistAttendance } from "../../services/vishistAttendance";
 
-export default function VishistAttendanceTable({ selectedDate, portalName }) {
+export default function VishistAttendanceTable({ selectedDate, portalName, isCustomCentre = false }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   useEffect(() => {
     let isMounted = true;
+
+    if (isCustomCentre) {
+      setRecords([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     fetchVishistAttendance(selectedDate, portalName, "approved")
@@ -18,7 +25,7 @@ export default function VishistAttendanceTable({ selectedDate, portalName }) {
     return () => {
       isMounted = false;
     };
-  }, [selectedDate, portalName]);
+  }, [selectedDate, portalName, isCustomCentre]);
 
   return (
     <div className="overflow-x-auto">

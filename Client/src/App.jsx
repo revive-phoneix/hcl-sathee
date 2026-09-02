@@ -149,6 +149,9 @@ const AppContent = () => {
   const [userCentre, setUserCentre] = useState(initialSession?.centre ?? null);
   const [userRole, setUserRole] = useState(initialSession?.role || "");
   const [selectedPortal, setSelectedPortal] = useState(initialSession?.portal || "");
+  const [isCustomCentre, setIsCustomCentre] = useState(
+    Boolean(initialSession?.isCustomCentre)
+  );
 
   useEffect(() => {
     if (!getAuthToken()) {
@@ -265,6 +268,7 @@ const AppContent = () => {
     setUserCentre(null);
     setUserRole("");
     setSelectedPortal("");
+    setIsCustomCentre(false);
     navigate("/", { replace: true });
   };
 
@@ -278,6 +282,7 @@ const AppContent = () => {
       setUserCentre(null);
       setUserRole("");
       setSelectedPortal("");
+      setIsCustomCentre(false);
       navigate("/", { replace: true });
     };
 
@@ -300,13 +305,23 @@ const AppContent = () => {
     if (path) navigate(path);
   };
 
-  const selectPortal = (name) => {
-    setSelectedPortal(name);
-    updateSession({ portal: name });
+  const selectPortal = (name, isCustom = false) => {
+    // Check if name has the custom centre prefix
+    if (name.startsWith("__CUSTOM__")) {
+      const cleanName = name.replace("__CUSTOM__", "");
+      setSelectedPortal(cleanName);
+      setIsCustomCentre(true);
+      updateSession({ portal: cleanName, isCustomCentre: true });
+    } else {
+      setSelectedPortal(name);
+      setIsCustomCentre(isCustom);
+      updateSession({ portal: name, isCustomCentre: isCustom });
+    }
   };
 
   const adminLayout = {
     portalName: selectedPortal,
+    isCustomCentre,
     navItems: adminNavItems,
     activeNav,
     onNavChange: handleAdminNavChange,
@@ -315,6 +330,7 @@ const AppContent = () => {
 
   const partnerLayout = {
     portalName: selectedPortal,
+    isCustomCentre,
     navItems: partnerNavItems,
     activeNav,
     onNavChange: handlePartnerNavChange,
@@ -323,6 +339,7 @@ const AppContent = () => {
 
   const mitraLayout = {
     portalName: selectedPortal,
+    isCustomCentre,
     navItems: mitraNavItems,
     activeNav,
     onNavChange: handleMitraNavChange,
@@ -359,6 +376,7 @@ const AppContent = () => {
             role,
             centre,
             portal: "",
+            isCustomCentre: false,
           });
           setIsLoggedIn(true);
         }}
@@ -375,7 +393,7 @@ const AppContent = () => {
     if (!isPartner || !selectedPortal) {
       return <Navigate to="/portals" replace />;
     }
-    if (!canAccessPortal(userCentre, selectedPortal, userRole)) {
+    if (!isCustomCentre && !canAccessPortal(userCentre, selectedPortal, userRole)) {
       return <Navigate to="/portals" replace />;
     }
   }
@@ -384,7 +402,7 @@ const AppContent = () => {
     if (!isMitra || !selectedPortal) {
       return <Navigate to="/portals" replace />;
     }
-    if (!canAccessPortal(userCentre, selectedPortal, userRole)) {
+    if (!isCustomCentre && !canAccessPortal(userCentre, selectedPortal, userRole)) {
       return <Navigate to="/portals" replace />;
     }
   }
@@ -404,22 +422,27 @@ const AppContent = () => {
               userCentre={userCentre}
               userRole={userRole}
               openDashboard={(name) => {
-                if (!canAccessPortal(userCentre, name, userRole)) return;
+                // Check if this is a custom centre (has __CUSTOM__ prefix)
+                const isCustom = name.startsWith("__CUSTOM__");
+                const cleanName = isCustom ? name.replace("__CUSTOM__", "") : name;
+
+                // Skip access check for custom centres (they're created by admins)
+                if (!isCustom && !canAccessPortal(userCentre, cleanName, userRole)) return;
 
                 if (canEnterAdminDashboard(userRole)) {
-                  selectPortal(name);
+                  selectPortal(cleanName, isCustom);
                   navigate("/dashboard");
                   return;
                 }
 
                 if (canEnterPartnerDashboard(userRole)) {
-                  selectPortal(name);
+                  selectPortal(cleanName, isCustom);
                   navigate("/partner/dashboard");
                   return;
                 }
 
                 if (canEnterSatheeMitraDashboard(userRole)) {
-                  selectPortal(name);
+                  selectPortal(cleanName, isCustom);
                   navigate("/mitra/dashboard");
                 }
               }}
@@ -427,37 +450,38 @@ const AppContent = () => {
           }
         />
 
-        <Route path="/dashboard" element={<Dashboard {...adminLayout} userName={userName} />} />
-        <Route path="/attendance" element={<AdminAttendance {...adminLayout} />} />
-        <Route path="/leave-requests" element={<AdminLeaveRequests {...adminLayout} />} />
-        <Route path="/analytics" element={<AdminAnalytics {...adminLayout} />} />
-        <Route path="/users" element={<AdminUser {...adminLayout} />} />
-        <Route path="/students" element={<Student {...adminLayout} />} />
+        <Route path="/dashboard" element={<Dashboard key={`dashboard-${selectedPortal}-${isCustomCentre}`} {...adminLayout} userName={userName} />} />
+        <Route path="/attendance" element={<AdminAttendance key={`attendance-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />} />
+        <Route path="/leave-requests" element={<AdminLeaveRequests key={`leave-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />} />
+        <Route path="/analytics" element={<AdminAnalytics key={`analytics-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />} />
+        <Route path="/users" element={<AdminUser key={`users-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />} />
+        <Route path="/students" element={<Student key={`students-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />} />
         <Route
           path="/announcements"
-          element={<AdminAnnouncements {...adminLayout} userName={userName} />}
+          element={<AdminAnnouncements key={`announcements-${selectedPortal}-${isCustomCentre}`} {...adminLayout} userName={userName} />}
         />
         <Route
           path="/queries"
           element={<AdminQueries {...adminLayout} userName={userName} />}
         />
 
-        <Route path="/partner/dashboard" element={<HCLPartnerDashboard {...partnerLayout} userName={userName} />} />
-        <Route path="/partner/attendance" element={<HCLPartnerAttendance {...partnerLayout} />} />
-        <Route path="/partner/analytics" element={<HCLPartnerAnalytics {...partnerLayout} />} />
-        <Route path="/partner/students" element={<PartnerStudents {...partnerLayout} />} />
+        <Route path="/partner/dashboard" element={<HCLPartnerDashboard key={`pdash-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} userName={userName} />} />
+        <Route path="/partner/attendance" element={<HCLPartnerAttendance key={`patt-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} />} />
+        <Route path="/partner/analytics" element={<HCLPartnerAnalytics key={`pana-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} />} />
+        <Route path="/partner/students" element={<PartnerStudents key={`pstu-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} />} />
         <Route
           path="/partner/announcements"
-          element={<HCLPartnerAnnouncements {...partnerLayout} userName={userName} />}
+          element={<HCLPartnerAnnouncements key={`pann-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} userName={userName} />}
         />
         <Route
           path="/partner/support"
-          element={<QueryAndSupport {...partnerLayout} userName={userName} userEmail={userEmail} />}
+          element={<QueryAndSupport key={`psup-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} userName={userName} userEmail={userEmail} />}
         />
         <Route
           path="/partner/profile"
           element={
             <MyProfile
+              key={`pprof-${selectedPortal}-${isCustomCentre}`}
               {...partnerLayout}
               roleLabel="Partner Portal"
               userName={userName}
@@ -469,11 +493,12 @@ const AppContent = () => {
           }
         />
 
-        <Route path="/mitra/dashboard" element={<SatheeMitraDashboard {...mitraLayout} userName={userName} />} />
+        <Route path="/mitra/dashboard" element={<SatheeMitraDashboard key={`mdash-${selectedPortal}-${isCustomCentre}`} {...mitraLayout} userName={userName} />} />
         <Route
           path="/mitra/attendance"
           element={
             <SM_Attendance
+              key={`matt-${selectedPortal}-${isCustomCentre}`}
               {...mitraLayout}
               userName={userName}
               userEmail={userEmail}
@@ -482,14 +507,15 @@ const AppContent = () => {
             />
           }
         />
-        <Route path="/mitra/analytics" element={<SM_Analytics {...mitraLayout} />} />
-        <Route path="/mitra/students" element={<SM_Student {...mitraLayout} />} />
-        <Route path="/mitra/test-marks" element={<SM_TestMarks {...mitraLayout} userCentre={userCentre} />} />
-        <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements {...mitraLayout} userName={userName} />} />
+        <Route path="/mitra/analytics" element={<SM_Analytics key={`mana-${selectedPortal}-${isCustomCentre}`} {...mitraLayout} />} />
+        <Route path="/mitra/students" element={<SM_Student key={`mstu-${selectedPortal}-${isCustomCentre}`} {...mitraLayout} />} />
+        <Route path="/mitra/test-marks" element={<SM_TestMarks key={`mtest-${selectedPortal}-${isCustomCentre}`} {...mitraLayout} userCentre={userCentre} />} />
+        <Route path="/mitra/announcements" element={<SatheeMitraAnnouncements key={`mann-${selectedPortal}-${isCustomCentre}`} {...mitraLayout} userName={userName} />} />
         <Route
           path="/mitra/profile"
           element={
             <MyProfile
+              key={`mprof-${selectedPortal}-${isCustomCentre}`}
               {...mitraLayout}
               roleLabel="Sathee Mitra Portal"
               userName={userName}

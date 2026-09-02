@@ -40,6 +40,7 @@ export default function AdminAnnouncements({
   onLogout,
   readOnly = false,
   roleLabel = "Admin Portal",
+  isCustomCentre = false,
 }) {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +56,13 @@ export default function AdminAnnouncements({
   const [viewId, setViewId] = useState(null);
 
   const loadAnnouncements = useCallback(async () => {
+    // Skip loading for custom centres
+    if (isCustomCentre) {
+      setAnnouncements([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -68,7 +76,7 @@ export default function AdminAnnouncements({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
     loadAnnouncements();

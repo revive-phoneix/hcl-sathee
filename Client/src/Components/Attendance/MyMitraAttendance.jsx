@@ -99,6 +99,7 @@ export default function MyMitraAttendance({
   allowUpload = true,
   headingLabel = "My Attendance",
   headingDescription = "Take a live arrival and departure photo for",
+  isCustomCentre = false,
 }) {
   const today = toInputDate();
   const date = selectedDate || today;
@@ -146,6 +147,11 @@ export default function MyMitraAttendance({
   ]);
 
   const loadProfile = useCallback(async () => {
+    if (isCustomCentre) {
+      setProfile(resolveFromToken());
+      return;
+    }
+
     const fallback = resolveFromToken();
     try {
       const user = await fetchCurrentUser();
@@ -159,11 +165,11 @@ export default function MyMitraAttendance({
       console.warn("Load current user failed, using session/token:", err?.message || err);
       setProfile(fallback);
     }
-  }, [resolveFromToken]);
+  }, [resolveFromToken, isCustomCentre]);
 
   const loadRecord = useCallback(async () => {
     const uid = profile.id;
-    if (!date || !uid) {
+    if (isCustomCentre || !date || !uid) {
       setRecord(null);
       setLoading(false);
       return;
@@ -181,7 +187,7 @@ export default function MyMitraAttendance({
     } finally {
       setLoading(false);
     }
-  }, [date, profile.id]);
+  }, [isCustomCentre, date, profile.id]);
 
   useEffect(() => {
     loadProfile();

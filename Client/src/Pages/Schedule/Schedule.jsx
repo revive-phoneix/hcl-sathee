@@ -30,6 +30,7 @@ export default function Schedule({
   onClose,
   readOnly = false,
   portalName = "",
+  isCustomCentre = false,
 }) {
   const [subject, setSubject] = useState("Mathematics");
   const [month, setMonth] = useState(DEFAULT_MONTHS[0]);
@@ -85,6 +86,15 @@ export default function Schedule({
       setIsDirty(false);
       setBannerVisible(false);
       setDeleteOpen(false);
+
+      // Skip loading for custom centres
+      if (isCustomCentre) {
+        setAllRows([]);
+        setScheduleMeta(null);
+        setMonth(DEFAULT_MONTHS[0]);
+        setLoading(false);
+        return;
+      }
 
       // Show device cache immediately (helps when Render is cold).
       const local = readLocalSchedule(portalName);
@@ -205,7 +215,7 @@ export default function Schedule({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, portalName, readOnly]);
+  }, [isOpen, portalName, readOnly, isCustomCentre]);
 
   const subjects = useMemo(() => {
     const fromData = [...new Set(allRows.map((r) => r.subject).filter(Boolean))];

@@ -12,7 +12,7 @@ const formatTodayLabel = (date = new Date()) =>
     year: "numeric",
   });
 
-export default function TodaysClassesCard({ portalName = "" }) {
+export default function TodaysClassesCard({ portalName = "", isCustomCentre = false }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -22,6 +22,14 @@ export default function TodaysClassesCard({ portalName = "" }) {
     let cancelled = false;
 
     const load = async () => {
+      // Skip loading for custom centres (no data yet)
+      if (isCustomCentre) {
+        setTimetable(null);
+        setError("");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
       try {
@@ -44,7 +52,7 @@ export default function TodaysClassesCard({ portalName = "" }) {
     return () => {
       cancelled = true;
     };
-  }, [portalName]);
+  }, [portalName, isCustomCentre]);
 
   const { day, classes, unsupported } = useMemo(
     () => getTodaysClasses(timetable),

@@ -290,6 +290,7 @@ export default function TimeTable({
   onClose,
   readOnly = false,
   portalName = "",
+  isCustomCentre = false,
 }) {
   const backdropRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -321,6 +322,13 @@ export default function TimeTable({
     const load = async () => {
       setError("");
       setIsDirty(false);
+
+      // Skip loading for custom centres
+      if (isCustomCentre) {
+        setData(null);
+        setLoading(false);
+        return;
+      }
 
       const local = readLocalTimetable(portalName);
       if (local?.kind) setData(local);
@@ -387,7 +395,7 @@ export default function TimeTable({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, portalName, readOnly]);
+  }, [isOpen, portalName, readOnly, isCustomCentre]);
 
   const hasUpload = Boolean(data);
   const subtitle = useMemo(() => {

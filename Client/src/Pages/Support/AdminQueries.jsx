@@ -13,7 +13,7 @@ const formatDate = (value) => {
   });
 };
 
-export default function AdminQueries({ portalName, navItems, activeNav, onNavChange, onLogout, userName }) {
+export default function AdminQueries({ portalName, navItems, activeNav, onNavChange, onLogout, userName, isCustomCentre = false }) {
   const [queries, setQueries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -21,6 +21,13 @@ export default function AdminQueries({ portalName, navItems, activeNav, onNavCha
   const [submittingId, setSubmittingId] = useState(null);
 
   const loadQueries = async () => {
+    // Skip loading for custom centres
+    if (isCustomCentre) {
+      setQueries([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -38,7 +45,7 @@ export default function AdminQueries({ portalName, navItems, activeNav, onNavCha
 
   useEffect(() => {
     loadQueries();
-  }, []);
+  }, [isCustomCentre]);
 
   const totalPending = useMemo(
     () => queries.filter((query) => (query.status || "Open") !== "Replied").length,

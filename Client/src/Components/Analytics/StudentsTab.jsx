@@ -367,7 +367,7 @@ function GraphPreviewModal({ course, testType, portalName, onClose }) {
   );
 }
 
-export default function StudentsTab({ portalName }) {
+export default function StudentsTab({ portalName, isCustomCentre = false }) {
   const [students, setStudents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -384,6 +384,13 @@ export default function StudentsTab({ portalName }) {
     let isMounted = true;
 
     const loadStudents = async () => {
+      // Skip loading for custom centres
+      if (isCustomCentre) {
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
 
@@ -405,7 +412,7 @@ export default function StudentsTab({ portalName }) {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isCustomCentre]);
 
   const centreStudents = useMemo(
     () => students.filter((student) => matchesPortalCentre(student.centre, portalName)),

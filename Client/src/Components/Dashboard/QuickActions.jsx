@@ -9,6 +9,7 @@ export function QuickActions({
   onViewAttendance,
   readOnly = false,
   portalName = "",
+  isCustomCentre = false,
 }) {
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
   const [isTimetableOpen, setIsTimetableOpen] = useState(false);
@@ -73,6 +74,7 @@ export function QuickActions({
           onClose={() => setIsScheduleOpen(false)}
           readOnly={readOnly}
           portalName={portalName}
+          isCustomCentre={isCustomCentre}
         />
       )}
 
@@ -82,6 +84,7 @@ export function QuickActions({
           onClose={() => setIsTimetableOpen(false)}
           readOnly={readOnly}
           portalName={portalName}
+          isCustomCentre={isCustomCentre}
         />
       )}
     </>

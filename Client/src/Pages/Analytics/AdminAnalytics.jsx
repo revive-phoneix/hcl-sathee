@@ -79,6 +79,7 @@ export default function AdminAnalytics({
   roleLabel = "Admin Portal",
   showMentors = true,
   allowAddEquipment = true,
+  isCustomCentre = false,
 }) {
   const [activeTab, setActiveTab] = useState("students");
   const [selectedMentor, setSelectedMentor] = useState(null);
@@ -89,7 +90,7 @@ export default function AdminAnalytics({
   const [savingMentorId, setSavingMentorId] = useState(null);
 
   useEffect(() => {
-    if (!showMentors) return undefined;
+    if (!showMentors || isCustomCentre) return undefined;
 
     let isMounted = true;
 
@@ -151,7 +152,7 @@ export default function AdminAnalytics({
     return () => {
       isMounted = false;
     };
-  }, [portalName, showMentors]);
+  }, [portalName, showMentors, isCustomCentre]);
 
   const regularMentors = useMemo(() => mentors.filter((mentor) => !mentor.isVishist), [mentors]);
   const vishistMentors = useMemo(() => mentors.filter((mentor) => mentor.isVishist), [mentors]);
@@ -221,7 +222,7 @@ export default function AdminAnalytics({
         </div>
 
         {activeTab === "students" ? (
-          <StudentsTab portalName={portalName} />
+          <StudentsTab portalName={portalName} isCustomCentre={isCustomCentre} />
         ) : (
           <TeachersTab
             mentors={regularMentors}
@@ -238,7 +239,7 @@ export default function AdminAnalytics({
           />
         )}
 
-        <UtilitiesSection portalName={portalName} readOnly={readOnly || !allowAddEquipment} />
+        <UtilitiesSection portalName={portalName} readOnly={readOnly || !allowAddEquipment} isCustomCentre={isCustomCentre} />
 
         {showMentors ? (
           <MentorDetailsModal

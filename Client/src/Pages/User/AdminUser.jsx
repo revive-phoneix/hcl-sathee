@@ -33,7 +33,7 @@ const normalizeUser = (user) => ({
   avatar: getInitials(user.name),
 });
 
-export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout }) {
+export default function AdminUser({ portalName, navItems, activeNav, onNavChange, onLogout, isCustomCentre = false }) {
   const [activeFilter, setActiveFilter] = useState("All Users");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("name");
@@ -48,6 +48,13 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
   useEscapeToClose(() => setUserToDelete(null), Boolean(userToDelete) && !deletingUser);
 
   const loadUsers = useCallback(async () => {
+    // Skip loading for custom centres
+    if (isCustomCentre) {
+      setUsers([]);
+      setLoadingUsers(false);
+      return;
+    }
+
     try {
       const data = await fetchUsers();
       setUsers(data.map(normalizeUser));
@@ -58,7 +65,7 @@ export default function AdminUser({ portalName, navItems, activeNav, onNavChange
     } finally {
       setLoadingUsers(false);
     }
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
     loadUsers();

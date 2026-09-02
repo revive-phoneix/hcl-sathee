@@ -7,7 +7,7 @@ import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
 import { tableHeadRowClass, zebraRowClass } from "./analyticsUi";
 import AddEquipmentModal from "./AddEquipmentModal";
 
-export default function UtilitiesSection({ portalName, readOnly = false }) {
+export default function UtilitiesSection({ portalName, readOnly = false, isCustomCentre = false }) {
   const [equipments, setEquipments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -15,6 +15,12 @@ export default function UtilitiesSection({ portalName, readOnly = false }) {
   const [submitting, setSubmitting] = useState(false);
 
   const loadEquipments = async () => {
+    if (isCustomCentre) {
+      setEquipments([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
     try {
@@ -30,7 +36,7 @@ export default function UtilitiesSection({ portalName, readOnly = false }) {
 
   useEffect(() => {
     loadEquipments();
-  }, []);
+  }, [isCustomCentre]);
 
   const rows = useMemo(
     () =>

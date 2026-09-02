@@ -21,6 +21,7 @@ export default function AdminDashboard({
   roleLabel = "Admin Portal",
   studentsNavIndex = 4,
   attendanceNavIndex = 1,
+  isCustomCentre = false,
 }) {
   const [students, setStudents] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -29,6 +30,13 @@ export default function AdminDashboard({
 
   useEffect(() => {
     let isMounted = true;
+
+    // Skip data fetching for custom centres
+    if (isCustomCentre) {
+      setStudents([]);
+      setLoadingStats(false);
+      return;
+    }
 
     const loadStats = async () => {
       setLoadingStats(true);
@@ -52,17 +60,24 @@ export default function AdminDashboard({
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
     let isMounted = true;
+
+    // Skip data fetching for custom centres
+    if (isCustomCentre) {
+      setTodaySummary(null);
+      return;
+    }
+
     fetchAttendanceSummary({ period: "daily", centre: portalName })
       .then((data) => isMounted && setTodaySummary(data))
       .catch(() => isMounted && setTodaySummary(null));
     return () => {
       isMounted = false;
     };
-  }, [portalName]);
+  }, [portalName, isCustomCentre]);
 
   const stats = useMemo(() => {
     const centreStudents = students.filter((student) =>
@@ -89,6 +104,7 @@ export default function AdminDashboard({
         <QuickActions
           readOnly={readOnly}
           portalName={portalName}
+          isCustomCentre={isCustomCentre}
           onViewStudents={() => onNavChange(studentsNavIndex)}
           onViewAttendance={() => onNavChange(attendanceNavIndex)}
         />
@@ -102,7 +118,7 @@ export default function AdminDashboard({
         <StudentsByCourseChart students={stats.centreStudents} loading={loadingStats} />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <AttendanceChart portalName={portalName} />
+          <AttendanceChart portalName={portalName} isCustomCentre={isCustomCentre} />
           <ExamProgress students={stats.centreStudents} loading={loadingStats} />
         </div>
 

@@ -23,6 +23,7 @@ export default function Student({
   readOnly = false,
   detailsReadOnly = false,
   roleLabel = "Admin Portal",
+  isCustomCentre = false,
 }) {
   const [search, setSearch] = useState("");
   const [courseFilter, setCourseFilter] = useState("All Courses");
@@ -127,6 +128,12 @@ export default function Student({
   };
 
   const loadStudents = async () => {
+    // Skip loading for custom centres
+    if (isCustomCentre) {
+      setStudents([]);
+      return;
+    }
+
     try {
       setStudents(await fetchStudents());
     } catch (error) {
@@ -136,7 +143,7 @@ export default function Student({
 
   useEffect(() => {
     loadStudents();
-  }, []);
+  }, [isCustomCentre]);
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();

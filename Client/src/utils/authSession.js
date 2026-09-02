@@ -23,6 +23,7 @@ export const getSession = () => {
       role: session.role || "",
       centre: session.centre ?? null,
       portal: session.portal || "",
+      isCustomCentre: Boolean(session.isCustomCentre),
     };
   } catch {
     return null;
@@ -44,6 +45,7 @@ export const setSession = (session) => {
         role: session.role || "",
         centre: session.centre ?? null,
         portal: session.portal || "",
+        isCustomCentre: Boolean(session.isCustomCentre),
       })
     );
   } catch {
@@ -59,6 +61,7 @@ export const updateSession = (patch) => {
     role: "",
     centre: null,
     portal: "",
+    isCustomCentre: false,
   };
   setSession({ ...current, ...patch });
 };

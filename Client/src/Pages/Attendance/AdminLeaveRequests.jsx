@@ -31,6 +31,7 @@ export default function AdminLeaveRequests({
   onNavChange,
   onLogout,
   roleLabel = "Admin Portal",
+  isCustomCentre = false,
 }) {
   const [leaveRequests, setLeaveRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -41,6 +42,12 @@ export default function AdminLeaveRequests({
   const [busyId, setBusyId] = useState(null);
 
   const loadLeaveRequests = useCallback(async () => {
+    if (isCustomCentre) {
+      setLeaveRequests([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError("");
 
@@ -54,7 +61,7 @@ export default function AdminLeaveRequests({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isCustomCentre]);
 
   useEffect(() => {
     loadLeaveRequests();
