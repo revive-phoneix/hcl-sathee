@@ -3,7 +3,7 @@ const { sendWelcomeEmail } = require("../Utils/sendEmail");
 const { createPasswordLink } = require("../Utils/createPasswordLink");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
-  VALID_CENTRES,
+  isValidCentre,
   filterByUserCentre,
   matchesCentre,
   isAdminRole,
@@ -140,7 +140,7 @@ exports.addUser = wrap(
     if (!normalizedCentre) {
       return fail(res, 400, "Centre is required");
     }
-    if (!VALID_CENTRES.includes(normalizedCentre)) {
+    if (!(await isValidCentre(normalizedCentre))) {
       return fail(res, 400, "Invalid centre selected");
     }
     let createdUser;
@@ -301,7 +301,7 @@ exports.updateUser = wrap(
     }
     if (centre != null) {
       const normalizedCentre = String(centre).trim();
-      if (!VALID_CENTRES.includes(normalizedCentre)) {
+      if (!(await isValidCentre(normalizedCentre))) {
         return fail(res, 400, "Invalid centre selected");
       }
       patch.centre = normalizedCentre;

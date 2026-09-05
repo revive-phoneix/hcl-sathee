@@ -1,4 +1,7 @@
-const CENTRE_OPTIONS = [
+import { useEffect, useState } from "react";
+import { fetchCentres } from "../../services/centres";
+
+const DEFAULT_CENTRE_OPTIONS = [
   "HCL RAJASTHAN",
   "HCL JHARKHAND",
   "HCL MADHYA PRADESH",
@@ -33,6 +36,23 @@ export default function TabSelector({
   onGo,
   canGo = false,
 }) {
+  const [centreOptions, setCentreOptions] = useState(DEFAULT_CENTRE_OPTIONS);
+
+  useEffect(() => {
+    if (!showCentreFilter) return undefined;
+    let cancelled = false;
+    fetchCentres()
+      .then((centres) => {
+        if (cancelled) return;
+        const names = centres.map((c) => c.name).filter(Boolean);
+        if (names.length) setCentreOptions(names);
+      })
+      .catch((error) => console.error("Fetch Centres Error:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, [showCentreFilter]);
+
   const typeValue = TYPE_OPTIONS.some((opt) => opt.value === activeTab)
     ? activeTab
     : "";
@@ -77,7 +97,7 @@ export default function TabSelector({
           aria-label="Select centre"
         >
           <option value="">Select Centre</option>
-          {CENTRE_OPTIONS.map((centre) => (
+          {centreOptions.map((centre) => (
             <option key={centre} value={centre}>
               {centre}
             </option>

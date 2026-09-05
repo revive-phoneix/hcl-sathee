@@ -19,13 +19,19 @@ export const getCanonicalCentreKey = (value = "") => {
   return matchCentreRule(normalized)?.key ?? normalized;
 };
 
-export const getCentreValueFromPortal = (portalName = "") =>
-  matchCentreRule(normalizeCentreValue(portalName))?.label ?? null;
+export const getCentreValueFromPortal = (portalName = "") => {
+  const rule = matchCentreRule(normalizeCentreValue(portalName));
+  if (rule) return rule.label;
+  // Dynamically-added centres have no rule — the portal name is already the
+  // centre value (e.g. "HCL UTTAR PRADESH").
+  const trimmed = portalName.toString().trim();
+  return trimmed || null;
+};
 
 export const matchesPortalCentre = (centreValue, portalName = "") => {
-  const targetCentre = getCentreValueFromPortal(portalName);
-  if (!targetCentre) return true;
-  return getCanonicalCentreKey(centreValue) === getCanonicalCentreKey(targetCentre);
+  const portalKey = getCanonicalCentreKey(portalName);
+  if (!portalKey) return true;
+  return getCanonicalCentreKey(centreValue) === portalKey;
 };
 
 export const canAccessPortal = (userCentre, portalName = "", userRole = "") => {

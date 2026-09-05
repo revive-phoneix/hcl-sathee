@@ -1,6 +1,6 @@
 const Equipment = require("../Models/Equipment");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
-const { VALID_CENTRES, filterByUserCentre, isAdminRole } = require("../Utils/centreMatch");
+const { isValidCentre, filterByUserCentre, isAdminRole } = require("../Utils/centreMatch");
 
 exports.getEquipments = wrap(
   async (req, res) => {
@@ -30,7 +30,7 @@ exports.addEquipment = wrap(
     }
 
     const normalizedCentre = centre?.trim() || null;
-    if (!normalizedCentre || !VALID_CENTRES.includes(normalizedCentre)) {
+    if (!normalizedCentre || !(await isValidCentre(normalizedCentre))) {
       return fail(res, 400, "Valid centre is required");
     }
     if (!isAdminRole(req.user?.role)) {

@@ -1,8 +1,7 @@
 const Schedule = require("../Models/Schedule");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
-  VALID_CENTRES,
-  getCanonicalCentreKey,
+  isValidCentre,
   matchesCentre,
   isAdminRole,
 } = require("../Utils/centreMatch");
@@ -38,12 +37,8 @@ exports.saveSchedule = wrap(
     const rows = req.body?.rows;
 
     if (!centre) return fail(res, 400, "centre is required");
-    if (!VALID_CENTRES.some((c) => getCanonicalCentreKey(c) === getCanonicalCentreKey(centre))) {
-      // Still allow known portal labels / typos via canonical key match on HCL*
-      const key = getCanonicalCentreKey(centre);
-      if (!key.startsWith("HCL")) {
-        return fail(res, 400, "Invalid centre");
-      }
+    if (!(await isValidCentre(centre))) {
+      return fail(res, 400, "Invalid centre");
     }
     if (!assertCanAccessCentre(req, centre)) {
       return fail(res, 403, "Access denied for this centre");

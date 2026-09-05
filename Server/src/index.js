@@ -6,6 +6,7 @@ require("dotenv").config();
 
 const { initFirebase } = require("./config/firebase");
 const authRoutes = require("./Routes/AuthRoutes");
+const centreRoutes = require("./Routes/CentreRoutes");
 const userRoutes = require("./Routes/UserRoutes");
 const studentRoutes = require("./Routes/StudentRoutes");
 const studentPerformanceRoutes = require("./Routes/StudentPerformanceRoutes");
@@ -77,6 +78,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/centres", centreRoutes);
 app.use("/api/users", userRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/students/performance", studentPerformanceRoutes);

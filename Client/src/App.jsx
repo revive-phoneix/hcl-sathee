@@ -149,9 +149,7 @@ const AppContent = () => {
   const [userCentre, setUserCentre] = useState(initialSession?.centre ?? null);
   const [userRole, setUserRole] = useState(initialSession?.role || "");
   const [selectedPortal, setSelectedPortal] = useState(initialSession?.portal || "");
-  const [isCustomCentre, setIsCustomCentre] = useState(
-    Boolean(initialSession?.isCustomCentre)
-  );
+  const [isCustomCentre, setIsCustomCentre] = useState(false);
 
   useEffect(() => {
     if (!getAuthToken()) {
@@ -305,18 +303,10 @@ const AppContent = () => {
     if (path) navigate(path);
   };
 
-  const selectPortal = (name, isCustom = false) => {
-    // Check if name has the custom centre prefix
-    if (name.startsWith("__CUSTOM__")) {
-      const cleanName = name.replace("__CUSTOM__", "");
-      setSelectedPortal(cleanName);
-      setIsCustomCentre(true);
-      updateSession({ portal: cleanName, isCustomCentre: true });
-    } else {
-      setSelectedPortal(name);
-      setIsCustomCentre(isCustom);
-      updateSession({ portal: name, isCustomCentre: isCustom });
-    }
+  const selectPortal = (name) => {
+    setSelectedPortal(name);
+    setIsCustomCentre(false);
+    updateSession({ portal: name, isCustomCentre: false });
   };
 
   const adminLayout = {
@@ -422,27 +412,22 @@ const AppContent = () => {
               userCentre={userCentre}
               userRole={userRole}
               openDashboard={(name) => {
-                // Check if this is a custom centre (has __CUSTOM__ prefix)
-                const isCustom = name.startsWith("__CUSTOM__");
-                const cleanName = isCustom ? name.replace("__CUSTOM__", "") : name;
-
-                // Skip access check for custom centres (they're created by admins)
-                if (!isCustom && !canAccessPortal(userCentre, cleanName, userRole)) return;
+                if (!canAccessPortal(userCentre, name, userRole)) return;
 
                 if (canEnterAdminDashboard(userRole)) {
-                  selectPortal(cleanName, isCustom);
+                  selectPortal(name);
                   navigate("/dashboard");
                   return;
                 }
 
                 if (canEnterPartnerDashboard(userRole)) {
-                  selectPortal(cleanName, isCustom);
+                  selectPortal(name);
                   navigate("/partner/dashboard");
                   return;
                 }
 
                 if (canEnterSatheeMitraDashboard(userRole)) {
-                  selectPortal(cleanName, isCustom);
+                  selectPortal(name);
                   navigate("/mitra/dashboard");
                 }
               }}

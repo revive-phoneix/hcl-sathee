@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getCanonicalCentreKey } from "../../utils/portalMapping";
+import { fetchCentres } from "../../services/centres";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
-const CENTRE_OPTIONS = [
+const DEFAULT_CENTRE_OPTIONS = [
   "HCL RAJASTHAN",
   "HCL JHARKHAND",
   "HCL MADHYA PRADESH",
@@ -13,11 +14,9 @@ const sameCentre = (a, b) =>
   Boolean(b) &&
   getCanonicalCentreKey(a) === getCanonicalCentreKey(b);
 
-const resolveDefaultCentre = (defaultCentre) => {
-  if (!defaultCentre) return null;
-  return (
-    CENTRE_OPTIONS.find((option) => sameCentre(option, defaultCentre)) || null
-  );
+const resolveCentre = (options, centre) => {
+  if (!centre) return null;
+  return options.find((option) => sameCentre(option, centre)) || centre;
 };
 
 export default function NewAnnouncementModal({
@@ -27,7 +26,23 @@ export default function NewAnnouncementModal({
   submitting = false,
   defaultCentre = null,
 }) {
-  const portalCentre = resolveDefaultCentre(defaultCentre);
+  const [centreOptions, setCentreOptions] = useState(DEFAULT_CENTRE_OPTIONS);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCentres()
+      .then((centres) => {
+        if (cancelled) return;
+        const names = centres.map((c) => c.name).filter(Boolean);
+        if (names.length) setCentreOptions(names);
+      })
+      .catch((error) => console.error("Fetch Centres Error:", error));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const portalCentre = resolveCentre(centreOptions, defaultCentre);
 
   const initialCentres = (() => {
     if (editData) {
@@ -35,9 +50,7 @@ export default function NewAnnouncementModal({
       const extras = Array.isArray(editData.otherCentres)
         ? editData.otherCentres
         : [];
-      const merged = [...new Set([...primary, ...extras])]
-        .map((c) => resolveDefaultCentre(c) || c)
-        .filter(Boolean);
+      const merged = [...new Set([...primary, ...extras])].filter(Boolean);
       return merged.length ? merged : portalCentre ? [portalCentre] : [];
     }
     return portalCentre ? [portalCentre] : [];
@@ -54,6 +67,19 @@ export default function NewAnnouncementModal({
   const [centreError, setCentreError] = useState("");
   const [attachmentError, setAttachmentError] = useState("");
   useEscapeToClose(onClose);
+
+  // Show every known centre plus any already-selected centre that isn't in the
+  // fetched list yet (e.g. while centres are still loading, or a removed centre
+  // referenced by an old announcement).
+  const displayCentres = useMemo(() => {
+    const merged = [...centreOptions];
+    for (const centre of form.centres) {
+      if (!merged.some((option) => sameCentre(option, centre))) {
+        merged.push(centre);
+      }
+    }
+    return merged;
+  }, [centreOptions, form.centres]);
   const needsReupload =
     Boolean(editData?.attachmentName) && !editData?.attachmentUrl;
 
@@ -155,7 +181,7 @@ export default function NewAnnouncementModal({
               </span>
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {CENTRE_OPTIONS.map((centre) => {
+              {displayCentres.map((centre) => {
                 const checked = form.centres.some((c) => sameCentre(c, centre));
                 return (
                   <label
