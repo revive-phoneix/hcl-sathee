@@ -167,7 +167,7 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
               </h2>
 
               <p className="mt-3 text-black text-bold">
-                Create a new centre backed by the database
+                Add a new centre
               </p>
 
               <div className="mt-8 flex items-center gap-2 font-medium text-blue-400">
