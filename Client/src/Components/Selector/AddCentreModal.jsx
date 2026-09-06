@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 export default function AddCentreModal({
@@ -7,14 +7,26 @@ export default function AddCentreModal({
   onAdd,
   submitting = false,
   error = "",
+  initialName = "",
+  title = "Add a Centre",
+  submitLabel = "Add",
 }) {
-  const [name, setName] = useState("");
+  const [name, setName] = useState(initialName);
   const [localError, setLocalError] = useState("");
+
+  // Re-seed the field whenever the modal is (re)opened — e.g. switching between
+  // "add" (blank) and "rename" (existing name) without unmounting.
+  useEffect(() => {
+    if (open) {
+      setName(initialName);
+      setLocalError("");
+    }
+  }, [open, initialName]);
 
   if (!open) return null;
 
   const handleClose = () => {
-    setName("");
+    setName(initialName);
     setLocalError("");
     onClose();
   };
@@ -34,7 +46,7 @@ export default function AddCentreModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
       <div className="w-full max-w-sm rounded-xl bg-white p-6 shadow-xl">
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Add a Centre</h2>
+          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
           <button onClick={handleClose} className="rounded p-1 text-slate-500 hover:bg-slate-100">
             <X size={18} />
           </button>
@@ -64,7 +76,7 @@ export default function AddCentreModal({
               disabled={submitting}
               className="flex-1 rounded bg-blue-600 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
             >
-              {submitting ? "Adding..." : "Add"}
+              {submitting ? "Saving..." : submitLabel}
             </button>
             <button
               type="button"

@@ -23,3 +23,27 @@ exports.createCentre = wrap(
   },
   { label: "Create Centre Error", message: "Failed to create centre" }
 );
+
+exports.updateCentre = wrap(
+  async (req, res) => {
+    try {
+      const centre = await Centre.update(req.params.id, req.body?.name);
+      return ok(res, { message: "Centre renamed", centre });
+    } catch (err) {
+      return fail(res, 400, err.message);
+    }
+  },
+  { label: "Update Centre Error", message: "Failed to rename centre" }
+);
+
+exports.deleteCentre = wrap(
+  async (req, res) => {
+    try {
+      await Centre.remove(req.params.id);
+      return ok(res, { message: "Centre deleted" });
+    } catch (err) {
+      return fail(res, 400, err.message);
+    }
+  },
+  { label: "Delete Centre Error", message: "Failed to delete centre" }
+);

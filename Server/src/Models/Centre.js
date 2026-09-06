@@ -89,9 +89,123 @@ const create = async (name, createdBy) => {
   return toApiCentre(String(id), payload);
 };
 
+/**
+ * Count how many docs in the collections we know carry a `centre` field
+ * (`users`, `students`, `equipments`) are assigned to the given centre,
+ * matched with the same fuzzy canonical key used everywhere else.
+ */
+const countUsageAcrossCollections = async (centreName) => {
+  const db = getDb();
+  const key = getCanonicalCentreKey(centreName);
+
+  const [usersSnap, studentsSnap, equipmentSnap] = await Promise.all([
+    db.collection("users").get(),
+    db.collection("students").get(),
+    db.collection("equipments").get(),
+  ]);
+
+  const matchesCentre = (doc) => getCanonicalCentreKey(doc.data().centre) === key;
+
+  return {
+    users: usersSnap.docs.filter(matchesCentre).length,
+    students: studentsSnap.docs.filter(matchesCentre).length,
+    equipment: equipmentSnap.docs.filter(matchesCentre).length,
+  };
+};
+
+/**
+ * Guard shared by `update` and `remove`: a centre may only be renamed or
+ * deleted when it is NOT one of the shipped defaults AND has zero associated
+ * users / students / equipment. Throws a coded error otherwise.
+ */
+const assertRemovable = async (centreName) => {
+  if (
+    DEFAULT_CENTRES.some(
+      (d) => getCanonicalCentreKey(d) === getCanonicalCentreKey(centreName)
+    )
+  ) {
+    const error = new Error("Default centres cannot be renamed or deleted");
+    error.code = "DEFAULT_CENTRE_LOCKED";
+    throw error;
+  }
+
+  const counts = await countUsageAcrossCollections(centreName);
+  const total = counts.users + counts.students + counts.equipment;
+  if (total > 0) {
+    const parts = [];
+    if (counts.students) parts.push(`${counts.students} student(s)`);
+    if (counts.users) parts.push(`${counts.users} staff member(s)`);
+    if (counts.equipment) parts.push(`${counts.equipment} equipment item(s)`);
+    const error = new Error(
+      `Cannot modify this centre — ${parts.join(", ")} still assigned to it. ` +
+        `Reassign or remove that data first.`
+    );
+    error.code = "CENTRE_IN_USE";
+    throw error;
+  }
+};
+
+/**
+ * Rename a custom centre. Does NOT cascade to existing records, so it is only
+ * permitted while the centre is empty (see `assertRemovable`). Rejects blank
+ * names and names that collide with another existing centre.
+ */
+const update = async (id, newName) => {
+  const doc = await centresRef().doc(String(id)).get();
+  if (!doc.exists) {
+    const error = new Error("Centre not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  await assertRemovable(doc.data().name);
+
+  const normalized = normalizeName(newName);
+  if (!normalized) {
+    const error = new Error("Centre name is required");
+    error.code = "INVALID_CENTRE";
+    throw error;
+  }
+
+  const key = getCanonicalCentreKey(normalized);
+  const existing = await findAll();
+  const duplicate = existing.some(
+    (c) => String(c.id) !== String(id) && getCanonicalCentreKey(c.name) === key
+  );
+  if (duplicate) {
+    const error = new Error("A centre with this name already exists");
+    error.code = "DUPLICATE_CENTRE";
+    throw error;
+  }
+
+  await centresRef()
+    .doc(String(id))
+    .update({ name: normalized, updatedAt: new Date() });
+  return toApiCentre(String(id), { name: normalized });
+};
+
+/**
+ * Delete a custom centre. Blocked for defaults and for any centre that still
+ * has associated data (see `assertRemovable`).
+ */
+const remove = async (id) => {
+  const doc = await centresRef().doc(String(id)).get();
+  if (!doc.exists) {
+    const error = new Error("Centre not found");
+    error.code = "NOT_FOUND";
+    throw error;
+  }
+
+  await assertRemovable(doc.data().name);
+  await centresRef().doc(String(id)).delete();
+  return { id };
+};
+
 module.exports = {
   DEFAULT_CENTRES,
   normalizeName,
   findAll,
   create,
+  update,
+  remove,
 };

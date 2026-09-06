@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
-import { MapPin, ArrowRight, ShieldAlert, Plus } from "lucide-react";
+import { MapPin, ArrowRight, ShieldAlert, Plus, Pencil, Trash2 } from "lucide-react";
 import AddCentreModal from "../../Components/Selector/AddCentreModal";
-import { fetchCentres, createCentre } from "../../services/centres";
+import {
+  fetchCentres,
+  createCentre,
+  renameCentre,
+  deleteCentre,
+} from "../../services/centres";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -24,6 +29,10 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
   const [extraCentres, setExtraCentres] = useState([]);
   const [addError, setAddError] = useState("");
   const [saving, setSaving] = useState(false);
+  // When set, the modal is in "rename" mode for this centre instead of "add".
+  const [editingCentre, setEditingCentre] = useState(null);
+  // Errors from rename/delete that aren't tied to the modal (e.g. CENTRE_IN_USE).
+  const [actionError, setActionError] = useState("");
 
   const loadCentres = async () => {
     try {
@@ -62,19 +71,65 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
     setAccessMessage("ACCESS DENIED");
   };
 
-  const handleAddCentre = async (name) => {
+  const openAddModal = () => {
+    setEditingCentre(null);
+    setAddError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const openRenameModal = (centre) => {
+    setEditingCentre(centre);
+    setAddError("");
+    setActionError("");
+    setModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setModalOpen(false);
+    setEditingCentre(null);
+    setAddError("");
+  };
+
+  const handleSubmitCentre = async (name) => {
     setAddError("");
     setSaving(true);
     try {
-      await createCentre(name);
+      if (editingCentre) {
+        await renameCentre(editingCentre.id, name);
+      } else {
+        await createCentre(name);
+      }
       await loadCentres();
-      setModalOpen(false);
+      closeModal();
     } catch (error) {
       setAddError(
-        error?.response?.data?.message || "Unable to add centre. Please try again."
+        error?.response?.data?.message ||
+          (editingCentre
+            ? "Unable to rename centre. Please try again."
+            : "Unable to add centre. Please try again.")
       );
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteCentre = async (centre) => {
+    if (
+      !window.confirm(
+        `Delete "${centre.name}"? This can't be undone.`
+      )
+    ) {
+      return;
+    }
+    setActionError("");
+    try {
+      await deleteCentre(centre.id);
+      await loadCentres();
+    } catch (error) {
+      setActionError(
+        error?.response?.data?.message || "Unable to delete centre. Please try again."
+      );
     }
   };
 
@@ -83,6 +138,7 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
     ...extraCentres.map((centre) => ({
       title: centre.name,
       subtitle: "Learning Portal",
+      custom: { id: centre.id, name: centre.name },
     })),
   ];
 
@@ -102,17 +158,45 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
         </div>
       )}
 
+      {actionError && (
+        <div className="mx-10 mb-2 flex items-center gap-3 rounded-2xl border border-red-300 bg-red-50 px-5 py-4 text-red-700">
+          <ShieldAlert size={22} className="shrink-0" />
+          <p className="text-sm font-bold tracking-wide">{actionError}</p>
+        </div>
+      )}
+
       <div className="flex-1 flex items-center justify-center px-6 pb-10 text-black">
         <div className="grid w-full max-w-6xl gap-8 md:grid-cols-2 lg:grid-cols-3">
           {centreCards.map((state) => {
             const allowed = canAccessPortal(userCentre, state.title, userRole);
+            const custom = state.custom;
 
             return (
+              <div key={state.title} className="relative">
+              {isAdmin && custom ? (
+                <div className="absolute right-4 top-4 z-10 flex gap-1.5">
+                  <button
+                    type="button"
+                    title="Rename centre"
+                    onClick={() => openRenameModal(custom)}
+                    className="rounded-full bg-white/90 p-1.5 text-slate-500 shadow-sm hover:bg-white hover:text-blue-600"
+                  >
+                    <Pencil size={16} />
+                  </button>
+                  <button
+                    type="button"
+                    title="Delete centre"
+                    onClick={() => handleDeleteCentre(custom)}
+                    className="rounded-full bg-white/90 p-1.5 text-slate-500 shadow-sm hover:bg-white hover:text-red-600"
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
+              ) : null}
               <button
-                key={state.title}
                 type="button"
                 onClick={() => handleOpenPortal(state.title)}
-                className={`group relative rounded-3xl border p-8 text-left shadow-xl transition-all duration-300 hover:-translate-y-2 ${
+                className={`group relative w-full rounded-3xl border p-8 text-left shadow-xl transition-all duration-300 hover:-translate-y-2 ${
                   allowed
                     ? "border-slate-700 bg-[#F1F5F9] hover:border-blue-500 hover:shadow-blue-500/20"
                     : "border-slate-300 bg-slate-100 opacity-80 hover:border-red-400 hover:shadow-red-500/10"
@@ -146,16 +230,14 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
                   />
                 </div>
               </button>
+              </div>
             );
           })}
 
           {isAdmin ? (
             <button
               type="button"
-              onClick={() => {
-                setAddError("");
-                setModalOpen(true);
-              }}
+              onClick={openAddModal}
               className="group rounded-3xl border-2 border-dashed border-slate-400 bg-slate-50 p-8 text-left shadow-xl transition-all duration-300 hover:-translate-y-2 hover:border-blue-500 hover:shadow-blue-500/20"
             >
               <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-600/20 text-blue-400">
@@ -189,10 +271,13 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
       {isAdmin ? (
         <AddCentreModal
           open={modalOpen}
-          onClose={() => setModalOpen(false)}
-          onAdd={handleAddCentre}
+          onClose={closeModal}
+          onAdd={handleSubmitCentre}
           submitting={saving}
           error={addError}
+          initialName={editingCentre?.name || ""}
+          title={editingCentre ? "Rename Centre" : "Add a Centre"}
+          submitLabel={editingCentre ? "Save" : "Add"}
         />
       ) : null}
     </div>
