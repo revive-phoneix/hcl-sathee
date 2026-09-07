@@ -1,4 +1,4 @@
-import { Search, UserPlus, ChevronDown } from "lucide-react";
+import { Search, UserPlus, ChevronDown, FileSpreadsheet } from "lucide-react";
 
 const COURSE_OPTIONS = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "ICAR", "CUET", "RRB"];
 
@@ -8,6 +8,7 @@ export default function StudentToolbar({
   courseFilter,
   onCourseChange,
   onAddStudent,
+  onImportStudents,
   readOnly = false,
 }) {
   return (
@@ -77,27 +78,49 @@ export default function StudentToolbar({
       </div>
 
       {!readOnly ? (
-        <button
-          type="button"
-          onClick={onAddStudent}
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            padding: "9px 16px",
-            borderRadius: 8,
-            border: "none",
-            background: "linear-gradient(135deg,#1e40af,#3b82f6)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 600,
-            marginLeft: "auto",
-            cursor: "pointer",
-          }}
-        >
-          <UserPlus size={15} />
-          Add Student
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginLeft: "auto" }}>
+          <button
+            type="button"
+            onClick={onImportStudents}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 16px",
+              borderRadius: 8,
+              border: "1px solid #bfdbfe",
+              background: "#eff6ff",
+              color: "#1d4ed8",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <FileSpreadsheet size={15} />
+            Import Data
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddStudent}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "9px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: "linear-gradient(135deg,#1e40af,#3b82f6)",
+              color: "#fff",
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <UserPlus size={15} />
+            Add Student
+          </button>
+        </div>
       ) : null}
     </div>
   );

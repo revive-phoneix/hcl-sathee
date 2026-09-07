@@ -5,9 +5,16 @@ import { matchesPortalCentre } from "../../utils/portalMapping";
 import StudentToolbar from "../../Components/Student/StudentToolbar";
 import StudentTable from "../../Components/Student/StudentTable";
 import NewStudent from "../../Components/Student/NewStudent";
+import ImportStudentsModal from "../../Components/Student/ImportStudentsModal";
 import StudentDetailsModal from "../../Components/Student/StudentDetailsModal";
 import TableSortControls from "../../Components/common/TableSortControls";
-import { fetchStudents, createStudent, updateStudent, removeStudent } from "../../services/students";
+import {
+  fetchStudents,
+  createStudent,
+  updateStudent,
+  removeStudent,
+  importStudents,
+} from "../../services/students";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { AVATAR_COLORS, getInitials } from "../../utils/studentMetrics";
 import { sortTableRows } from "../../utils/tableSort";
@@ -30,6 +37,7 @@ export default function Student({
   const [sortBy, setSortBy] = useState("name");
   const [sortDirection, setSortDirection] = useState("asc");
   const [showNewStudent, setShowNewStudent] = useState(false);
+  const [showImportStudents, setShowImportStudents] = useState(false);
   const [showStudentDetails, setShowStudentDetails] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
   const [page, setPage] = useState(1);
@@ -82,6 +90,14 @@ export default function Student({
     } finally {
       setSubmittingStudent(false);
     }
+  };
+
+  const handleImportStudents = async (payloads) => {
+    const result = await importStudents(payloads);
+    // Some rows may have been created even if others failed — always refresh.
+    await loadStudents();
+    setPage(1);
+    return result;
   };
 
   const handleUpdateStudent = async (updatedStudent) => {
@@ -205,6 +221,7 @@ export default function Student({
               setPage(1);
             }}
             onAddStudent={() => setShowNewStudent(true)}
+            onImportStudents={() => setShowImportStudents(true)}
             readOnly={readOnly}
           />
 
@@ -314,6 +331,15 @@ export default function Student({
           onSubmit={handleAddStudent}
           error={createStudentError}
           submitting={submittingStudent}
+          portalName={portalName}
+        />
+      ) : null}
+
+      {!readOnly ? (
+        <ImportStudentsModal
+          open={showImportStudents}
+          onClose={() => setShowImportStudents(false)}
+          onImport={handleImportStudents}
           portalName={portalName}
         />
       ) : null}

@@ -35,6 +35,11 @@ export const createStudent = async (payload) => {
   return parseStudent(response.data.student);
 };
 
+export const importStudents = async (students) => {
+  const response = await api.post("/api/students/import", { students });
+  return response.data;
+};
+
 export const updateStudent = async (id, payload) => {
   const response = await api.patch(`/api/students/${id}`, payload);
   return parseStudent(response.data.student);

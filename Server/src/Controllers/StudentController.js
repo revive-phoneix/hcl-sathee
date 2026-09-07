@@ -164,101 +164,182 @@ exports.getStudents = wrap(
   { label: "Get Students Error", message: "Failed to fetch students" }
 );
 
+/**
+ * Core "create one student" logic shared by the single-add endpoint and the
+ * bulk import endpoint. Returns a plain result object instead of touching the
+ * response, so the caller decides how to report success/failure.
+ *
+ * @returns {Promise<{ ok: true, student: object } | { ok: false, status: number, message: string }>}
+ */
+const createStudentRecord = async (body = {}) => {
+  const {
+    studentId,
+    enrollmentNo,
+    gender,
+    email,
+    phone,
+    centre,
+    course,
+    category,
+    address,
+    parents,
+    subjects,
+    marks,
+    attendance,
+    qualifications,
+    avatarColor,
+    initials,
+  } = body;
+
+  // Accept either a full `name` or first/last parts (bulk-import sheets use the
+  // same split as the Add form).
+  const name =
+    body.name && String(body.name).trim()
+      ? String(body.name)
+      : `${body.firstName || ""} ${body.lastName || ""}`.trim();
+
+  if (!name || !gender || !email) {
+    return { ok: false, status: 400, message: "Name, gender, and email are required" };
+  }
+
+  const normalizedPhone = normalizePhone10(phone);
+  if (!normalizedPhone) {
+    return { ok: false, status: 400, message: "Phone number must be exactly 10 digits" };
+  }
+
+  const fatherPhone = parents?.fatherPhone;
+  const motherPhone = parents?.motherPhone;
+  if (!isOptionalPhone10(fatherPhone) || !isOptionalPhone10(motherPhone)) {
+    return { ok: false, status: 400, message: "Parent phone numbers must be exactly 10 digits (or left blank)" };
+  }
+
+  const normalizedParents = {
+    ...(parents || {}),
+    fatherPhone: fatherPhone?.trim() ? normalizePhone10(fatherPhone) : fatherPhone || "",
+    motherPhone: motherPhone?.trim() ? normalizePhone10(motherPhone) : motherPhone || "",
+  };
+
+  const normalizedCourse = normalizeCourseCode(course) || course?.trim() || null;
+  const resolved = resolveSubjectsForCourse(
+    normalizedCourse,
+    subjects,
+    marks,
+    attendance
+  );
+  if (!resolved.ok) {
+    return { ok: false, status: 400, message: resolved.message };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+  if (await Student.findByEmail(normalizedEmail)) {
+    return { ok: false, status: 409, message: "A student with this email already exists" };
+  }
+
+  const suffix = Date.now().toString().slice(-6);
+  const initialMaps = buildMapsFromRecords(resolved.subjects, [], []);
+
+  const student = await Student.create({
+    studentId: studentId?.trim() || `STU${suffix}`,
+    enrollmentNo: enrollmentNo?.trim() || `ENR${suffix}`,
+    name: name.trim(),
+    gender: gender.trim(),
+    email: normalizedEmail,
+    phone: normalizedPhone,
+    centre: centre?.trim() || null,
+    course: normalizedCourse,
+    category: category?.trim() || null,
+    address: address || null,
+    parents: normalizedParents,
+    subjects: resolved.subjects,
+    marks: marks && typeof marks === "object" ? marks : initialMaps.marks,
+    attendance:
+      attendance && typeof attendance === "object" ? attendance : initialMaps.attendance,
+    qualifications: qualifications || {},
+    avatarColor: avatarColor || null,
+    initials: initials || null,
+  });
+
+  const { performances, attendances } = await seedSubjectRecords(
+    student.id,
+    resolved.subjects,
+    marks,
+    attendance
+  );
+
+  return { ok: true, student: enrichStudent(student, performances, attendances) };
+};
+
 exports.addStudent = wrap(
   async (req, res) => {
-    const {
-      studentId,
-      enrollmentNo,
-      name,
-      gender,
-      email,
-      phone,
-      centre,
-      course,
-      category,
-      address,
-      parents,
-      subjects,
-      marks,
-      attendance,
-      qualifications,
-      avatarColor,
-      initials,
-    } = req.body;
-
-    if (!name || !gender || !email) {
-      return fail(res, 400, "Name, gender, and email are required");
+    const result = await createStudentRecord(req.body);
+    if (!result.ok) {
+      return fail(res, result.status, result.message);
     }
-
-    const normalizedPhone = normalizePhone10(phone);
-    if (!normalizedPhone) {
-      return fail(res, 400, "Phone number must be exactly 10 digits");
-    }
-
-    const fatherPhone = parents?.fatherPhone;
-    const motherPhone = parents?.motherPhone;
-    if (!isOptionalPhone10(fatherPhone) || !isOptionalPhone10(motherPhone)) {
-      return fail(res, 400, "Parent phone numbers must be exactly 10 digits");
-    }
-
-    const normalizedParents = {
-      ...(parents || {}),
-      fatherPhone: fatherPhone?.trim() ? normalizePhone10(fatherPhone) : fatherPhone || "",
-      motherPhone: motherPhone?.trim() ? normalizePhone10(motherPhone) : motherPhone || "",
-    };
-
-    const normalizedCourse = normalizeCourseCode(course) || course?.trim() || null;
-    const resolved = resolveSubjectsForCourse(
-      normalizedCourse,
-      subjects,
-      marks,
-      attendance
-    );
-    if (!resolved.ok) {
-      return fail(res, 400, resolved.message);
-    }
-
-    const normalizedEmail = email.trim().toLowerCase();
-    if (await Student.findByEmail(normalizedEmail)) {
-      return fail(res, 409, "A student with this email already exists");
-    }
-
-    const suffix = Date.now().toString().slice(-6);
-    const initialMaps = buildMapsFromRecords(resolved.subjects, [], []);
-
-    const student = await Student.create({
-      studentId: studentId?.trim() || `STU${suffix}`,
-      enrollmentNo: enrollmentNo?.trim() || `ENR${suffix}`,
-      name: name.trim(),
-      gender: gender.trim(),
-      email: normalizedEmail,
-      phone: normalizedPhone,
-      centre: centre?.trim() || null,
-      course: normalizedCourse,
-      category: category?.trim() || null,
-      address: address || null,
-      parents: normalizedParents,
-      subjects: resolved.subjects,
-      marks: marks && typeof marks === "object" ? marks : initialMaps.marks,
-      attendance:
-        attendance && typeof attendance === "object" ? attendance : initialMaps.attendance,
-      qualifications: qualifications || {},
-      avatarColor: avatarColor || null,
-      initials: initials || null,
-    });
-
-    const { performances, attendances } = await seedSubjectRecords(
-      student.id,
-      resolved.subjects,
-      marks,
-      attendance
-    );
-
-    return ok(res, 201, {
-      student: enrichStudent(student, performances, attendances),
-    });
+    return ok(res, 201, { student: result.student });
   },
   { label: "Add Student Error", message: "Failed to add student" }
+);
+
+const MAX_IMPORT_ROWS = 500;
+
+exports.importStudents = wrap(
+  async (req, res) => {
+    const rows = Array.isArray(req.body?.students) ? req.body.students : null;
+    if (!rows || !rows.length) {
+      return fail(res, 400, "No student rows were provided");
+    }
+    if (rows.length > MAX_IMPORT_ROWS) {
+      return fail(
+        res,
+        400,
+        `Too many rows in one import (max ${MAX_IMPORT_ROWS}). Split the sheet and try again.`
+      );
+    }
+
+    const results = [];
+    const seenEmails = new Set();
+    let created = 0;
+
+    for (let i = 0; i < rows.length; i += 1) {
+      const row = rows[i] || {};
+      // `__row` carries the source spreadsheet row number for a friendly report;
+      // fall back to a 1-based position (header is row 1) when it's missing.
+      const rowNo = Number(row.__row) || i + 2;
+      const email = String(row.email || "").trim().toLowerCase();
+
+      if (email && seenEmails.has(email)) {
+        results.push({ row: rowNo, ok: false, message: "Duplicate email within the uploaded sheet" });
+        continue;
+      }
+
+      try {
+        const result = await createStudentRecord(row);
+        if (result.ok) {
+          created += 1;
+          if (email) seenEmails.add(email);
+          results.push({
+            row: rowNo,
+            ok: true,
+            name: result.student.name,
+            studentId: result.student.studentId,
+          });
+        } else {
+          results.push({ row: rowNo, ok: false, message: result.message });
+        }
+      } catch (err) {
+        console.error(`Import Students: row ${rowNo} failed`, err);
+        results.push({ row: rowNo, ok: false, message: err.message || "Failed to import this row" });
+      }
+    }
+
+    return ok(res, {
+      total: results.length,
+      created,
+      failed: results.length - created,
+      results,
+    });
+  },
+  { label: "Import Students Error", message: "Failed to import students" }
 );
 
 exports.updateStudent = wrap(
