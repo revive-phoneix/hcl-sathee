@@ -22,11 +22,14 @@ import { useEscapeToClose } from "../../hooks/useEscapeToClose";
  * deliberately excluded because the platform fills those itself.
  */
 const COLUMNS = [
-  { key: "firstName", label: "First Name", required: true, aliases: ["firstname", "first"] },
-  { key: "lastName", label: "Last Name", aliases: ["lastname", "last", "surname"] },
+  // `name` is accepted as an alternative to First/Last Name for sheets that keep
+  // the student's name in one column. It's hidden from the generated template.
+  { key: "name", label: "Name", templateHidden: true, aliases: ["student name", "full name", "student", "candidate name", "name of student"] },
+  { key: "firstName", label: "First Name", aliases: ["firstname", "first", "given name"] },
+  { key: "lastName", label: "Last Name", aliases: ["lastname", "last", "surname", "family name"] },
   { key: "gender", label: "Gender", required: true, aliases: ["sex"] },
-  { key: "email", label: "Email", required: true, aliases: ["email address", "e mail", "mail"] },
-  { key: "phone", label: "Phone", required: true, aliases: ["phone number", "mobile", "mobile number", "contact", "contact number"] },
+  { key: "email", label: "Email", required: true, aliases: ["email address", "e mail", "mail", "email id"] },
+  { key: "phone", label: "Phone", required: true, aliases: ["phone number", "mobile", "mobile number", "contact", "contact number", "phone no", "mobile no"] },
   { key: "course", label: "Course", required: true, aliases: ["course enrolled", "exam", "batch"] },
   { key: "category", label: "Category", aliases: ["caste", "category caste", "category (caste)"] },
   { key: "centre", label: "Centre", aliases: ["center", "centre name", "center name"] },
@@ -40,7 +43,10 @@ const COLUMNS = [
   { key: "subjects", label: "Subjects", aliases: ["optional subjects", "domain subjects", "subject"] },
 ];
 
+// A name column is required too, but "Name" OR "First Name" both satisfy it — so
+// it's checked separately rather than via this list.
 const REQUIRED_KEYS = COLUMNS.filter((c) => c.required).map((c) => c.key);
+const TEMPLATE_COLUMNS = COLUMNS.filter((c) => !c.templateHidden);
 const GENDERS = ["male", "female", "other"];
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -71,7 +77,9 @@ const splitSubjects = (value) =>
 
 /** Build the request payload for one parsed row (same shape the Add form sends). */
 const toPayload = (row, defaultCentre) => {
-  const name = `${row.firstName || ""} ${row.lastName || ""}`.trim();
+  const name =
+    String(row.name ?? "").trim() ||
+    `${row.firstName || ""} ${row.lastName || ""}`.trim();
   return {
     __row: row.__row,
     studentId: String(row.studentId ?? "").trim(),
@@ -96,7 +104,7 @@ const toPayload = (row, defaultCentre) => {
 
 /** Light pre-flight check so obvious mistakes surface before uploading. */
 const previewIssue = (payload) => {
-  if (!`${payload.name}`.trim()) return "First name is required";
+  if (!`${payload.name}`.trim()) return "Name is required";
   if (!GENDERS.includes(payload.gender.toLowerCase())) return "Gender must be Male, Female or Other";
   if (!payload.email) return "Email is required";
   if (!EMAIL_RE.test(payload.email)) return "Email looks invalid";
@@ -181,8 +189,8 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
   };
 
   const downloadTemplate = () => {
-    const headers = COLUMNS.map((c) => c.label);
-    const example = COLUMNS.map((c) => EXAMPLE_ROW[c.key] ?? "");
+    const headers = TEMPLATE_COLUMNS.map((c) => c.label);
+    const example = TEMPLATE_COLUMNS.map((c) => EXAMPLE_ROW[c.key] ?? "");
     const ws = XLSX.utils.aoa_to_sheet([headers, example]);
     ws["!cols"] = headers.map((h) => ({ wch: Math.max(14, h.length + 2) }));
     const wb = XLSX.utils.book_new();
@@ -215,13 +223,16 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
     });
 
     const mappedKeys = new Set(Object.values(headerMap));
-    const missingRequired = REQUIRED_KEYS.filter((k) => !mappedKeys.has(k));
-    if (missingRequired.length) {
-      const labels = missingRequired
-        .map((k) => COLUMNS.find((c) => c.key === k)?.label || k)
-        .join(", ");
+    const missing = [];
+    if (!mappedKeys.has("name") && !mappedKeys.has("firstName")) {
+      missing.push('"Name" (or "First Name")');
+    }
+    for (const key of REQUIRED_KEYS) {
+      if (!mappedKeys.has(key)) missing.push(COLUMNS.find((c) => c.key === key)?.label || key);
+    }
+    if (missing.length) {
       setParseError(
-        `Missing required column(s): ${labels}. Download the template to see the expected headers.`
+        `Missing required column(s): ${missing.join(", ")}. Download the template to see the expected headers.`
       );
       return;
     }
@@ -452,9 +463,11 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
               )}
 
               <p style={{ fontSize: 12, color: "#64748b", margin: "12px 0 0" }}>
-                Marks, attendance and other auto-generated fields are filled by the platform — leave
-                them out. For <strong>CUET</strong> and <strong>ICAR</strong>, put every required
-                subject (compulsory + chosen) in the <strong>Subjects</strong> column, comma-separated.
+                Headers are matched loosely — a single <strong>Name</strong> column works instead of
+                First / Last Name. Marks, attendance and other auto-generated fields are filled by the
+                platform, so leave them out. For <strong>CUET</strong> and <strong>ICAR</strong>, put
+                every required subject (compulsory + chosen) in the <strong>Subjects</strong> column,
+                comma-separated.
               </p>
 
               {parseError ? (
