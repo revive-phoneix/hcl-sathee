@@ -317,7 +317,6 @@ const AppContent = () => {
     activeNav,
     onNavChange: handleAdminNavChange,
     onLogout: handleLogout,
-    onOtherCentres: () => navigate("/centres"),
   };
 
   const partnerLayout = {

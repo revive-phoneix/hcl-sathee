@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { LogOut, ChevronLeft, ChevronRight, Menu, X, Building2 } from "lucide-react";
 import HCLLogo from "../assets/HCL.svg";
 
@@ -39,12 +40,16 @@ export function MainLayout({
   activeNav,
   onNavChange,
   onLogout,
-  onOtherCentres,
   roleLabel = "Admin Portal",
   children,
 }) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  // Partner/Mitra portals live under /partner/* and /mitra/*; everything else in
+  // this layout is the Admin portal, which is the only one that switches centres.
+  const isAdminArea = !/^\/(partner|mitra)(\/|$)/.test(location.pathname);
 
   useEffect(() => {
     if (!mobileNavOpen) return undefined;
@@ -96,10 +101,10 @@ export function MainLayout({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {onOtherCentres ? (
+          {isAdminArea ? (
             <button
               type="button"
-              onClick={onOtherCentres}
+              onClick={() => navigate("/centres")}
               className="bg-white/20 hover:bg-white/30 text-slate-900 px-3 sm:px-5 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors"
             >
               <Building2 size={18} />
