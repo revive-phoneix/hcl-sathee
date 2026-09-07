@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { LogOut, ChevronLeft, ChevronRight, Menu, X } from "lucide-react";
+import { LogOut, ChevronLeft, ChevronRight, Menu, X, Building2 } from "lucide-react";
 import HCLLogo from "../assets/HCL.svg";
 
 function NavButtons({
@@ -39,6 +39,7 @@ export function MainLayout({
   activeNav,
   onNavChange,
   onLogout,
+  onOtherCentres,
   roleLabel = "Admin Portal",
   children,
 }) {
@@ -94,14 +95,27 @@ export function MainLayout({
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={onLogout}
-          className="bg-[#3B82F6] hover:bg-blue-600 px-3 sm:px-6 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors shrink-0"
-        >
-          <LogOut size={18} />
-          <span className="hidden sm:inline">Logout</span>
-        </button>
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
+          {onOtherCentres ? (
+            <button
+              type="button"
+              onClick={onOtherCentres}
+              className="bg-white/20 hover:bg-white/30 text-slate-900 px-3 sm:px-5 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors"
+            >
+              <Building2 size={18} />
+              <span className="hidden sm:inline">Other Centres</span>
+            </button>
+          ) : null}
+
+          <button
+            type="button"
+            onClick={onLogout}
+            className="bg-[#3B82F6] hover:bg-blue-600 px-3 sm:px-6 py-2 rounded-2xl text-sm font-medium flex items-center gap-2 transition-colors"
+          >
+            <LogOut size={18} />
+            <span className="hidden sm:inline">Logout</span>
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 overflow-visible relative">

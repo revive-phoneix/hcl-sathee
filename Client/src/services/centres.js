@@ -5,6 +5,12 @@ export const fetchCentres = async () => {
   return response.data.centres ?? [];
 };
 
+// Admin-only: each centre with student / Sathee Mitra / Vishist / HCL Partner counts.
+export const fetchCentresOverview = async () => {
+  const response = await api.get("/api/centres/overview");
+  return response.data.centres ?? [];
+};
+
 export const createCentre = async (name) => {
   const response = await api.post("/api/centres", { name });
   return response.data.centre;

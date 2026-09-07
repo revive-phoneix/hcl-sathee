@@ -1,6 +1,7 @@
 const express = require("express");
 const {
   getCentres,
+  getCentresOverview,
   createCentre,
   updateCentre,
   deleteCentre,
@@ -11,6 +12,8 @@ const router = express.Router();
 
 // Any authenticated user needs this for the portal selector (every role).
 router.get("/", authenticate, getCentres);
+// Admin-only: per-centre headcounts for the "Other Centres" page.
+router.get("/overview", authenticate, requireAdmin, getCentresOverview);
 // Only admins can add a new centre.
 router.post("/", authenticate, requireAdmin, createCentre);
 // Only admins can rename or delete a custom centre (defaults are locked in the model).

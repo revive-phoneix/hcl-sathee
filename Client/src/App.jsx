@@ -7,6 +7,7 @@ import CreatePassword from "./Components/Auth/CreatePassword";
 import ForgetPassword from "./Components/Auth/ForgetPassword";
 import CardSelector_1 from "./Pages/Selector/CardSelector_1";
 import CardSelector_2 from "./Pages/Selector/CardSelector_2";
+import OtherCentres from "./Pages/Selector/OtherCentres";
 import Dashboard from "./Pages/Dashboard/AdminDashboard";
 import HCLPartnerDashboard from "./Pages/Dashboard/HCLPartnerDashboard";
 import SatheeMitraDashboard from "./Pages/Dashboard/SatheeMitraDashboard";
@@ -316,6 +317,7 @@ const AppContent = () => {
     activeNav,
     onNavChange: handleAdminNavChange,
     onLogout: handleLogout,
+    onOtherCentres: () => navigate("/centres"),
   };
 
   const partnerLayout = {
@@ -375,6 +377,10 @@ const AppContent = () => {
   }
 
   // Role-based route guards
+  if (location.pathname === "/centres" && !isAdmin) {
+    return <Navigate to="/" replace />;
+  }
+
   if (ADMIN_PATHS.has(location.pathname) && (!isAdmin || !selectedPortal)) {
     return <Navigate to="/portals" replace />;
   }
@@ -430,6 +436,20 @@ const AppContent = () => {
                   selectPortal(name);
                   navigate("/mitra/dashboard");
                 }
+              }}
+            />
+          }
+        />
+
+        <Route
+          path="/centres"
+          element={
+            <OtherCentres
+              currentPortal={selectedPortal}
+              onBack={() => navigate(selectedPortal ? "/dashboard" : "/portals")}
+              onOpenCentre={(portalName) => {
+                selectPortal(portalName);
+                navigate("/dashboard");
               }}
             />
           }

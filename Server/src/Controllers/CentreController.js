@@ -1,5 +1,11 @@
 const Centre = require("../Models/Centre");
+const { getDb } = require("../config/firebase");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
+const {
+  getCanonicalCentreKey,
+  isSatheeMitraRole,
+  isHclPartnerRole,
+} = require("../Utils/centreMatch");
 
 exports.getCentres = wrap(
   async (_req, res) => {
@@ -7,6 +13,53 @@ exports.getCentres = wrap(
     return ok(res, { centres });
   },
   { label: "Get Centres Error", message: "Failed to fetch centres" }
+);
+
+const isVishistUser = (user) => {
+  const v = user.isVishist;
+  return v === true || v === "true" || v === 1 || v === "1";
+};
+
+/**
+ * Per-centre headcounts for the admin "Other Centres" page: students, Sathee
+ * Mitras (non-Vishist), Sathee Vishists, and HCL Partners assigned to each
+ * centre. One pass over `users` + `students`, matched with the shared fuzzy key.
+ */
+exports.getCentresOverview = wrap(
+  async (_req, res) => {
+    const db = getDb();
+    const [centres, usersSnap, studentsSnap] = await Promise.all([
+      Centre.findAll(),
+      db.collection("users").get(),
+      db.collection("students").get(),
+    ]);
+
+    const users = usersSnap.docs.map((d) => d.data());
+    const students = studentsSnap.docs.map((d) => d.data());
+
+    const overview = centres.map((centre) => {
+      const key = getCanonicalCentreKey(centre.name);
+      const inCentre = (doc) => getCanonicalCentreKey(doc.centre) === key;
+
+      const centreUsers = users.filter(inCentre);
+      const mitras = centreUsers.filter((u) => isSatheeMitraRole(u.role));
+
+      return {
+        id: centre.id,
+        name: centre.name,
+        isDefault: String(centre.id).startsWith("default:"),
+        counts: {
+          students: students.filter(inCentre).length,
+          satheeMitra: mitras.filter((u) => !isVishistUser(u)).length,
+          satheeVishist: mitras.filter(isVishistUser).length,
+          hclPartner: centreUsers.filter((u) => isHclPartnerRole(u.role)).length,
+        },
+      };
+    });
+
+    return ok(res, { centres: overview });
+  },
+  { label: "Centres Overview Error", message: "Failed to load the centres overview" }
 );
 
 exports.createCentre = wrap(
