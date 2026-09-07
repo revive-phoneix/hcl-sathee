@@ -29,17 +29,17 @@ const COLUMNS = [
   { key: "lastName", label: "Last Name", aliases: ["lastname", "last", "surname", "family name"] },
   { key: "gender", label: "Gender", required: true, aliases: ["sex"] },
   { key: "email", label: "Email", required: true, aliases: ["email address", "e mail", "mail", "email id"] },
-  { key: "phone", label: "Phone", required: true, aliases: ["phone number", "mobile", "mobile number", "contact", "contact number", "phone no", "mobile no"] },
+  { key: "phone", label: "Phone", required: true, aliases: ["phone number", "phone no", "mobile", "mobile number", "mobile no", "mob", "mob no", "contact", "contact number", "contact no", "cell", "cell number", "whatsapp", "whatsapp number", "primary contact"] },
   { key: "course", label: "Course", required: true, aliases: ["course enrolled", "exam", "batch"] },
   { key: "category", label: "Category", aliases: ["caste", "category caste", "category (caste)"] },
   { key: "centre", label: "Centre", aliases: ["center", "centre name", "center name"] },
   { key: "studentId", label: "Student ID", aliases: ["studentid", "student id", "roll no", "roll number", "roll"] },
   { key: "enrollmentNo", label: "Enrollment No", aliases: ["enrollmentno", "enrolment no", "enrollment number", "enrolment number", "enrollment"] },
   { key: "address", label: "Address", aliases: ["addr", "residential address"] },
-  { key: "fatherName", label: "Father Name", aliases: ["fathers name", "father's name", "father"] },
-  { key: "fatherPhone", label: "Father Phone", aliases: ["fathers phone", "father's phone", "father mobile", "father contact"] },
-  { key: "motherName", label: "Mother Name", aliases: ["mothers name", "mother's name", "mother"] },
-  { key: "motherPhone", label: "Mother Phone", aliases: ["mothers phone", "mother's phone", "mother mobile", "mother contact"] },
+  { key: "fatherName", label: "Father Name", aliases: ["fathers name", "father's name", "father", "father full name", "guardian name"] },
+  { key: "fatherPhone", label: "Father Phone", aliases: ["father phone", "fathers phone", "father's phone", "father phone number", "father phone no", "father mobile", "father mobile number", "father mobile no", "fathers mobile", "father contact", "father contact number", "father contact no", "father number", "father no", "father whatsapp", "guardian phone", "guardian mobile", "guardian contact", "parent phone", "parent contact"] },
+  { key: "motherName", label: "Mother Name", aliases: ["mothers name", "mother's name", "mother", "mother full name"] },
+  { key: "motherPhone", label: "Mother Phone", aliases: ["mother phone", "mothers phone", "mother's phone", "mother phone number", "mother phone no", "mother mobile", "mother mobile number", "mother mobile no", "mothers mobile", "mother contact", "mother contact number", "mother contact no", "mother number", "mother no", "mother whatsapp"] },
   { key: "subjects", label: "Subjects", aliases: ["optional subjects", "domain subjects", "subject"] },
 ];
 
@@ -58,6 +58,18 @@ const normalizeHeader = (value = "") =>
 
 const digits = (value = "") => String(value ?? "").replace(/\D/g, "");
 
+/** Digits only, tolerating common Indian formats: +91 prefix, leading 0. */
+const toPhone10 = (value = "") => {
+  let d = digits(value);
+  if (d.length === 12 && d.startsWith("91")) d = d.slice(2);
+  else if (d.length === 11 && d.startsWith("0")) d = d.slice(1);
+  return d;
+};
+
+const FATHER_TOKENS = ["father", "fathers", "papa", "guardian"];
+const MOTHER_TOKENS = ["mother", "mothers", "mummy", "mom"];
+const PHONE_TOKENS = ["phone", "mobile", "contact", "whatsapp", "cell", "mob", "number", "no", "ph"];
+
 const matchHeaderToKey = (header) => {
   const norm = normalizeHeader(header);
   if (!norm) return null;
@@ -65,6 +77,21 @@ const matchHeaderToKey = (header) => {
     if (normalizeHeader(col.label) === norm) return col.key;
     if (col.key.toLowerCase() === norm.replace(/\s/g, "")) return col.key;
     if ((col.aliases || []).some((a) => normalizeHeader(a) === norm)) return col.key;
+  }
+
+  // Fuzzy fallback: parent contact/name columns are worded countless ways
+  // ("Father's Contact No.", "Mother Mobile Number", …). Only fire when the
+  // header clearly names a parent AND clearly refers to a phone or a name.
+  const tokens = new Set(norm.split(" "));
+  const hasFather = FATHER_TOKENS.some((t) => tokens.has(t));
+  const hasMother = MOTHER_TOKENS.some((t) => tokens.has(t));
+  if (hasFather || hasMother) {
+    if (PHONE_TOKENS.some((t) => tokens.has(t))) {
+      return hasFather ? "fatherPhone" : "motherPhone";
+    }
+    if (tokens.has("name")) {
+      return hasFather ? "fatherName" : "motherName";
+    }
   }
   return null;
 };
@@ -87,16 +114,16 @@ const toPayload = (row, defaultCentre) => {
     name,
     gender: String(row.gender ?? "").trim(),
     email: String(row.email ?? "").trim(),
-    phone: digits(row.phone),
+    phone: toPhone10(row.phone),
     centre: String(row.centre ?? "").trim() || defaultCentre,
     course: String(row.course ?? "").trim(),
     category: String(row.category ?? "").trim(),
     address: String(row.address ?? "").trim(),
     parents: {
       father: String(row.fatherName ?? "").trim(),
-      fatherPhone: digits(row.fatherPhone),
+      fatherPhone: toPhone10(row.fatherPhone),
       mother: String(row.motherName ?? "").trim(),
-      motherPhone: digits(row.motherPhone),
+      motherPhone: toPhone10(row.motherPhone),
     },
     subjects: splitSubjects(row.subjects),
   };
