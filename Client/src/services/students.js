@@ -40,6 +40,12 @@ export const importStudents = async (students) => {
   return response.data;
 };
 
+// Pulls a link-shared Google Sheet as CSV text (fetched server-side to dodge CORS).
+export const fetchImportSheet = async (url) => {
+  const response = await api.post("/api/students/import/fetch-sheet", { url });
+  return response.data.csv;
+};
+
 export const updateStudent = async (id, payload) => {
   const response = await api.patch(`/api/students/${id}`, payload);
   return parseStudent(response.data.student);

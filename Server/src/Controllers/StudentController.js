@@ -342,6 +342,99 @@ exports.importStudents = wrap(
   { label: "Import Students Error", message: "Failed to import students" }
 );
 
+/**
+ * Resolve a user-supplied Google Sheets reference to a spreadsheet id + gid.
+ * Accepts a bare id or a docs.google.com / drive.google.com link. Returns null
+ * for anything else — we never fetch an arbitrary URL (SSRF guard).
+ */
+const parseGoogleSheetRef = (input) => {
+  const raw = String(input || "").trim();
+  if (!raw) return null;
+
+  if (/^[a-zA-Z0-9-_]{20,}$/.test(raw)) return { id: raw, gid: null };
+
+  let url;
+  try {
+    url = new URL(raw);
+  } catch {
+    return null;
+  }
+  const host = url.hostname.toLowerCase();
+  if (host !== "docs.google.com" && host !== "drive.google.com") return null;
+
+  const match = url.pathname.match(/\/(?:spreadsheets|file)\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) return null;
+
+  const gid =
+    (url.hash.match(/[#&]gid=(\d+)/) || [])[1] ||
+    url.searchParams.get("gid") ||
+    null;
+  return { id: match[1], gid };
+};
+
+// The fetch (following redirects) must land on a Google-owned host.
+const GOOGLE_RESULT_HOST = /(^|\.)(google\.com|googleusercontent\.com)$/;
+const MAX_SHEET_BYTES = 2_000_000;
+
+exports.fetchImportSheet = wrap(
+  async (req, res) => {
+    const ref = parseGoogleSheetRef(req.body?.url);
+    if (!ref) {
+      return fail(
+        res,
+        400,
+        "Enter a valid Google Sheets link (it should look like docs.google.com/spreadsheets/d/…)."
+      );
+    }
+
+    const exportUrl =
+      `https://docs.google.com/spreadsheets/d/${ref.id}/export?format=csv` +
+      (ref.gid ? `&gid=${ref.gid}` : "");
+
+    let response;
+    try {
+      response = await fetch(exportUrl, {
+        redirect: "follow",
+        signal: AbortSignal.timeout(15000),
+      });
+    } catch {
+      return fail(res, 502, "Could not reach Google Sheets. Check the link and try again.");
+    }
+
+    let finalHost = "";
+    try {
+      finalHost = new URL(response.url).hostname.toLowerCase();
+    } catch {
+      finalHost = "";
+    }
+    if (!GOOGLE_RESULT_HOST.test(finalHost)) {
+      return fail(res, 502, "Unexpected redirect while fetching that sheet.");
+    }
+
+    const contentType = response.headers.get("content-type") || "";
+    if (!response.ok || contentType.includes("text/html")) {
+      // Google returns its sign-in page (HTML) when the sheet isn't link-shared.
+      return fail(
+        res,
+        403,
+        'That sheet isn\'t publicly accessible. In Google Sheets: Share → General access → ' +
+          '"Anyone with the link" → Viewer, then paste the link again — or use the file upload option.'
+      );
+    }
+
+    const csv = await response.text();
+    if (!csv.trim()) {
+      return fail(res, 422, "That sheet (or the first tab) appears to be empty.");
+    }
+    if (csv.length > MAX_SHEET_BYTES) {
+      return fail(res, 413, "That sheet is too large to import in one go. Split it and try again.");
+    }
+
+    return ok(res, { csv });
+  },
+  { label: "Fetch Import Sheet Error", message: "Failed to fetch that sheet" }
+);
+
 exports.updateStudent = wrap(
   async (req, res) => {
     const existing = await Student.findById(req.params.id);

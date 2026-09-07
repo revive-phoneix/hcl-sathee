@@ -7,10 +7,12 @@ import {
   CheckCircle2,
   AlertTriangle,
   Loader2,
+  Cloud,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { getCentreValueFromPortal } from "../../utils/portalMapping";
 import { normalizeCourseCode, getCourseSubjectConfig } from "../../utils/courseSubjects";
+import { fetchImportSheet } from "../../services/students";
 import { useEscapeToClose } from "../../hooks/useEscapeToClose";
 
 /**
@@ -133,7 +135,11 @@ const EXAMPLE_ROW = {
 export default function ImportStudentsModal({ open, onClose, onImport, portalName }) {
   const defaultCentre = getCentreValueFromPortal(portalName) || "HCL RAJASTHAN";
   const fileInputRef = useRef(null);
+  const [mode, setMode] = useState("file"); // "file" | "cloud"
   const [fileName, setFileName] = useState("");
+  const [sheetUrl, setSheetUrl] = useState("");
+  const [fetching, setFetching] = useState(false);
+  const [sourceLabel, setSourceLabel] = useState("");
   const [rows, setRows] = useState([]); // parsed row objects with __row
   const [parseError, setParseError] = useState("");
   const [ignoredHeaders, setIgnoredHeaders] = useState([]);
@@ -160,14 +166,17 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
   const resetParsed = () => {
     setRows([]);
     setFileName("");
+    setSourceLabel("");
     setParseError("");
     setIgnoredHeaders([]);
     setReport(null);
   };
 
   const handleClose = () => {
-    if (importing) return;
+    if (importing || fetching) return;
     resetParsed();
+    setSheetUrl("");
+    setMode("file");
     onClose();
   };
 
@@ -181,72 +190,94 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
     XLSX.writeFile(wb, "student-data-import-template.xlsx");
   };
 
+  /** Shared: turn a parsed workbook into preview rows (or set a parse error). */
+  const ingestWorkbook = (wb) => {
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    if (!sheet) {
+      setParseError("No readable sheet was found.");
+      return;
+    }
+
+    const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: "" });
+    if (!aoa.length) {
+      setParseError("The sheet is empty.");
+      return;
+    }
+
+    const headerRow = aoa[0].map((c) => String(c ?? "").trim());
+    const headerMap = {}; // colIndex -> key
+    const ignored = [];
+    headerRow.forEach((header, idx) => {
+      if (!header) return;
+      const key = matchHeaderToKey(header);
+      if (key) headerMap[idx] = key;
+      else ignored.push(header);
+    });
+
+    const mappedKeys = new Set(Object.values(headerMap));
+    const missingRequired = REQUIRED_KEYS.filter((k) => !mappedKeys.has(k));
+    if (missingRequired.length) {
+      const labels = missingRequired
+        .map((k) => COLUMNS.find((c) => c.key === k)?.label || k)
+        .join(", ");
+      setParseError(
+        `Missing required column(s): ${labels}. Download the template to see the expected headers.`
+      );
+      return;
+    }
+
+    const parsed = [];
+    for (let j = 1; j < aoa.length; j += 1) {
+      const cells = aoa[j] || [];
+      const obj = { __row: j + 1 };
+      let hasValue = false;
+      Object.entries(headerMap).forEach(([idx, key]) => {
+        const raw = cells[idx];
+        const value = raw == null ? "" : String(raw).trim();
+        obj[key] = value;
+        if (value) hasValue = true;
+      });
+      if (hasValue) parsed.push(obj);
+    }
+
+    if (!parsed.length) {
+      setParseError("No data rows were found under the header.");
+      return;
+    }
+
+    setRows(parsed);
+    setIgnoredHeaders(ignored);
+  };
+
   const handleFile = async (file) => {
     resetParsed();
     if (!file) return;
     setFileName(file.name);
-
     try {
       const buffer = await file.arrayBuffer();
-      const wb = XLSX.read(new Uint8Array(buffer), { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-      if (!sheet) {
-        setParseError("That file has no readable sheet.");
-        return;
-      }
-
-      const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, blankrows: false, defval: "" });
-      if (!aoa.length) {
-        setParseError("The sheet is empty.");
-        return;
-      }
-
-      const headerRow = aoa[0].map((c) => String(c ?? "").trim());
-      const headerMap = {}; // colIndex -> key
-      const ignored = [];
-      headerRow.forEach((header, idx) => {
-        if (!header) return;
-        const key = matchHeaderToKey(header);
-        if (key) headerMap[idx] = key;
-        else ignored.push(header);
-      });
-
-      const mappedKeys = new Set(Object.values(headerMap));
-      const missingRequired = REQUIRED_KEYS.filter((k) => !mappedKeys.has(k));
-      if (missingRequired.length) {
-        const labels = missingRequired
-          .map((k) => COLUMNS.find((c) => c.key === k)?.label || k)
-          .join(", ");
-        setParseError(
-          `Missing required column(s): ${labels}. Download the template to see the expected headers.`
-        );
-        return;
-      }
-
-      const parsed = [];
-      for (let j = 1; j < aoa.length; j += 1) {
-        const cells = aoa[j] || [];
-        const obj = { __row: j + 1 };
-        let hasValue = false;
-        Object.entries(headerMap).forEach(([idx, key]) => {
-          const raw = cells[idx];
-          const value = raw == null ? "" : String(raw).trim();
-          obj[key] = value;
-          if (value) hasValue = true;
-        });
-        if (hasValue) parsed.push(obj);
-      }
-
-      if (!parsed.length) {
-        setParseError("No data rows found under the header.");
-        return;
-      }
-
-      setRows(parsed);
-      setIgnoredHeaders(ignored);
+      ingestWorkbook(XLSX.read(new Uint8Array(buffer), { type: "array" }));
     } catch (err) {
       console.error("Import parse error:", err);
       setParseError("Could not read that file. Use .xlsx, .xls or .csv exported from your sheet.");
+    }
+  };
+
+  const handleFetchSheet = async () => {
+    if (!sheetUrl.trim() || fetching) return;
+    resetParsed();
+    setFetching(true);
+    try {
+      const csv = await fetchImportSheet(sheetUrl.trim());
+      setSourceLabel("Google Sheets");
+      ingestWorkbook(XLSX.read(csv, { type: "string" }));
+    } catch (err) {
+      console.error("Fetch sheet error:", err);
+      setParseError(
+        err?.response?.data?.message ||
+          "Could not load that sheet. Make sure the link is shared as \"Anyone with the link\"."
+      );
+    } finally {
+      setFetching(false);
     }
   };
 
@@ -286,7 +317,7 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
               </p>
             </div>
           </div>
-          <button onClick={handleClose} style={closeBtn} disabled={importing} aria-label="Close">
+          <button onClick={handleClose} style={closeBtn} disabled={importing || fetching} aria-label="Close">
             <X size={22} color="#64748b" />
           </button>
         </div>
@@ -325,7 +356,7 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 12, marginTop: 20 }}>
                 <button type="button" style={secondaryBtn} onClick={resetParsed}>
-                  Import another file
+                  Import more
                 </button>
                 <button type="button" style={primaryBtn} onClick={handleClose}>
                   Done
@@ -344,27 +375,81 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
                 </button>
               </div>
 
-              <button
-                type="button"
-                style={dropZone}
-                onClick={() => fileInputRef.current?.click()}
-                disabled={importing}
-              >
-                <UploadCloud size={30} color="#3b82f6" />
-                <span style={{ fontSize: 14, fontWeight: 600, color: "#1e3a5f" }}>
-                  {fileName || "Choose a spreadsheet file"}
-                </span>
-                <span style={{ fontSize: 12, color: "#94a3b8" }}>
-                  Students are added to <strong>{defaultCentre}</strong> unless the sheet has a Centre column
-                </span>
-              </button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
-                onChange={(e) => handleFile(e.target.files?.[0] || null)}
-                style={{ display: "none" }}
-              />
+              <div style={tabRow}>
+                <button
+                  type="button"
+                  style={mode === "file" ? tabActive : tabIdle}
+                  onClick={() => { setMode("file"); resetParsed(); }}
+                >
+                  <UploadCloud size={15} /> Upload file
+                </button>
+                <button
+                  type="button"
+                  style={mode === "cloud" ? tabActive : tabIdle}
+                  onClick={() => { setMode("cloud"); resetParsed(); }}
+                >
+                  <Cloud size={15} /> Add from cloud
+                </button>
+              </div>
+
+              {mode === "file" ? (
+                <>
+                  <button
+                    type="button"
+                    style={dropZone}
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={importing}
+                  >
+                    <UploadCloud size={30} color="#3b82f6" />
+                    <span style={{ fontSize: 14, fontWeight: 600, color: "#1e3a5f" }}>
+                      {fileName || "Choose a spreadsheet file"}
+                    </span>
+                    <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                      Students are added to <strong>{defaultCentre}</strong> unless the sheet has a Centre column
+                    </span>
+                  </button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
+                    onChange={(e) => handleFile(e.target.files?.[0] || null)}
+                    style={{ display: "none" }}
+                  />
+                </>
+              ) : (
+                <div style={{ ...dropZone, cursor: "default" }}>
+                  <Cloud size={28} color="#3b82f6" />
+                  <span style={{ fontSize: 13, color: "#475569", textAlign: "center" }}>
+                    Paste a <strong>Google Sheets</strong> link. In Sheets: <em>Share → General access →
+                    “Anyone with the link” → Viewer</em>, then paste it here.
+                  </span>
+                  <div style={{ display: "flex", gap: 8, width: "100%", maxWidth: 520 }}>
+                    <input
+                      type="url"
+                      value={sheetUrl}
+                      onChange={(e) => setSheetUrl(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleFetchSheet(); }}
+                      placeholder="https://docs.google.com/spreadsheets/d/…"
+                      style={urlInput}
+                    />
+                    <button
+                      type="button"
+                      style={{ ...primaryBtn, padding: "10px 18px", opacity: fetching || !sheetUrl.trim() ? 0.6 : 1, cursor: fetching || !sheetUrl.trim() ? "not-allowed" : "pointer" }}
+                      onClick={handleFetchSheet}
+                      disabled={fetching || !sheetUrl.trim()}
+                    >
+                      {fetching ? (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                          <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Loading
+                        </span>
+                      ) : "Fetch"}
+                    </button>
+                  </div>
+                  <span style={{ fontSize: 12, color: "#94a3b8" }}>
+                    Students are added to <strong>{defaultCentre}</strong> unless the sheet has a Centre column
+                  </span>
+                </div>
+              )}
 
               <p style={{ fontSize: 12, color: "#64748b", margin: "12px 0 0" }}>
                 Marks, attendance and other auto-generated fields are filled by the platform — leave
@@ -388,9 +473,14 @@ export default function ImportStudentsModal({ open, onClose, onImport, portalNam
               {/* STEP: preview */}
               {preview.length > 0 ? (
                 <div style={{ marginTop: 16 }}>
-                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10 }}>
+                  <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginBottom: 10, alignItems: "center" }}>
                     <SummaryPill label="Ready" value={readyCount} tone="ok" />
                     <SummaryPill label="Needs a fix" value={issueCount} tone={issueCount ? "bad" : "muted"} />
+                    {(sourceLabel || fileName) ? (
+                      <span style={{ fontSize: 12, color: "#64748b" }}>
+                        from {sourceLabel || fileName}
+                      </span>
+                    ) : null}
                   </div>
 
                   <div style={tableWrap}>
@@ -540,6 +630,48 @@ const templateBtn = {
   fontSize: 13,
   fontWeight: 600,
   cursor: "pointer",
+};
+
+const tabRow = {
+  display: "flex",
+  gap: 8,
+  marginBottom: 14,
+};
+
+const tabBase = {
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 6,
+  padding: "8px 16px",
+  borderRadius: 8,
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: "pointer",
+};
+
+const tabActive = {
+  ...tabBase,
+  border: "1px solid #1d4ed8",
+  background: "#1d4ed8",
+  color: "#fff",
+};
+
+const tabIdle = {
+  ...tabBase,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  color: "#475569",
+};
+
+const urlInput = {
+  flex: 1,
+  padding: "10px 14px",
+  borderRadius: 10,
+  border: "1px solid #cbd5e1",
+  background: "#fff",
+  fontSize: 13,
+  color: "#0f172a",
+  outline: "none",
 };
 
 const dropZone = {
