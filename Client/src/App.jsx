@@ -444,8 +444,9 @@ const AppContent = () => {
           path="/centres"
           element={
             <OtherCentres
+              {...adminLayout}
+              activeNav={-1}
               currentPortal={selectedPortal}
-              onBack={() => navigate(selectedPortal ? "/dashboard" : "/portals")}
               onOpenCentre={(portalName) => {
                 selectPortal(portalName);
                 navigate("/dashboard");

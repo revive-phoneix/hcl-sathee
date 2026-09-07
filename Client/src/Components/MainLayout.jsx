@@ -50,6 +50,7 @@ export function MainLayout({
   // Partner/Mitra portals live under /partner/* and /mitra/*; everything else in
   // this layout is the Admin portal, which is the only one that switches centres.
   const isAdminArea = !/^\/(partner|mitra)(\/|$)/.test(location.pathname);
+  const showOtherCentres = isAdminArea && location.pathname !== "/centres";
 
   useEffect(() => {
     if (!mobileNavOpen) return undefined;
@@ -101,7 +102,7 @@ export function MainLayout({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-          {isAdminArea ? (
+          {showOtherCentres ? (
             <button
               type="button"
               onClick={() => navigate("/centres")}

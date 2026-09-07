@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  ArrowLeft,
   ArrowRight,
   MapPin,
   GraduationCap,
@@ -10,7 +9,7 @@ import {
   Loader2,
   RefreshCw,
 } from "lucide-react";
-import HCLLogo from "../../assets/HCL.svg";
+import { MainLayout } from "../../Components/MainLayout";
 import { fetchCentresOverview } from "../../services/centres";
 import { getCanonicalCentreKey, PORTAL_OPTIONS } from "../../utils/portalMapping";
 
@@ -18,9 +17,7 @@ import { getCanonicalCentreKey, PORTAL_OPTIONS } from "../../utils/portalMapping
  *  keep their "HCL SATHEE <STATE>" portal title; custom centres use their name). */
 const portalNameForCentre = (centreName) => {
   const key = getCanonicalCentreKey(centreName);
-  const option = PORTAL_OPTIONS.find(
-    (o) => getCanonicalCentreKey(o.title) === key
-  );
+  const option = PORTAL_OPTIONS.find((o) => getCanonicalCentreKey(o.title) === key);
   return option ? option.title : centreName;
 };
 
@@ -31,7 +28,15 @@ const STAT_META = [
   { key: "hclPartner", label: "HCL Partner", Icon: Handshake, tint: "text-violet-600 bg-violet-50" },
 ];
 
-export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" }) {
+export default function OtherCentres({
+  portalName,
+  navItems,
+  activeNav,
+  onNavChange,
+  onLogout,
+  onOpenCentre,
+  currentPortal = "",
+}) {
   const [centres, setCentres] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -86,33 +91,31 @@ export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" 
   };
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] text-slate-900">
-      <header className="flex items-center gap-4 border-b border-slate-200 bg-white px-6 py-4">
-        <button
-          type="button"
-          onClick={onBack}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-        >
-          <ArrowLeft size={16} /> Back
-        </button>
-        <img src={HCLLogo} alt="HCL" className="h-8 w-8 object-contain" />
-        <div>
-          <h1 className="text-lg font-bold leading-tight">Other Centres</h1>
-          <p className="text-xs text-slate-500">
-            Jump to another centre&rsquo;s portal
-          </p>
+    <MainLayout
+      portalName={portalName}
+      navItems={navItems}
+      activeNav={activeNav}
+      onNavChange={onNavChange}
+      onLogout={onLogout}
+    >
+      <div className="text-slate-900">
+        <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold">Other Centres</h1>
+            <p className="mt-1 text-sm text-slate-500">
+              Open another centre&rsquo;s portal. Headcounts update live.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={reload}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={reload}
-          disabled={loading}
-          className="ml-auto flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-        >
-          <RefreshCw size={15} className={loading ? "animate-spin" : ""} /> Refresh
-        </button>
-      </header>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
         {loading ? (
           <div className="flex items-center justify-center gap-3 py-24 text-slate-500">
             <Loader2 size={20} className="animate-spin" /> Loading centres&hellip;
@@ -124,7 +127,7 @@ export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" 
         ) : centres.length === 0 ? (
           <p className="py-24 text-center text-slate-500">No centres found.</p>
         ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
             {centres.map((centre) => {
               const isCurrent =
                 currentKey && getCanonicalCentreKey(centre.name) === currentKey;
@@ -165,7 +168,9 @@ export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" 
                         key={key}
                         className="rounded-2xl border border-slate-100 bg-slate-50/60 p-3"
                       >
-                        <div className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg ${tint}`}>
+                        <div
+                          className={`mb-2 flex h-8 w-8 items-center justify-center rounded-lg ${tint}`}
+                        >
                           <Icon size={16} />
                         </div>
                         <div className="text-lg font-bold leading-none">
@@ -193,7 +198,7 @@ export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" 
       </div>
 
       {pending ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/45 p-4">
           <div className="w-full max-w-sm rounded-3xl bg-white p-7 text-center shadow-2xl">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/10 text-blue-600">
               <MapPin size={26} />
@@ -223,6 +228,6 @@ export default function OtherCentres({ onOpenCentre, onBack, currentPortal = "" 
           </div>
         </div>
       ) : null}
-    </div>
+    </MainLayout>
   );
 }
