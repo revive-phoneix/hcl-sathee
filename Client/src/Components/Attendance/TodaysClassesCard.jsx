@@ -59,6 +59,15 @@ export default function TodaysClassesCard({ portalName = "", isCustomCentre = fa
     [timetable]
   );
 
+  const coursesToday = useMemo(() => {
+    const seen = new Set();
+    for (const item of classes) {
+      const name = String(item.course || "").trim();
+      if (name) seen.add(name);
+    }
+    return [...seen];
+  }, [classes]);
+
   const isSunday = day === "Sunday";
   const summary = loading
     ? "Loading…"
@@ -71,6 +80,7 @@ export default function TodaysClassesCard({ portalName = "", isCustomCentre = fa
           : `${classes.length} class${classes.length === 1 ? "" : "es"}`;
 
   return (
+    <div className="space-y-2">
     <section className="rounded-2xl border border-violet-200 bg-white shadow-sm overflow-hidden">
       <button
         type="button"
@@ -157,5 +167,13 @@ export default function TodaysClassesCard({ portalName = "", isCustomCentre = fa
         </div>
       ) : null}
     </section>
+
+      {!loading && !error && coursesToday.length > 0 ? (
+        <p className="px-1 text-xs font-medium uppercase tracking-wide text-slate-500">
+          Subjects taught today are from courses: {" "}
+          <span className="text-violet-700">{coursesToday.join(", ")}</span>
+        </p>
+      ) : null}
+    </div>
   );
 }

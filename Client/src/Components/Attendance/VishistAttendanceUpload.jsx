@@ -25,6 +25,7 @@ export default function VishistAttendanceUpload({ portalName, isCustomCentre = f
     const [loadingRecords, setLoadingRecords] = useState(true);
     const [approvingId, setApprovingId] = useState(null);
     const previewUrlRef = useRef(null);
+    const fileInputRef = useRef(null);
 
     const handleApprove = async (id) => {
         setApprovingId(id);
@@ -76,21 +77,28 @@ export default function VishistAttendanceUpload({ portalName, isCustomCentre = f
     }, [isCustomCentre]);
 
     const handleFileChange = (e) => {
-        const file = e.target.files?.[0] || null;
+        // Keep the current photo if the picker was dismissed without a choice.
+        const file = e.target.files?.[0];
+        if (!file) return;
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = file ? URL.createObjectURL(file) : null;
+        previewUrlRef.current = URL.createObjectURL(file);
         setPhotoFile(file);
         setPhotoPreview(previewUrlRef.current);
+    };
+
+    const clearPhoto = () => {
+        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+        previewUrlRef.current = null;
+        setPhotoFile(null);
+        setPhotoPreview(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
     };
 
     const resetForm = () => {
         setSelectedId("");
         setSubject("");
         setTopicTaught("");
-        setPhotoFile(null);
-        setPhotoPreview(null);
-        if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
-        previewUrlRef.current = null;
+        clearPhoto();
         setError("");
         setMessage("");
     };
@@ -188,18 +196,57 @@ export default function VishistAttendanceUpload({ portalName, isCustomCentre = f
                 <div>
                     <label className="mb-1.5 block text-sm font-medium text-slate-700">Photo (optional)</label>
                     <div className="flex items-center gap-4">
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50">
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            aria-label={photoFile ? "Change photo" : "Upload photo"}
+                            className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-dashed border-slate-300 bg-slate-50 transition-colors hover:border-blue-400 hover:bg-blue-50"
+                        >
                             {photoPreview ? (
                                 <img src={photoPreview} alt="Preview" className="h-full w-full object-cover" />
                             ) : (
                                 <ImageOff size={22} className="text-slate-400" />
                             )}
+                        </button>
+
+                        <div className="min-w-0 text-sm">
+                            {photoFile ? (
+                                <>
+                                    <p className="truncate font-medium text-slate-700">{photoFile.name}</p>
+                                    <div className="mt-1 flex gap-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => fileInputRef.current?.click()}
+                                            className="font-medium text-blue-600 hover:underline"
+                                        >
+                                            Change
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={clearPhoto}
+                                            className="font-medium text-slate-500 hover:underline"
+                                        >
+                                            Remove
+                                        </button>
+                                    </div>
+                                </>
+                            ) : (
+                                <button
+                                    type="button"
+                                    onClick={() => fileInputRef.current?.click()}
+                                    className="font-medium text-blue-600 hover:underline"
+                                >
+                                    Choose a photo
+                                </button>
+                            )}
                         </div>
+
                         <input
+                            ref={fileInputRef}
                             type="file"
                             accept="image/jpeg,image/png,image/webp,image/jpg"
                             onChange={handleFileChange}
-                            className="text-sm text-slate-600"
+                            className="hidden"
                         />
                     </div>
                 </div>

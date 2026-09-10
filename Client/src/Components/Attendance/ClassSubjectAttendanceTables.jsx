@@ -65,9 +65,19 @@ const studentMatchesClass = (student, classItem) => {
   );
 };
 
-const classHeading = (classItem) => {
-  if (classItem.course) {
-    return `${classItem.subject} course : ${classItem.course}`;
+const classHeading = (classItem, students = []) => {
+  const explicit = String(classItem.course || "").trim();
+  if (explicit) {
+    return `${classItem.subject} (${explicit})`;
+  }
+
+  // Timetable slot has no course — show the course(s) the matched students
+  // belong to, e.g. "Chemistry (JEE, NEET)".
+  const derived = [
+    ...new Set(students.map((s) => normalizeCourseKey(s.course)).filter(Boolean)),
+  ].sort();
+  if (derived.length) {
+    return `${classItem.subject} (${derived.join(", ")})`;
   }
   return classItem.subject;
 };
@@ -252,7 +262,7 @@ function ClassAttendanceTable({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-5 py-3.5">
         <div className="min-w-0">
           <h3 className="text-base font-semibold text-slate-900">
-            {classHeading(classItem)}
+            {classHeading(classItem, students)}
           </h3>
           <p className="mt-0.5 text-xs text-slate-500">
             {classItem.time ? `${classItem.time} · ` : ""}
