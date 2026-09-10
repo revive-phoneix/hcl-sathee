@@ -1,4 +1,6 @@
-export default function EmptyState({ readOnly, onUploadClick }) {
+import { Download } from "lucide-react";
+
+export default function EmptyState({ readOnly, onUploadClick, onDownloadTemplate }) {
   return (
     <div className="flex flex-col items-center justify-center flex-1 py-16 gap-5">
       <div
@@ -16,13 +18,28 @@ export default function EmptyState({ readOnly, onUploadClick }) {
         </p>
       </div>
       {!readOnly ? (
-        <button
-          type="button"
-          onClick={onUploadClick}
-          className="mt-1 px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600"
-        >
-          Upload Schedule
-        </button>
+        <div className="flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={onUploadClick}
+            className="mt-1 px-6 py-2.5 rounded-xl bg-blue-500 text-white text-sm font-semibold hover:bg-blue-600"
+          >
+            Upload Schedule
+          </button>
+          {onDownloadTemplate ? (
+            <p className="text-xs text-gray-500">
+              New to this?{" "}
+              <button
+                type="button"
+                onClick={onDownloadTemplate}
+                className="font-semibold text-blue-600 hover:underline inline-flex items-center gap-1"
+              >
+                <Download size={12} /> Download the template
+              </button>{" "}
+              so the columns line up.
+            </p>
+          ) : null}
+        </div>
       ) : null}
     </div>
   );

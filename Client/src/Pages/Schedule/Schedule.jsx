@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Download } from "lucide-react";
 import ExportDropdown from "../../Components/common/ExportDropdown";
 import { downloadTableSvg, downloadTableXlsx } from "../../utils/exportTable";
+import { downloadScheduleTemplate } from "../../utils/uploadTemplates";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import {
   deleteSchedule,
@@ -472,6 +474,7 @@ export default function Schedule({
             <EmptyState
               readOnly={readOnly}
               onUploadClick={() => fileInputRef.current?.click()}
+              onDownloadTemplate={downloadScheduleTemplate}
             />
           ) : (
             <>
@@ -536,6 +539,14 @@ export default function Schedule({
                 className="hidden"
                 onChange={handleFileChange}
               />
+              <button
+                type="button"
+                onClick={downloadScheduleTemplate}
+                className="px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-semibold text-slate-600 hover:bg-slate-50 inline-flex items-center gap-2"
+              >
+                <Download size={16} />
+                Template
+              </button>
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}

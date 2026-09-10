@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import * as XLSX from "xlsx";
-import { Calendar, Upload, X } from "lucide-react";
+import { Calendar, Upload, X, Download } from "lucide-react";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+import { downloadTimetableTemplate } from "../../utils/uploadTemplates";
 import {
   deleteTimetable,
   loadTimetableForPortal,
@@ -212,14 +213,27 @@ function EmptyTimetable({ readOnly, onUploadClick }) {
         </p>
       </div>
       {!readOnly ? (
-        <button
-          type="button"
-          onClick={onUploadClick}
-          className="mt-1 px-6 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-all inline-flex items-center gap-2"
-        >
-          <Upload size={16} />
-          Upload Timetable
-        </button>
+        <div className="mt-1 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={onUploadClick}
+            className="px-6 py-2.5 rounded-xl bg-violet-600 text-white text-sm font-semibold hover:bg-violet-700 transition-all inline-flex items-center gap-2"
+          >
+            <Upload size={16} />
+            Upload Timetable
+          </button>
+          <p className="text-xs text-gray-500">
+            New to this?{" "}
+            <button
+              type="button"
+              onClick={downloadTimetableTemplate}
+              className="font-semibold text-violet-600 hover:underline inline-flex items-center gap-1"
+            >
+              <Download size={12} /> Download the template
+            </button>{" "}
+            so the columns line up.
+          </p>
+        </div>
       ) : null}
     </div>
   );
@@ -603,6 +617,14 @@ export default function TimeTable({
                 className="hidden"
                 onChange={handleFileChange}
               />
+              <button
+                type="button"
+                onClick={downloadTimetableTemplate}
+                className="px-4 py-2.5 border border-slate-200 text-slate-600 rounded-2xl hover:bg-slate-50 transition-colors font-medium inline-flex items-center gap-2 text-sm"
+              >
+                <Download size={16} />
+                Template
+              </button>
               <button
                 type="button"
                 disabled={saving || loading}
