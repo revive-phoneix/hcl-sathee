@@ -12,6 +12,7 @@ import {
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchCentresOverview } from "../../services/centres";
 import { getCanonicalCentreKey, PORTAL_OPTIONS } from "../../utils/portalMapping";
+import { getCentreId } from "../../utils/centreDirectory";
 
 /** Centre name -> the portal name the rest of the app expects (default centres
  *  keep their "HCL SATHEE <STATE>" portal title; custom centres use their name). */
@@ -23,8 +24,8 @@ const portalNameForCentre = (centreName) => {
 
 const STAT_META = [
   { key: "students", label: "Students", Icon: GraduationCap, tint: "text-blue-600 bg-blue-50" },
-  { key: "satheeMitra", label: "Sathee Mitra", Icon: Users, tint: "text-emerald-600 bg-emerald-50" },
-  { key: "satheeVishist", label: "Sathee Vishist", Icon: Award, tint: "text-amber-600 bg-amber-50" },
+  { key: "satheeMitra", label: "SATHEE MITRA", Icon: Users, tint: "text-emerald-600 bg-emerald-50" },
+  { key: "satheeVishist", label: "SATHEE VISHIST", Icon: Award, tint: "text-amber-600 bg-amber-50" },
   { key: "hclPartner", label: "HCL Partner", Icon: Handshake, tint: "text-violet-600 bg-violet-50" },
 ];
 
@@ -161,6 +162,9 @@ export default function OtherCentres({
                   </div>
 
                   <h2 className="mt-4 text-xl font-bold leading-snug">{centre.name}</h2>
+                  <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    Centre ID: {getCentreId(centre.name) ?? "—"}
+                  </p>
 
                   <div className="mt-5 grid grid-cols-2 gap-3">
                     {STAT_META.map(({ key, label, Icon, tint }) => (

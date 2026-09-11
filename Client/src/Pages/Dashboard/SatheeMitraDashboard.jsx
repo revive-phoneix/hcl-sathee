@@ -4,7 +4,7 @@ export default function SatheeMitraDashboard(props) {
   return (
     <AdminDashboard
       {...props}
-      roleLabel="Sathee Mitra Portal"
+      roleLabel="SATHEE MITRA PORTAL"
       studentsNavIndex={3}
       attendanceNavIndex={1}
     />

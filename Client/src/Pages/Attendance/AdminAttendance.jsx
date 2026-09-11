@@ -221,7 +221,7 @@ export default function AdminAttendance({
   roleLabel = "Admin Portal",
   showCentreFilter,
   showMitraTab,
-  mitraTabLabel = "Sathee Mitra",
+  mitraTabLabel = "SATHEE MITRA",
   mitraSelfUpload = false,
   userName = "",
   userEmail = "",
@@ -443,7 +443,7 @@ export default function AdminAttendance({
         setLoadingMitras(false);
         return;
       }
-      fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch Sathee Mitra error");
+      fetchList(fetchUsers, setMitras, setLoadingMitras, "Fetch SATHEE MITRA error");
     },
     [isCustomCentre]
   );
@@ -560,7 +560,7 @@ export default function AdminAttendance({
 
   const runAttendanceExport = (format) => {
     if (isMitraView) {
-      alert("Export for Sathee Mitra attendance is not available yet");
+      alert("Export for SATHEE MITRA attendance is not available yet");
       return;
     }
 
@@ -609,7 +609,7 @@ export default function AdminAttendance({
               <div>
                 <h2 className="text-lg font-semibold text-slate-900">Attendance</h2>
                 <p className="text-sm text-slate-500">
-                  Choose the attendance view for your own record or Sathee Vishist mentors.
+                  Choose the attendance view for your own record or SATHEE VISHIST mentors.
                 </p>
               </div>
 
@@ -698,7 +698,7 @@ export default function AdminAttendance({
                   </h3>
                   <p className="text-sm text-slate-500">
                     {attendancePanel === "vishistAttendance"
-                      ? "Review attendance for Sathee Vishist mentors in your centre."
+                      ? "Review attendance for SATHEE VISHIST mentors in your centre."
                       : "Upload your arrival and departure photos for daily tracking."}
                   </p>
                 </div>
@@ -805,7 +805,7 @@ export default function AdminAttendance({
             <h1 className="text-2xl font-semibold text-gray-900">Attendance Record</h1>
             <p className="mt-1 text-sm text-gray-500">
               {viewReady && appliedRole === "sathee-mitra"
-                ? "Track Sathee Mitra presence with arrival and departure photo proof."
+                ? "Track SATHEE MITRA presence with arrival and departure photo proof."
                 : "Combined centre attendance by day, week, and month."}
             </p>
           </div>
@@ -894,7 +894,7 @@ export default function AdminAttendance({
           ) : isVishistView && appliedType !== "daily" ? (
             <div className="px-6 py-16 text-center">
               <p className="text-sm font-medium text-gray-700">
-                Weekly and monthly attendance is not available for Sathee Vishist.
+                Weekly and monthly attendance is not available for SATHEE VISHIST.
               </p>
               <p className="mt-1 text-xs text-gray-400">
                 Select Daily to view the allotted attendance days.

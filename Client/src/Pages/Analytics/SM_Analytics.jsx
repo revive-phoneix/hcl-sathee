@@ -4,7 +4,7 @@ export default function SM_Analytics(props) {
   return (
     <AdminAnalytics
       {...props}
-      roleLabel="Sathee Mitra Portal"
+      roleLabel="SATHEE MITRA PORTAL"
       showMentors={false}
       allowAddEquipment={false}
     />

@@ -344,12 +344,12 @@ export default function MyProfile({
           {isMitraProfile ? (
             <div className="px-5 py-4">
               <p className="mb-1 text-[12px] font-semibold uppercase tracking-[0.03em] text-slate-500">
-                Sathee Vishist mentors
+                SATHEE VISHIST mentors
               </p>
 
               {vishistMentors.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
-                  No Sathee Vishist mentors assigned to this centre yet.
+                  No SATHEE VISHIST mentors assigned to this centre yet.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -359,7 +359,7 @@ export default function MyProfile({
                     return (
                       <div key={mentor.id} className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
                         <div className="mb-2 flex items-center justify-between gap-3">
-                          <p className="text-[13px] font-medium text-slate-900">{mentor.name || "Sathee Vishist"}</p>
+                          <p className="text-[13px] font-medium text-slate-900">{mentor.name || "SATHEE VISHIST"}</p>
                           <p className="text-[12px] text-slate-500 break-all">{mentor.email || "No email provided"}</p>
                         </div>
                         <div className="flex flex-wrap gap-2">

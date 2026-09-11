@@ -156,7 +156,7 @@ export default function MentorDetailsModal({
             <div>
               <h2 style={{ margin: 0, fontSize: 26 }}>{mentor.name}</h2>
               <p style={{ margin: "6px 0 0", opacity: 0.9 }}>
-                {mentor.qualification || "Sathee Mitra"}
+                {mentor.qualification || "SATHEE MITRA"}
               </p>
             </div>
           </div>
@@ -212,7 +212,7 @@ export default function MentorDetailsModal({
 
             <div>
               <SectionTitle>Professional Details</SectionTitle>
-              <DetailLine label="Role">{mentor.qualification || "Sathee Mitra"}</DetailLine>
+              <DetailLine label="Role">{mentor.qualification || "SATHEE MITRA"}</DetailLine>
               <DetailLine label="Attendance (7d)">
                 {mentor.attendance == null ? "—" : `${mentor.attendance}%`}
               </DetailLine>

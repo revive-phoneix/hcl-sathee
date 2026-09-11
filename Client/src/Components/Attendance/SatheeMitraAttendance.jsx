@@ -209,7 +209,7 @@ export default function SatheeMitraAttendance({
         console.error("Load mitra attendance error:", err);
         if (!isMounted) return;
         setError(
-          err.response?.data?.message || "Unable to load Sathee Mitra attendance"
+          err.response?.data?.message || "Unable to load SATHEE MITRA attendance"
         );
         setRecords([]);
       } finally {
@@ -373,11 +373,11 @@ export default function SatheeMitraAttendance({
           <tbody>
             {busy ? (
               <TableStatusRow colSpan={colSpan} className="px-6 py-12 text-center text-sm text-gray-400">
-                Loading Sathee Mitra attendance…
+                Loading SATHEE MITRA attendance…
               </TableStatusRow>
             ) : rows.length === 0 ? (
               <TableStatusRow colSpan={colSpan} className="px-6 py-12 text-center text-sm text-gray-400">
-                No Sathee Mitra found for this centre.
+                No SATHEE MITRA found for this centre.
               </TableStatusRow>
             ) : (
               rows.map((mitra, index) => {

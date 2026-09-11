@@ -1,17 +1,23 @@
 import { Trash2 } from "lucide-react";
 import CourseBadge from "./CourseBadge";
 import { SerialNoCell, SerialNoHeader } from "../common/tableSerial";
+import { getCentreId } from "../../utils/centreDirectory";
 
 const TABLE_COLUMNS = [
   "Student Full Name",
   "Gender",
   "Centre",
+  "Centre ID",
   "Student ID",
   "Email Address",
   "Phone Number",
   "Course Enrolled",
   "Actions",
 ];
+
+// Short, badge-like columns read better centered; everything else stays
+// left-aligned with the text it holds.
+const CENTERED_COLUMNS = new Set(["Centre ID", "Actions"]);
 
 const headerStyle = {
   padding: "14px 20px",
@@ -24,6 +30,7 @@ const headerStyle = {
 };
 
 const cellStyle = { padding: "16px 20px", color: "#374151" };
+const centerCellStyle = { ...cellStyle, textAlign: "center" };
 
 export default function StudentTable({
   paginated,
@@ -32,7 +39,7 @@ export default function StudentTable({
   readOnly = false,
   serialOffset = 0,
 }) {
-  const colCount = readOnly ? 8 : 9;
+  const colCount = readOnly ? 9 : 10;
 
   return (
     <div style={{ overflowX: "auto" }}>
@@ -46,8 +53,14 @@ export default function StudentTable({
                 textAlign: "center",
               }}
             />
-            {(readOnly ? TABLE_COLUMNS.slice(0, 7) : TABLE_COLUMNS).map((col) => (
-              <th key={col} style={headerStyle}>
+            {(readOnly ? TABLE_COLUMNS.slice(0, 8) : TABLE_COLUMNS).map((col) => (
+              <th
+                key={col}
+                style={{
+                  ...headerStyle,
+                  ...(CENTERED_COLUMNS.has(col) ? { textAlign: "center" } : {}),
+                }}
+              >
                 {col}
               </th>
             ))}
@@ -76,50 +89,35 @@ export default function StudentTable({
                   index={serialOffset + i}
                   style={{ padding: "16px 20px", textAlign: "center", color: "#94a3b8", fontWeight: 600 }}
                 />
-                <td style={{ padding: "16px 20px" }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <div
-                      style={{
-                        width: 40,
-                        height: 40,
-                        borderRadius: "50%",
-                        background: s.avatarColor,
-                        color: "#ffffff",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        fontWeight: 700,
-                        fontSize: 14,
-                      }}
-                    >
-                      {s.initials}
-                    </div>
-                    <span
-                      style={{
-                        fontWeight: 500,
-                        color: "#1e40af",
-                        cursor: "pointer",
-                        textDecoration: "underline",
-                        textUnderlineOffset: "2px",
-                      }}
-                      onClick={() => onViewDetails && onViewDetails(s)}
-                    >
-                      {s.name}
-                    </span>
-                  </div>
+                <td style={cellStyle}>
+                  <span
+                    style={{
+                      fontWeight: 500,
+                      color: "#1e40af",
+                      cursor: "pointer",
+                      textDecoration: "underline",
+                      textUnderlineOffset: "2px",
+                    }}
+                    onClick={() => onViewDetails && onViewDetails(s)}
+                  >
+                    {s.name}
+                  </span>
                 </td>
                 <td style={cellStyle}>{s.gender}</td>
                 <td style={cellStyle}>{s.centre}</td>
+                <td style={{ ...centerCellStyle, fontFamily: "monospace" }}>
+                  {getCentreId(s.centre) ?? "—"}
+                </td>
                 <td style={{ ...cellStyle, fontFamily: "monospace" }}>
                   {s.studentId || s.enrollmentNo || s.id}
                 </td>
                 <td style={{ ...cellStyle, color: "#1e40af" }}>{s.email}</td>
                 <td style={cellStyle}>{s.phone}</td>
-                <td style={{ padding: "16px 20px" }}>
+                <td style={cellStyle}>
                   <CourseBadge course={s.course} />
                 </td>
                 {!readOnly ? (
-                  <td style={{ padding: "16px 20px" }}>
+                  <td style={centerCellStyle}>
                     <button
                       type="button"
                       onClick={() => onDeleteStudent?.(s)}

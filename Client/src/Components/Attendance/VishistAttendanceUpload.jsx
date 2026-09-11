@@ -115,7 +115,7 @@ export default function VishistAttendanceUpload({ portalName, isCustomCentre = f
         const cleanSubject = subject.trim();
         const cleanTopic = topicTaught.trim();
 
-        if (!selectedId) return setError("Select a Sathee Vishist name from the dropdown.");
+        if (!selectedId) return setError("Select a SATHEE VISHIST name from the dropdown.");
         if (!selectedVishist) return setError("The selected Vishist could not be found. Please choose another name.");
         if (!cleanSubject) return setError("Enter the subject taught.");
         if (!cleanTopic) return setError("Enter the topic taught.");
@@ -145,7 +145,7 @@ export default function VishistAttendanceUpload({ portalName, isCustomCentre = f
             <form onSubmit={handleSubmit} className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5">
                 <div className="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <label className="mb-1.5 block text-sm font-medium text-slate-700">Sathee Vishist Name</label>
+                        <label className="mb-1.5 block text-sm font-medium text-slate-700">SATHEE VISHIST Name</label>
                         <select
                             value={selectedId}
                             onChange={(e) => setSelectedId(e.target.value)}

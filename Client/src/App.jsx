@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation, } from "react-router-dom";
-import { LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle, MessageSquareText, ClipboardList } from "lucide-react";
+import { LayoutDashboard, CalendarDays, TrendingUp, Users, IdCard, Megaphone, UserCircle, MessageSquareText, ClipboardList, FileBarChart2 } from "lucide-react";
 
 import Authentication from "./Pages/Auth/Authentication";
 import CreatePassword from "./Components/Auth/CreatePassword";
@@ -30,6 +30,7 @@ import QueryAndSupport from "./Pages/Support/QueryAndSupport";
 import AdminQueries from "./Pages/Support/AdminQueries";
 import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
 import SM_TestMarks from "./Pages/TestMarks/SM_TestMarks";
+import CentreReport from "./Pages/Report/CentreReport";
 import {
   canAccessPortal,
   canEnterAdminDashboard,
@@ -48,6 +49,7 @@ const ADMIN_PATH_TO_NAV = {
   "/students": 4,
   "/announcements": 5,
   "/queries": 6,
+  "/report": 7,
 };
 
 const ADMIN_NAV_PATHS = [
@@ -58,6 +60,7 @@ const ADMIN_NAV_PATHS = [
   "/students",
   "/announcements",
   "/queries",
+  "/report",
 ];
 
 const PARTNER_PATH_TO_NAV = {
@@ -230,6 +233,7 @@ const AppContent = () => {
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
     { icon: MessageSquareText, label: "Queries" },
+    { icon: FileBarChart2, label: "Centre Report" },
   ];
 
   const partnerNavItems = [
@@ -468,6 +472,10 @@ const AppContent = () => {
         <Route
           path="/queries"
           element={<AdminQueries {...adminLayout} userName={userName} />}
+        />
+        <Route
+          path="/report"
+          element={<CentreReport key={`report-${selectedPortal}-${isCustomCentre}`} {...adminLayout} />}
         />
 
         <Route path="/partner/dashboard" element={<HCLPartnerDashboard key={`pdash-${selectedPortal}-${isCustomCentre}`} {...partnerLayout} userName={userName} />} />

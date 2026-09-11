@@ -4,7 +4,7 @@ export default function SM_Student(props) {
   return (
     <Student
       {...props}
-      roleLabel="Sathee Mitra Portal"
+      roleLabel="SATHEE MITRA PORTAL"
       detailsReadOnly
     />
   );

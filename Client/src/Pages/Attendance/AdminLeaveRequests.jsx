@@ -137,7 +137,7 @@ export default function AdminLeaveRequests({
                   Leave Requests
                 </h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  Review leave requests submitted by Sathee Mitra for this centre
+                  Review leave requests submitted by SATHEE MITRA for this centre
                 </p>
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function AdminLeaveRequests({
                 No leave requests found
               </h3>
               <p className="text-slate-500 mt-2">
-                Leave requests from Sathee Mitra will appear here.
+                Leave requests from SATHEE MITRA will appear here.
               </p>
             </div>
           ) : (

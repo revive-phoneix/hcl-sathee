@@ -115,7 +115,7 @@ export default function TeachersTab({
     <div className="space-y-8">
       <MentorTableSection
         title="Mentors Overview"
-        subtitle="Sathee Mitra directory with last 7 days attendance"
+        subtitle="SATHEE MITRA directory with last 7 days attendance"
         headers={OVERVIEW_HEADERS}
         colSpan={6}
       >
@@ -128,7 +128,7 @@ export default function TeachersTab({
             </TableStatusRow>
           ) : mentors.length === 0 ? (
             <TableStatusRow colSpan={colSpan}>
-              No Sathee Mitra found for this centre.
+              No SATHEE MITRA found for this centre.
             </TableStatusRow>
           ) : (
             mentors.map((mentor, i) => (
@@ -140,7 +140,7 @@ export default function TeachersTab({
                 <td className="px-5 py-4">
                   <MentorNameLink mentor={mentor} onViewMentor={onViewMentor} withAvatar />
                 </td>
-                <td className="px-4 py-4 font-medium text-blue-700">{mentor.subject || "Sathee Mitra"}</td>
+                <td className="px-4 py-4 font-medium text-blue-700">{mentor.subject || "SATHEE MITRA"}</td>
                 <td className="px-4 py-4 font-medium text-gray-700">{mentor.centre}</td>
                 <td className="px-4 py-4 text-gray-500 text-xs">{mentor.email}</td>
                 <td className="px-5 py-4 text-center">
@@ -155,8 +155,8 @@ export default function TeachersTab({
       </MentorTableSection>
 
       <MentorTableSection
-        title="SATHEE Vishist Schedule"
-        subtitle="Toggle days when each Sathee Mitra (Vishist) is available for special lectures"
+        title="SATHEE VISHIST SCHEDULE"
+        subtitle="Toggle days when each SATHEE MITRA (VISHIST) is available for special lectures"
         headers={VISHIST_HEADERS}
         colSpan={6}
       >
@@ -165,7 +165,7 @@ export default function TeachersTab({
             <TableStatusRow colSpan={colSpan}>Loading schedule…</TableStatusRow>
           ) : vishists.length === 0 ? (
             <TableStatusRow colSpan={colSpan}>
-              No Sathee Vishist scheduled for this centre.
+              No SATHEE VISHIST scheduled for this centre.
             </TableStatusRow>
           ) : (
             vishists.map((mentor, i) => (

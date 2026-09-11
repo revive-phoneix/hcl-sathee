@@ -32,7 +32,7 @@ export default function TabSelector({
   setSelectedRole,
   showCentreFilter = false,
   showMitraTab = true,
-  mitraTabLabel = "Sathee Mitra",
+  mitraTabLabel = "SATHEE MITRA",
   onGo,
   canGo = false,
 }) {
@@ -61,7 +61,7 @@ export default function TabSelector({
     { value: "student", label: "Student" },
     { value: "sathee-mitra", label: mitraTabLabel },
     ...(typeValue === "daily" || !typeValue
-      ? [{ value: "sathee-vishist", label: "Sathee Vishist" }]
+      ? [{ value: "sathee-vishist", label: "SATHEE VISHIST" }]
       : []),
   ];
 

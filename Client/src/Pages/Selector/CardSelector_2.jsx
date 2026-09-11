@@ -15,6 +15,7 @@ import {
   getCanonicalCentreKey,
   PORTAL_OPTIONS,
 } from "../../utils/portalMapping";
+import { getCentreId } from "../../utils/centreDirectory";
 
 // The 3 originals are already rendered from PORTAL_OPTIONS with their own
 // titles/subtitles — filter them out of the dynamic list so they show once.
@@ -215,6 +216,9 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
                 <h2 className="text-2xl font-bold leading-snug text-black">
                   {state.title}
                 </h2>
+                <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Centre ID: {getCentreId(state.title) ?? "—"}
+                </p>
 
                 <p className="mt-3 text-black text-bold">{state.subtitle}</p>
 
