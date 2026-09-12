@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, FileBarChart2, Loader2 } from "lucide-react";
+import { ChevronDown, Download, FileBarChart2, Loader2, X } from "lucide-react";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchStudents } from "../../services/students";
+import { fetchUsers } from "../../services/users";
 import { fetchAttendanceDetail } from "../../services/dailySubjectAttendance";
 import { fetchCourseTestMarks } from "../../services/testMarks";
 import { getCentreValueFromPortal, matchesPortalCentre } from "../../utils/portalMapping";
@@ -12,6 +13,7 @@ import {
 } from "../../utils/centreDirectory";
 import { normalizeCourseCode, getCourseSubjectConfig } from "../../utils/courseSubjects";
 import { getApiErrorMessage } from "../../utils/apiRequest";
+import { buildCentreReportPdf } from "../../utils/centreReportPdf";
 
 const COURSES = ["JEE", "NEET", "SSC", "CLAT", "IBPS", "RRB", "ICAR", "CUET"];
 
@@ -42,6 +44,9 @@ const getMonthRange = (date = new Date()) => {
   const last = new Date(date.getFullYear(), date.getMonth() + 1, 0);
   return { from: toDateOnly(first), to: toDateOnly(last) };
 };
+
+const isSatheeMitraRoleUser = (user) =>
+  String(user?.role || "").trim().toUpperCase() === "SATHEE MITRA";
 
 /** Build one student x subject marks table for a single test. Missing marks show "0/0". */
 const buildMarksTable = (course, test, students) => {
@@ -308,6 +313,99 @@ function AttendanceTable({ rows }) {
   );
 }
 
+function ExportReportModal({
+  open,
+  onClose,
+  includeMitra,
+  onToggleMitra,
+  includeVishist,
+  onToggleVishist,
+  onDownload,
+  exporting,
+  error,
+}) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape" && !exporting) onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [open, exporting, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-2xl">
+        <div className="flex items-start justify-between gap-3">
+          <h3 className="text-lg font-bold text-slate-900">Download the report?</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={exporting}
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 disabled:opacity-50"
+            aria-label="Close"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <p className="mt-1 text-sm text-slate-500">
+          Optionally include these sections, then export as PDF.
+        </p>
+
+        <div className="mt-4 space-y-2.5">
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={includeMitra}
+              onChange={(e) => onToggleMitra(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+            />
+            Include SATHEE MITRA?
+          </label>
+          <label className="flex cursor-pointer items-center gap-2.5 rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm text-slate-700 hover:bg-slate-50">
+            <input
+              type="checkbox"
+              checked={includeVishist}
+              onChange={(e) => onToggleVishist(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+            />
+            Include SATHEE VISHIST?
+          </label>
+        </div>
+
+        {error ? <p className="mt-3 text-sm text-red-600">{error}</p> : null}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={exporting}
+            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onDownload}
+            disabled={exporting}
+            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 px-5 py-2 text-sm font-semibold text-white hover:bg-sky-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {exporting ? (
+              <>
+                <Loader2 size={15} className="animate-spin" /> Preparing…
+              </>
+            ) : (
+              "Download"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /**
  * "Centre Report" (Admin only). Pick a period + courses, press Go — generates
  * a Performance section (weekly/pre-mid test marks, course-wise) and an
@@ -329,7 +427,20 @@ export default function CentreReport({
   const [error, setError] = useState("");
   const [report, setReport] = useState(null);
 
+  const [downloadOpen, setDownloadOpen] = useState(false);
+  const [includeMitra, setIncludeMitra] = useState(false);
+  const [includeVishist, setIncludeVishist] = useState(false);
+  const [exporting, setExporting] = useState(false);
+  const [exportError, setExportError] = useState("");
+
   const centreValue = getCentreValueFromPortal(portalName) || portalName || "—";
+
+  const openDownloadModal = () => {
+    setIncludeMitra(false);
+    setIncludeVishist(false);
+    setExportError("");
+    setDownloadOpen(true);
+  };
 
   const handleGo = async () => {
     if (!selectedCourses.length) return;
@@ -378,6 +489,62 @@ export default function CentreReport({
       setReport(null);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!report) return;
+    setExporting(true);
+    setExportError("");
+    try {
+      let mitraRows = [];
+      let vishistRows = [];
+
+      if (includeMitra || includeVishist) {
+        const allUsers = await fetchUsers();
+        const centreUsers = allUsers.filter((u) => matchesPortalCentre(u.centre, portalName));
+
+        if (includeMitra) {
+          mitraRows = centreUsers
+            .filter((u) => isSatheeMitraRoleUser(u) && !u.isVishist)
+            .map((user) => ({ name: user.name, email: user.email, phone: user.phone }));
+        }
+
+        if (includeVishist) {
+          vishistRows = centreUsers
+            .filter((u) => isSatheeMitraRoleUser(u) && u.isVishist)
+            .map((user) => ({ name: user.name, email: user.email }));
+        }
+      }
+
+      const doc = buildCentreReportPdf({
+        centreValue,
+        centreId: getCentreId(portalName),
+        place: getCentrePlace(portalName),
+        address: getCentreAddress(portalName),
+        dateLabel: report.generatedAt.toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+        }),
+        periodLabel: report.period === "weekly" ? "Weekly" : "Monthly",
+        courses: report.courses,
+        performanceByCourse: report.performanceByCourse,
+        attendanceByCourse: report.attendanceByCourse,
+        includeMitra,
+        mitraRows,
+        includeVishist,
+        vishistRows,
+      });
+
+      const slug = String(centreValue).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      doc.save(`hcl-sathee-${slug || "centre"}-${report.period}-report-${toDateOnly(new Date())}.pdf`);
+      setDownloadOpen(false);
+    } catch (err) {
+      console.error("Export report PDF error:", err);
+      setExportError(getApiErrorMessage(err, "Unable to export the report. Please try again."));
+    } finally {
+      setExporting(false);
     }
   };
 
@@ -464,6 +631,16 @@ export default function CentreReport({
 
         {report ? (
           <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-8">
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={openDownloadModal}
+                className="mb-2 inline-flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:bg-slate-50"
+              >
+                <Download size={15} /> Export Report
+              </button>
+            </div>
+
             <h2 className="text-center text-xl font-bold uppercase tracking-wide text-slate-900">
               {report.period} Report — {centreValue}
             </h2>
@@ -546,6 +723,18 @@ export default function CentreReport({
           </div>
         ) : null}
       </div>
+
+      <ExportReportModal
+        open={downloadOpen}
+        onClose={() => (exporting ? null : setDownloadOpen(false))}
+        includeMitra={includeMitra}
+        onToggleMitra={setIncludeMitra}
+        includeVishist={includeVishist}
+        onToggleVishist={setIncludeVishist}
+        onDownload={handleDownloadPdf}
+        exporting={exporting}
+        error={exportError}
+      />
     </MainLayout>
   );
 }

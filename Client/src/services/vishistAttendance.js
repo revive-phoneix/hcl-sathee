@@ -7,6 +7,14 @@ export const fetchVishistAttendance = async (date, centre, status) => {
   return response.data.records ?? [];
 };
 
+export const fetchVishistAttendanceRange = async (from, to, centre) => {
+  if (!from || !to) return [];
+  const response = await api.get("/api/vishist-attendance", {
+    params: { from, to, ...(centre ? { centre } : {}) },
+  });
+  return response.data.records ?? [];
+};
+
 export const markVishistAttendance = async ({ vishistUserId, subject, topicTaught, date, photoFile }) => {
   const formData = new FormData();
   formData.append("vishistUserId", vishistUserId);

@@ -119,4 +119,20 @@ const findByDate = async (date, centre = null, status = null) => {
   return rows.sort((a, b) => (b.created_at?.getTime() || 0) - (a.created_at?.getTime() || 0));
 };
 
-module.exports = { create, findByDate, approve };
+const findByDateRange = async (fromDate, toDateArg, centre = null, status = null) => {
+  const snap = await attendancesRef()
+    .where("date", ">=", fromDate)
+    .where("date", "<=", toDateArg)
+    .get();
+  let rows = snap.docs.map((doc) => toApiRecord(doc.id, doc.data()));
+  if (centre) {
+    const { matchesCentre } = require("../Utils/centreMatch");
+    rows = rows.filter((r) => matchesCentre(r.centre, centre));
+  }
+  if (status) {
+    rows = rows.filter((r) => r.status === status);
+  }
+  return rows.sort((a, b) => (b.created_at?.getTime() || 0) - (a.created_at?.getTime() || 0));
+};
+
+module.exports = { create, findByDate, findByDateRange, approve };

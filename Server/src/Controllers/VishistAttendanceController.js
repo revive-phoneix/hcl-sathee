@@ -5,12 +5,20 @@ const { fail, ok, wrap } = require("../Utils/httpResponse");
 exports.getVishistAttendance = wrap(
   async (req, res) => {
     const date = (req.query.date || "").trim();
-    if (!date) return fail(res, 400, "date is required");
-    const records = await VishistAttendance.findByDate(
-      date,
-      req.query.centre || null,
-      req.query.status || null
-    );
+    const from = (req.query.from || "").trim();
+    const to = (req.query.to || "").trim();
+    const centre = req.query.centre || null;
+    const status = req.query.status || null;
+
+    let records;
+    if (date) {
+      records = await VishistAttendance.findByDate(date, centre, status);
+    } else if (from && to) {
+      records = await VishistAttendance.findByDateRange(from, to, centre, status);
+    } else {
+      return fail(res, 400, "Provide date=YYYY-MM-DD or from and to query params");
+    }
+
     return ok(res, { records });
   },
   { label: "Get Vishist Attendance Error", message: "Failed to fetch Vishist attendance" }
