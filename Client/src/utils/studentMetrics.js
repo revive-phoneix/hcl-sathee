@@ -36,33 +36,6 @@ export const average = (values) => {
   return values.reduce((sum, value) => sum + value, 0) / values.length;
 };
 
-export const getStudentAttendanceRates = (student) => {
-  const rates = [];
-
-  if (Array.isArray(student.attendances)) {
-    for (const record of student.attendances) {
-      const candidates = [
-        record.dailyAttendancePercentage,
-        record.weeklyAttendancePercentage,
-        record.monthlyAttendancePercentage,
-        record.attendancePercentage, // legacy fallback
-      ];
-
-      for (const value of candidates) {
-        const rate = parsePercentValue(value);
-        if (rate != null) rates.push(rate);
-      }
-    }
-  }
-
-  for (const value of Object.values(parseJsonField(student.attendance))) {
-    const rate = parsePercentValue(value);
-    if (rate != null) rates.push(rate);
-  }
-
-  return rates;
-};
-
 export const getStudentProgressRates = (student) => {
   const scores = [];
 

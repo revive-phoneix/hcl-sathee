@@ -1,9 +1,7 @@
-const { getDb } = require("../config/firebase");
+const { getSupabase, assertNoError } = require("../config/supabase");
 const { toDate, toDateOnly } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "dailySubjectAttendances";
-
-const logsRef = () => getDb().collection(COLLECTION);
+const TABLE = "daily_subject_attendances";
 
 const STATUS = {
   present: "present",
@@ -26,32 +24,25 @@ const slugPart = (value, fallback = "na") => {
   return cleaned || fallback;
 };
 
-const buildDocId = ({ studentId, subject, date, time = "" }) => {
-  const dateOnly = toDateOnly(date);
-  return [
-    String(studentId),
-    slugPart(subject, "subject"),
-    dateOnly || "unknown-date",
-    slugPart(time, "notime"),
-  ].join("_");
+const toApiLog = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    name: row.name ?? null,
+    centre: row.centre ?? null,
+    course: row.course ?? null,
+    subject: row.subject,
+    topic: row.topic ?? null,
+    date: row.date,
+    time: row.time ?? "",
+    status: normalizeStatus(row.status),
+    photoUrl: row.photo_url ?? null,
+    photoPath: row.photo_path ?? null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
 };
-
-const toApiLog = (docId, data) => ({
-  id: docId,
-  studentId: data.studentId,
-  name: data.name ?? null,
-  centre: data.centre ?? null,
-  course: data.course ?? null,
-  subject: data.subject,
-  topic: data.topic ?? null,
-  date: data.date,
-  time: data.time ?? "",
-  status: normalizeStatus(data.status),
-  photoUrl: data.photoUrl ?? null,
-  photoPath: data.photoPath ?? null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
 
 const filterByCentre = (rows, centre) => {
   if (!centre) return rows;
@@ -63,24 +54,27 @@ const findByDateSubjectTime = async ({ date, subject, time = "", centre = null }
   const dateOnly = toDateOnly(date);
   if (!dateOnly || !subject) return [];
 
-  let query = logsRef()
-    .where("date", "==", dateOnly)
-    .where("subject", "==", String(subject).trim());
+  let query = getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("date", dateOnly)
+    .eq("subject", String(subject).trim());
 
   const timeKey = String(time || "").trim();
-  if (timeKey) {
-    query = query.where("time", "==", timeKey);
-  }
+  if (timeKey) query = query.eq("time", timeKey);
 
-  const snap = await query.get();
-  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
+  const { data, error } = await query;
+  assertNoError(error, "Failed to load daily subject attendance");
+  return filterByCentre((data || []).map(toApiLog), centre);
 };
+
 const findByDate = async (date, centre = null) => {
   const dateOnly = toDateOnly(date);
   if (!dateOnly) return [];
 
-  const snap = await logsRef().where("date", "==", dateOnly).get();
-  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("date", dateOnly);
+  assertNoError(error, "Failed to load daily subject attendance");
+  return filterByCentre((data || []).map(toApiLog), centre);
 };
 
 const findByDateRange = async (fromDate, toDateArg, centre = null) => {
@@ -88,23 +82,32 @@ const findByDateRange = async (fromDate, toDateArg, centre = null) => {
   const to = toDateOnly(toDateArg);
   if (!from || !to) return [];
 
-  const snap = await logsRef().where("date", ">=", from).where("date", "<=", to).get();
-  return filterByCentre(snap.docs.map((doc) => toApiLog(doc.id, doc.data())), centre);
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .gte("date", from)
+    .lte("date", to);
+  assertNoError(error, "Failed to load daily subject attendance");
+  return filterByCentre((data || []).map(toApiLog), centre);
 };
 
 const findByStudentAndSubject = async (studentId, subject) => {
-  const snap = await logsRef()
-    .where("studentId", "==", Number(studentId) || studentId)
-    .where("subject", "==", String(subject).trim())
-    .get();
-  return snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("student_id", Number(studentId) || studentId)
+    .eq("subject", String(subject).trim());
+  assertNoError(error, "Failed to load student attendance");
+  return (data || []).map(toApiLog);
 };
 
 const findByStudentId = async (studentId) => {
-  const snap = await logsRef()
-    .where("studentId", "==", Number(studentId) || studentId)
-    .get();
-  return snap.docs.map((doc) => toApiLog(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("student_id", Number(studentId) || studentId);
+  assertNoError(error, "Failed to load student attendance");
+  return (data || []).map(toApiLog);
 };
 
 const upsert = async ({
@@ -127,51 +130,46 @@ const upsert = async ({
 
   const subjectName = String(subject).trim();
   const timeKey = String(time || "").trim();
-  const docId = buildDocId({
-    studentId,
-    subject: subjectName,
-    date: dateOnly,
-    time: timeKey,
-  });
+  const normalizedStudentId = Number(studentId) || studentId;
+  const supabase = getSupabase();
 
-  const ref = logsRef().doc(docId);
-  const existing = await ref.get();
-  const now = new Date();
-  const normalizedStatus = normalizeStatus(status);
-
-  const base = existing.exists
-    ? existing.data()
-    : {
-        id: docId,
-        studentId: Number(studentId) || studentId,
-        created_at: now,
-      };
+  const { data: existing, error: fetchError } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("student_id", normalizedStudentId)
+    .eq("subject", subjectName)
+    .eq("date", dateOnly)
+    .eq("time", timeKey)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load existing attendance record");
 
   const payload = {
-    ...base,
-    id: docId,
-    studentId: Number(studentId) || studentId,
-    name: name || base.name || null,
-    centre: centre || base.centre || null,
-    course: course || base.course || null,
+    student_id: normalizedStudentId,
+    name: name || existing?.name || null,
+    centre: centre || existing?.centre || null,
+    course: course || existing?.course || null,
     subject: subjectName,
-    topic: topic || base.topic || null,
+    topic: topic || existing?.topic || null,
     date: dateOnly,
     time: timeKey,
-    status: normalizedStatus,
-    photoUrl: photoUrl ?? base.photoUrl ?? null,
-    photoPath: photoPath ?? base.photoPath ?? null,
-    updated_at: now,
+    status: normalizeStatus(status),
+    photo_url: photoUrl ?? existing?.photo_url ?? null,
+    photo_path: photoPath ?? existing?.photo_path ?? null,
   };
+  if (existing) payload.id = existing.id;
 
-  await ref.set(payload, { merge: true });
-  return toApiLog(docId, payload);
+  const { data, error } = await supabase
+    .from(TABLE)
+    .upsert(payload, { onConflict: "student_id,subject,date,time" })
+    .select("*")
+    .single();
+  assertNoError(error, "Failed to save attendance record");
+  return toApiLog(data);
 };
 
 module.exports = {
   STATUS,
   normalizeStatus,
-  buildDocId,
   slugPart,
   findByDateSubjectTime,
   findByStudentAndSubject,

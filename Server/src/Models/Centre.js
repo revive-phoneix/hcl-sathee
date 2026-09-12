@@ -1,15 +1,11 @@
-const { getDb } = require("../config/firebase");
-const { getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getSupabase, assertNoError } = require("../config/supabase");
 const { getCanonicalCentreKey } = require("../Utils/centreMatch");
 
-const COLLECTION = "centres";
-
-const centresRef = () => getDb().collection(COLLECTION);
-const getNextId = () => nextId(centresRef());
+const TABLE = "centres";
 
 /**
  * The 3 centres the platform shipped with. They behave as always-present
- * defaults even when the Firestore `centres` collection has no docs for them.
+ * defaults even when the `centres` table has no rows for them.
  */
 const DEFAULT_CENTRES = ["HCL RAJASTHAN", "HCL JHARKHAND", "HCL MADHYA PRADESH"];
 
@@ -35,19 +31,24 @@ const normalizeName = (value = "") => {
   return `HCL ${base}`;
 };
 
-const toApiCentre = (docId, data) => ({
-  id: Number(docId) || docId,
-  name: data.name ?? "",
+const toApiCentre = (row) => ({
+  id: row.id,
+  name: row.name ?? "",
 });
 
 /**
  * All centres: the default 3 (always present) followed by any custom centres
- * stored in Firestore, ordered by creation time. A default is only listed once
- * even if it has also been persisted as a real document.
+ * stored in Postgres, ordered by creation time. A default is only listed once
+ * even if it has also been persisted as a real row.
  */
 const findAll = async () => {
-  const snap = await centresRef().orderBy("createdAt", "asc").get();
-  const stored = snap.docs.map((doc) => toApiCentre(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: true });
+  assertNoError(error, "Failed to list centres");
+
+  const stored = (data || []).map(toApiCentre);
 
   const storedKeys = new Set(stored.map((c) => getCanonicalCentreKey(c.name)));
   const defaults = DEFAULT_CENTRES.filter(
@@ -77,39 +78,40 @@ const create = async (name, createdBy) => {
     throw error;
   }
 
-  const id = await getNextId();
-  const payload = {
-    id,
-    name: normalized,
-    createdAt: new Date(),
-    createdBy: createdBy ?? null,
-  };
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .insert({ name: normalized, created_by: createdBy ?? null })
+    .select("*")
+    .single();
+  assertNoError(error, "Failed to create centre");
 
-  await centresRef().doc(String(id)).set(payload);
-  return toApiCentre(String(id), payload);
+  return toApiCentre(data);
 };
 
 /**
- * Count how many docs in the collections we know carry a `centre` field
+ * Count how many rows in the tables we know carry a `centre` column
  * (`users`, `students`, `equipments`) are assigned to the given centre,
  * matched with the same fuzzy canonical key used everywhere else.
  */
 const countUsageAcrossCollections = async (centreName) => {
-  const db = getDb();
+  const supabase = getSupabase();
   const key = getCanonicalCentreKey(centreName);
 
-  const [usersSnap, studentsSnap, equipmentSnap] = await Promise.all([
-    db.collection("users").get(),
-    db.collection("students").get(),
-    db.collection("equipments").get(),
+  const [usersRes, studentsRes, equipmentRes] = await Promise.all([
+    supabase.from("users").select("centre"),
+    supabase.from("students").select("centre"),
+    supabase.from("equipments").select("centre"),
   ]);
+  assertNoError(usersRes.error, "Failed to count centre usage (users)");
+  assertNoError(studentsRes.error, "Failed to count centre usage (students)");
+  assertNoError(equipmentRes.error, "Failed to count centre usage (equipment)");
 
-  const matchesCentre = (doc) => getCanonicalCentreKey(doc.data().centre) === key;
+  const matchesCentre = (row) => getCanonicalCentreKey(row.centre) === key;
 
   return {
-    users: usersSnap.docs.filter(matchesCentre).length,
-    students: studentsSnap.docs.filter(matchesCentre).length,
-    equipment: equipmentSnap.docs.filter(matchesCentre).length,
+    users: (usersRes.data || []).filter(matchesCentre).length,
+    students: (studentsRes.data || []).filter(matchesCentre).length,
+    equipment: (equipmentRes.data || []).filter(matchesCentre).length,
   };
 };
 
@@ -151,14 +153,19 @@ const assertRemovable = async (centreName) => {
  * names and names that collide with another existing centre.
  */
 const update = async (id, newName) => {
-  const doc = await centresRef().doc(String(id)).get();
-  if (!doc.exists) {
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load centre");
+  if (!existing) {
     const error = new Error("Centre not found");
     error.code = "NOT_FOUND";
     throw error;
   }
 
-  await assertRemovable(doc.data().name);
+  await assertRemovable(existing.name);
 
   const normalized = normalizeName(newName);
   if (!normalized) {
@@ -168,8 +175,8 @@ const update = async (id, newName) => {
   }
 
   const key = getCanonicalCentreKey(normalized);
-  const existing = await findAll();
-  const duplicate = existing.some(
+  const all = await findAll();
+  const duplicate = all.some(
     (c) => String(c.id) !== String(id) && getCanonicalCentreKey(c.name) === key
   );
   if (duplicate) {
@@ -178,10 +185,9 @@ const update = async (id, newName) => {
     throw error;
   }
 
-  await centresRef()
-    .doc(String(id))
-    .update({ name: normalized, updatedAt: new Date() });
-  return toApiCentre(String(id), { name: normalized });
+  const { error } = await getSupabase().from(TABLE).update({ name: normalized }).eq("id", id);
+  assertNoError(error, "Failed to rename centre");
+  return toApiCentre({ id: existing.id, name: normalized });
 };
 
 /**
@@ -189,15 +195,21 @@ const update = async (id, newName) => {
  * has associated data (see `assertRemovable`).
  */
 const remove = async (id) => {
-  const doc = await centresRef().doc(String(id)).get();
-  if (!doc.exists) {
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load centre");
+  if (!existing) {
     const error = new Error("Centre not found");
     error.code = "NOT_FOUND";
     throw error;
   }
 
-  await assertRemovable(doc.data().name);
-  await centresRef().doc(String(id)).delete();
+  await assertRemovable(existing.name);
+  const { error } = await getSupabase().from(TABLE).delete().eq("id", id);
+  assertNoError(error, "Failed to delete centre");
   return { id };
 };
 

@@ -45,8 +45,3 @@ export const getAuthPayload = () => {
     return null;
   }
 };
-
-export const authHeaders = () => {
-  const token = getAuthToken();
-  return token ? { Authorization: `Bearer ${token}` } : {};
-};

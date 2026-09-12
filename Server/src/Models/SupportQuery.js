@@ -1,11 +1,7 @@
-const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
-const { getDb } = require("../config/firebase");
+const { getSupabase, assertNoError } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "support_queries";
-
-const supportQueriesRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(supportQueriesRef(), id);
-const getNextId = () => nextId(supportQueriesRef());
+const TABLE = "support_queries";
 
 const normalizeReplies = (value) => {
   if (!Array.isArray(value)) return [];
@@ -20,86 +16,94 @@ const normalizeReplies = (value) => {
     .filter((reply) => reply.message);
 };
 
-const toApiSupportQuery = (docId, data) => ({
-  id: Number(docId) || docId,
-  title: data.title || "Untitled query",
-  description: data.description || "",
-  status: data.status || "Open",
-  submittedBy: data.submittedBy || "Partner User",
-  submittedByEmail: data.submittedByEmail || "",
-  submittedByRole: data.submittedByRole || "HCL Partner",
-  centre: data.centre || null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-  replies: normalizeReplies(data.replies),
-});
+const toApiSupportQuery = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title || "Untitled query",
+    description: row.description || "",
+    status: row.status || "Open",
+    submittedBy: row.submitted_by || "Partner User",
+    submittedByEmail: row.submitted_by_email || "",
+    submittedByRole: row.submitted_by_role || "HCL Partner",
+    centre: row.centre || null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+    replies: normalizeReplies(row.replies),
+  };
+};
 
 const findAll = async () => {
-  const snap = await supportQueriesRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: false });
+  assertNoError(error, "Failed to list support queries");
+  return (data || []).map(toApiSupportQuery);
 };
 
 const findBySubmittedByEmail = async (email) => {
   const normalized = String(email || "").trim().toLowerCase();
   if (!normalized) return [];
 
-  const snap = await supportQueriesRef().where("submittedByEmail", "==", normalized).get();
-  return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("submitted_by_email", normalized);
+  assertNoError(error, "Failed to load support queries");
+  return (data || []).map(toApiSupportQuery);
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApiSupportQuery(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find support query");
+  return toApiSupportQuery(data);
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const payload = {
-    id,
     title: String(data.title || "").trim(),
     description: String(data.description || "").trim(),
     status: data.status || "Open",
-    submittedBy: String(data.submittedBy || "Partner User").trim(),
-    submittedByEmail: String(data.submittedByEmail || "").trim(),
-    submittedByRole: String(data.submittedByRole || "HCL Partner").trim(),
+    submitted_by: String(data.submittedBy || "Partner User").trim(),
+    submitted_by_email: String(data.submittedByEmail || "").trim(),
+    submitted_by_role: String(data.submittedByRole || "HCL Partner").trim(),
     centre: data.centre || null,
     replies: normalizeReplies(data.replies),
-    created_at: now,
-    updated_at: now,
   };
 
-  await supportQueriesRef().doc(String(id)).set(payload);
-  return toApiSupportQuery(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create support query");
+  return toApiSupportQuery(row);
 };
 
 const addReply = async (id, { adminName, message }) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
+  const { data: current, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load support query");
+  if (!current) return null;
 
-  const existing = await ref.get();
-  const current = existing.data() || {};
-  const nextReplies = normalizeReplies(current.replies || []);
   const reply = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     adminName: String(adminName || "Admin").trim(),
     message: String(message || "").trim(),
     created_at: new Date(),
   };
-
   if (!reply.message) return null;
 
-  const updated = {
-    replies: [...nextReplies, reply],
-    status: "Replied",
-    updated_at: new Date(),
-  };
+  const nextReplies = [...normalizeReplies(current.replies || []), reply];
 
-  await ref.update(updated);
-  const doc = await ref.get();
-  return toApiSupportQuery(doc.id, doc.data());
+  const { data: row, error } = await getSupabase()
+    .from(TABLE)
+    .update({ replies: nextReplies, status: "Replied" })
+    .eq("id", id)
+    .select("*")
+    .single();
+  assertNoError(error, "Failed to add reply");
+  return toApiSupportQuery(row);
 };
 
 module.exports = { findAll, findBySubmittedByEmail, findById, create, addReply };

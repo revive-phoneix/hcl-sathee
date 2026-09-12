@@ -1,12 +1,7 @@
-const { FieldValue } = require("firebase-admin/firestore");
-const { getDb } = require("../config/firebase");
-const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getSupabase, assertNoError, UNIQUE_VIOLATION, paginateByCreatedAt } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "users";
-
-const usersRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(usersRef(), id);
-const getNextId = () => nextId(usersRef());
+const TABLE = "users";
 
 const WEEKDAYS = [
   "Monday",
@@ -45,23 +40,24 @@ const normalizeIsVishist = (role, value) => {
   return value === true || value === "true" || value === 1 || value === "1";
 };
 
-const toApiUser = (docId, data) => {
+const toApiUser = (row) => {
+  if (!row) return null;
   const user = {
-    id: Number(docId) || docId,
-    name: data.name,
-    email: typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email,
-    password: data.password == null ? null : String(data.password),
-    phone: data.phone ?? null,
-    role: data.role,
-    centre: data.centre ?? null,
-    fcmTokens: Array.isArray(data.fcmTokens) ? data.fcmTokens : [],
-    availableDays: normalizeAvailableDays(data.availableDays),
-    created_at: toDate(data.created_at),
-    updated_at: toDate(data.updated_at),
+    id: row.id,
+    name: row.name,
+    email: typeof row.email === "string" ? row.email.trim().toLowerCase() : row.email,
+    password: row.password == null ? null : String(row.password),
+    phone: row.phone ?? null,
+    role: row.role,
+    centre: row.centre ?? null,
+    fcmTokens: Array.isArray(row.fcm_tokens) ? row.fcm_tokens : [],
+    availableDays: normalizeAvailableDays(row.available_days),
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
   };
 
-  if (isMitraRole(data.role)) {
-    user.isVishist = Boolean(normalizeIsVishist(data.role, data.isVishist));
+  if (isMitraRole(row.role)) {
+    user.isVishist = Boolean(normalizeIsVishist(row.role, row.is_vishist));
   }
 
   return user;
@@ -70,42 +66,26 @@ const toApiUser = (docId, data) => {
 let isVishistBackfillDone = false;
 
 /**
- * - Sathee Mitra missing isVishist → set false
- * - Non-Mitra with isVishist present → delete the field
+ * - Sathee Mitra missing is_vishist -> set false
+ * - Non-Mitra with is_vishist set -> clear to null
+ * One-time, idempotent, same intent as the old Firestore batch backfill.
  */
 const backfillMissingIsVishist = async () => {
   if (isVishistBackfillDone) return;
   isVishistBackfillDone = true;
 
   try {
-    const snap = await usersRef().get();
-    const batch = getDb().batch();
-    let ops = 0;
-
-    for (const doc of snap.docs) {
-      const data = doc.data() || {};
-      const hasField = Object.prototype.hasOwnProperty.call(data, "isVishist");
-
-      if (isMitraRole(data.role)) {
-        if (hasField) continue;
-        batch.update(doc.ref, { isVishist: false, updated_at: new Date() });
-        ops += 1;
-        continue;
-      }
-
-      if (hasField) {
-        batch.update(doc.ref, {
-          isVishist: FieldValue.delete(),
-          updated_at: new Date(),
-        });
-        ops += 1;
-      }
-    }
-
-    if (ops > 0) {
-      await batch.commit();
-      console.log(`Synced isVishist field on ${ops} user document(s)`);
-    }
+    const supabase = getSupabase();
+    await supabase
+      .from(TABLE)
+      .update({ is_vishist: false })
+      .ilike("role", "SATHEE MITRA")
+      .is("is_vishist", null);
+    await supabase
+      .from(TABLE)
+      .update({ is_vishist: null })
+      .not("role", "ilike", "SATHEE MITRA")
+      .not("is_vishist", "is", null);
   } catch (error) {
     console.error("isVishist backfill failed:", error);
     isVishistBackfillDone = false;
@@ -114,219 +94,235 @@ const backfillMissingIsVishist = async () => {
 
 const findAll = async ({ limit = 200, cursor } = {}) => {
   await backfillMissingIsVishist();
-  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
-  let query = usersRef().orderBy("created_at", "desc").limit(pageLimit);
-  if (cursor) {
-    const cursorDoc = await usersRef().doc(String(cursor)).get();
-    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-  }
-  const snap = await query.get();
-  const users = snap.docs.map((doc) => toApiUser(doc.id, doc.data()));
-  Object.defineProperty(users, "nextCursor", {
-    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
-    enumerable: false,
-  });
+  const { rows, nextCursor } = await paginateByCreatedAt(TABLE, { limit, cursor });
+  const users = rows.map(toApiUser);
+  Object.defineProperty(users, "nextCursor", { value: nextCursor, enumerable: false });
   return users;
 };
 
 const findByEmail = async (email) => {
   const normalized = email.trim().toLowerCase();
-  const snap = await usersRef().where("email", "==", normalized).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return toApiUser(doc.id, doc.data());
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("email", normalized)
+    .maybeSingle();
+  assertNoError(error, "Failed to find user by email");
+  return toApiUser(data);
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApiUser(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find user");
+  return toApiUser(data);
 };
 
 const findByPhone = async (phone) => {
-  const snap = await usersRef().where("phone", "==", phone.trim()).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return toApiUser(doc.id, doc.data());
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("phone", phone.trim())
+    .maybeSingle();
+  assertNoError(error, "Failed to find user by phone");
+  return toApiUser(data);
+};
+
+const duplicateErrorFor = (error) => {
+  const msg = String(error?.message || "").toLowerCase();
+  if (msg.includes("email")) {
+    const e = new Error("Email already exists");
+    e.code = "DUPLICATE_EMAIL";
+    return e;
+  }
+  if (msg.includes("phone")) {
+    const e = new Error("Phone number already exists");
+    e.code = "DUPLICATE_PHONE";
+    return e;
+  }
+  return null;
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const role = data.role;
   const payload = {
-    id,
     name: data.name,
     email: data.email,
     phone: data.phone ?? null,
     password: data.password == null ? null : String(data.password),
     role,
     centre: data.centre ?? null,
-    availableDays: isMitraRole(role)
-      ? normalizeAvailableDays(data.availableDays)
-      : [],
-    created_at: now,
-    updated_at: now,
+    available_days: isMitraRole(role) ? normalizeAvailableDays(data.availableDays) : [],
   };
 
   if (isMitraRole(role)) {
-    payload.isVishist = Boolean(normalizeIsVishist(role, data.isVishist));
+    payload.is_vishist = Boolean(normalizeIsVishist(role, data.isVishist));
   }
 
-  const db = getDb();
-  const userRef = usersRef().doc(String(id));
-  const emailLockRef = db.collection("_unique_user_fields").doc(`email:${data.email}`);
-  const phoneLockRef = db.collection("_unique_user_fields").doc(`phone:${data.phone}`);
-
-  await db.runTransaction(async (transaction) => {
-    const [emailLock, phoneLock, emailUser, phoneUser] = await Promise.all([
-      transaction.get(emailLockRef),
-      transaction.get(phoneLockRef),
-      transaction.get(usersRef().where("email", "==", data.email).limit(1)),
-      transaction.get(usersRef().where("phone", "==", data.phone).limit(1)),
-    ]);
-    if (emailLock.exists || !emailUser.empty) {
-      const error = new Error("Email already exists");
-      error.code = "DUPLICATE_EMAIL";
-      throw error;
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      const duplicate = duplicateErrorFor(error);
+      if (duplicate) throw duplicate;
     }
-    if (phoneLock.exists || !phoneUser.empty) {
-      const error = new Error("Phone number already exists");
-      error.code = "DUPLICATE_PHONE";
-      throw error;
-    }
+    assertNoError(error, "Failed to create user");
+  }
 
-    transaction.create(emailLockRef, { userId: id, value: data.email });
-    transaction.create(phoneLockRef, { userId: id, value: data.phone });
-    transaction.create(userRef, payload);
-  });
-  return toApiUser(String(id), payload);
+  return toApiUser(row);
 };
 
 const update = async (id, data) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load user");
+  if (!existing) return null;
 
-  const existing = (await ref.get()).data() || {};
   const nextRole = data.role != null ? data.role : existing.role;
-  const updated = { ...data, updated_at: new Date() };
+  const patch = {};
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.email !== undefined) patch.email = data.email;
+  if (data.phone !== undefined) patch.phone = data.phone;
+  if (data.password !== undefined) patch.password = data.password == null ? null : String(data.password);
+  if (data.role !== undefined) patch.role = data.role;
+  if (data.centre !== undefined) patch.centre = data.centre;
 
   if (Object.prototype.hasOwnProperty.call(data, "availableDays")) {
-    updated.availableDays = isMitraRole(nextRole)
-      ? normalizeAvailableDays(data.availableDays)
-      : [];
+    patch.available_days = isMitraRole(nextRole) ? normalizeAvailableDays(data.availableDays) : [];
   }
 
-  if (
-    Object.prototype.hasOwnProperty.call(data, "isVishist") ||
-    data.role != null
-  ) {
-    if (isMitraRole(nextRole)) {
-      updated.isVishist = Boolean(
-        normalizeIsVishist(
-          nextRole,
-          Object.prototype.hasOwnProperty.call(data, "isVishist")
-            ? data.isVishist
-            : existing.isVishist
+  if (Object.prototype.hasOwnProperty.call(data, "isVishist") || data.role != null) {
+    patch.is_vishist = isMitraRole(nextRole)
+      ? Boolean(
+          normalizeIsVishist(
+            nextRole,
+            Object.prototype.hasOwnProperty.call(data, "isVishist")
+              ? data.isVishist
+              : existing.is_vishist
+          )
         )
-      );
-    } else {
-      updated.isVishist = FieldValue.delete();
-    }
+      : null;
   }
 
-  await ref.update(updated);
-  const doc = await ref.get();
-  return toApiUser(doc.id, doc.data());
+  const { data: row, error } = await getSupabase()
+    .from(TABLE)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error) {
+    if (error.code === UNIQUE_VIOLATION) {
+      const duplicate = duplicateErrorFor(error);
+      if (duplicate) throw duplicate;
+    }
+    assertNoError(error, "Failed to update user");
+  }
+
+  return toApiUser(row);
 };
 
 const destroy = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return 0;
-  await ref.delete();
-  return 1;
+  const { data, error } = await getSupabase().from(TABLE).delete().eq("id", id).select("id");
+  assertNoError(error, "Failed to delete user");
+  return data && data.length ? 1 : 0;
 };
 
 const addFcmToken = async (id, token) => {
-  const ref = await findDocRefById(id);
-  if (!ref || !token) return null;
-  await ref.update({
-    fcmTokens: FieldValue.arrayUnion(token),
-    updated_at: new Date(),
-  });
-  const doc = await ref.get();
-  return toApiUser(doc.id, doc.data());
+  if (!token) return null;
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("fcm_tokens")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load user");
+  if (!existing) return null;
+
+  const tokens = new Set(existing.fcm_tokens || []);
+  tokens.add(token);
+
+  const { data: row, error } = await getSupabase()
+    .from(TABLE)
+    .update({ fcm_tokens: [...tokens] })
+    .eq("id", id)
+    .select("*")
+    .single();
+  assertNoError(error, "Failed to save device token");
+  return toApiUser(row);
 };
 
 const removeFcmToken = async (id, token) => {
-  const ref = await findDocRefById(id);
-  if (!ref || !token) return null;
-  await ref.update({
-    fcmTokens: FieldValue.arrayRemove(token),
-    updated_at: new Date(),
-  });
+  if (!token) return null;
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("fcm_tokens")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load user");
+  if (!existing) return null;
+
+  const tokens = (existing.fcm_tokens || []).filter((t) => t !== token);
+  const { error } = await getSupabase().from(TABLE).update({ fcm_tokens: tokens }).eq("id", id);
+  assertNoError(error, "Failed to remove device token");
 };
 
 /**
- * Set password reset OTP for a user
- * Resets attempts counter to 0
+ * Set password reset OTP for a user. Resets attempts counter to 0.
  */
 const setPasswordResetOtp = async (id, { otpHash, expiresAt }) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  await ref.update({
-    otpHash: otpHash || null,
-    otpExpiresAt: expiresAt || null,
-    otpAttempts: 0,
-    updated_at: new Date(),
-  });
+  const { error } = await getSupabase()
+    .from(TABLE)
+    .update({ otp_hash: otpHash || null, otp_expires_at: expiresAt || null, otp_attempts: 0 })
+    .eq("id", id);
+  assertNoError(error, "Failed to set password reset OTP");
 };
 
 /**
- * Get password reset OTP data for a user
+ * Get password reset OTP data for a user.
  */
 const getPasswordResetOtp = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  const data = doc.data() || {};
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("otp_hash, otp_expires_at, otp_attempts")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(error, "Failed to load password reset OTP");
+  if (!data) return null;
   return {
-    otpHash: data.otpHash || null,
-    otpExpiresAt: data.otpExpiresAt || null,
-    otpAttempts: data.otpAttempts || 0,
+    otpHash: data.otp_hash || null,
+    otpExpiresAt: data.otp_expires_at || null,
+    otpAttempts: data.otp_attempts || 0,
   };
 };
 
 /**
- * Increment OTP attempt counter for a user
+ * Increment OTP attempt counter for a user.
  */
 const incrementOtpAttempts = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  const data = doc.data() || {};
-  const newAttempts = (data.otpAttempts || 0) + 1;
-  await ref.update({
-    otpAttempts: newAttempts,
-    updated_at: new Date(),
-  });
+  const { data: existing, error: fetchError } = await getSupabase()
+    .from(TABLE)
+    .select("otp_attempts")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to load user");
+  if (!existing) return null;
+
+  const newAttempts = (existing.otp_attempts || 0) + 1;
+  const { error } = await getSupabase().from(TABLE).update({ otp_attempts: newAttempts }).eq("id", id);
+  assertNoError(error, "Failed to update OTP attempts");
   return newAttempts;
 };
 
 /**
- * Clear password reset OTP data for a user
- * Call after successful reset or when max attempts exceeded
+ * Clear password reset OTP data for a user. Call after successful reset or
+ * when max attempts exceeded.
  */
 const clearPasswordResetOtp = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  await ref.update({
-    otpHash: FieldValue.delete(),
-    otpExpiresAt: FieldValue.delete(),
-    otpAttempts: FieldValue.delete(),
-    updated_at: new Date(),
-  });
+  const { error } = await getSupabase()
+    .from(TABLE)
+    .update({ otp_hash: null, otp_expires_at: null, otp_attempts: 0 })
+    .eq("id", id);
+  assertNoError(error, "Failed to clear password reset OTP");
 };
 
 module.exports = {

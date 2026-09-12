@@ -1,33 +1,35 @@
-const { getDb, withStorageBucket } = require("../config/firebase");
+const { getSupabase, assertNoError } = require("../config/supabase");
+const { uploadToStorage } = require("../config/storage");
 const { toDate } = require("../Utils/firestoreHelpers");
 const { getCanonicalCentreKey } = require("../Utils/centreMatch");
 
-const COLLECTION = "timetables";
+const TABLE = "timetables";
 const MAX_INLINE_SVG_BYTES = 700 * 1024;
 
-const timetablesRef = () => getDb().collection(COLLECTION);
-
-const toApi = (docId, data = {}) => ({
-  id: docId,
-  centre: data.centre ?? null,
-  centreKey: docId,
-  kind: data.kind ?? null,
-  name: data.name ?? null,
-  title: data.title ?? null,
-  days: Array.isArray(data.days) ? data.days : null,
-  slots: Array.isArray(data.slots) ? data.slots : null,
-  dataUrl: data.dataUrl ?? null,
-  storagePath: data.storagePath ?? null,
-  updatedAt: toDate(data.updatedAt) || toDate(data.updated_at),
-  updatedBy: data.updatedBy ?? null,
-});
+const toApi = (row) => {
+  if (!row) return null;
+  return {
+    id: row.centre_key,
+    centre: row.centre ?? null,
+    centreKey: row.centre_key,
+    kind: row.kind ?? null,
+    name: row.name ?? null,
+    title: row.title ?? null,
+    days: Array.isArray(row.days) ? row.days : null,
+    slots: Array.isArray(row.slots) ? row.slots : null,
+    dataUrl: row.data_url ?? null,
+    storagePath: row.storage_path ?? null,
+    updatedAt: toDate(row.updated_at),
+    updatedBy: row.updated_by ?? null,
+  };
+};
 
 const findByCentreKey = async (centreKey) => {
   const key = getCanonicalCentreKey(centreKey);
   if (!key) return null;
-  const doc = await timetablesRef().doc(key).get();
-  if (!doc.exists) return null;
-  return toApi(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("centre_key", key).maybeSingle();
+  assertNoError(error, "Failed to load timetable");
+  return toApi(data);
 };
 
 const uploadSvgToStorage = async (centreKey, dataUrl) => {
@@ -41,27 +43,8 @@ const uploadSvgToStorage = async (centreKey, dataUrl) => {
   }
 
   const storagePath = `timetables/${centreKey}/svg-${Date.now()}.svg`;
-  return withStorageBucket(async (bucket) => {
-    const file = bucket.file(storagePath);
-    await file.save(buffer, {
-      metadata: { contentType, cacheControl: "public, max-age=31536000" },
-      resumable: false,
-    });
-
-    let url;
-    try {
-      const [signedUrl] = await file.getSignedUrl({
-        action: "read",
-        expires: new Date("2500-01-01T00:00:00.000Z"),
-      });
-      url = signedUrl;
-    } catch {
-      await file.makePublic();
-      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-    }
-
-    return { dataUrl: url, storagePath };
-  });
+  const { url, storagePath: savedPath } = await uploadToStorage(storagePath, buffer, { contentType });
+  return { dataUrl: url, storagePath: savedPath };
 };
 
 const upsert = async ({
@@ -81,7 +64,6 @@ const upsert = async ({
     throw new Error("kind must be grid or svg");
   }
 
-  const now = new Date();
   let storedDataUrl = dataUrl || null;
   let storagePath = null;
 
@@ -92,27 +74,33 @@ const upsert = async ({
   }
 
   const payload = {
+    centre_key: key,
     centre: centre || null,
-    centreKey: key,
     kind,
     name: name || null,
     title: title || null,
     days: kind === "grid" && Array.isArray(days) ? days : null,
     slots: kind === "grid" && Array.isArray(slots) ? slots : null,
-    dataUrl: kind === "svg" ? storedDataUrl : null,
-    storagePath: kind === "svg" ? storagePath : null,
-    updatedAt: now,
-    updatedBy: updatedBy || null,
+    data_url: kind === "svg" ? storedDataUrl : null,
+    storage_path: kind === "svg" ? storagePath : null,
+    updated_at: new Date().toISOString(),
+    updated_by: updatedBy || null,
   };
 
-  await timetablesRef().doc(key).set(payload, { merge: false });
-  return toApi(key, payload);
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .upsert(payload, { onConflict: "centre_key" })
+    .select("*")
+    .single();
+  assertNoError(error, "Failed to save timetable");
+  return toApi(data);
 };
 
 const remove = async (centreKey) => {
   const key = getCanonicalCentreKey(centreKey);
   if (!key) return false;
-  await timetablesRef().doc(key).delete();
+  const { error } = await getSupabase().from(TABLE).delete().eq("centre_key", key);
+  assertNoError(error, "Failed to delete timetable");
   return true;
 };
 

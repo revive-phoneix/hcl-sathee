@@ -31,13 +31,6 @@ export const saveTestMarks = async ({ testId, testType, studentId, course, centr
   return response.data;
 };
 
-export const fetchCourseProgress = async (course, centre = "") => {
-  const response = await api.get("/api/test-marks/course-progress", {
-    params: { course, ...(centre ? { centre } : {}) },
-  });
-  return response.data.timeline ?? [];
-};
-
 export const fetchTestTypeProgress = async (course, testType, centre) => {
   const response = await api.get("/api/test-marks/test-type-progress", {
     params: { course, testType, ...(centre ? { centre } : {}) },

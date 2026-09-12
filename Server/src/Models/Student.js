@@ -1,11 +1,7 @@
-const { getDb } = require("../config/firebase");
-const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getSupabase, assertNoError, paginateByCreatedAt } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "students";
-
-const studentsRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(studentsRef(), id);
-const getNextId = () => nextId(studentsRef());
+const TABLE = "students";
 
 const parseObjectField = (value) => {
   if (value && typeof value === "object" && !Array.isArray(value)) return value;
@@ -38,69 +34,59 @@ const parseSubjectsField = (value) => {
   return [];
 };
 
-const toApiStudent = (docId, data) => ({
-  id: Number(docId) || docId,
-  studentId: data.studentId,
-  enrollmentNo: data.enrollmentNo ?? null,
-  name: data.name,
-  gender: data.gender,
-  email: typeof data.email === "string" ? data.email.trim().toLowerCase() : data.email,
-  phone: data.phone ?? null,
-  centre: data.centre ?? null,
-  course: data.course ?? null,
-  category: data.category ?? null,
-  address: data.address ?? null,
-  parents: parseObjectField(data.parents),
-  subjects: parseSubjectsField(data.subjects),
-  marks: parseObjectField(data.marks),
-  attendance: parseObjectField(data.attendance),
-  qualifications: parseObjectField(data.qualifications),
-  avatarColor: data.avatarColor ?? null,
-  initials: data.initials ?? null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
+const toApiStudent = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    enrollmentNo: row.enrollment_no ?? null,
+    name: row.name,
+    gender: row.gender,
+    email: typeof row.email === "string" ? row.email.trim().toLowerCase() : row.email,
+    phone: row.phone ?? null,
+    centre: row.centre ?? null,
+    course: row.course ?? null,
+    category: row.category ?? null,
+    address: row.address ?? null,
+    parents: parseObjectField(row.parents),
+    subjects: parseSubjectsField(row.subjects),
+    marks: parseObjectField(row.marks),
+    attendance: parseObjectField(row.attendance),
+    qualifications: parseObjectField(row.qualifications),
+    avatarColor: row.avatar_color ?? null,
+    initials: row.initials ?? null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
+};
 
 const findAll = async ({ limit = 200, cursor } = {}) => {
-  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
-  let query = studentsRef().orderBy("created_at", "desc").limit(pageLimit);
-  if (cursor) {
-    const cursorDoc = await studentsRef().doc(String(cursor)).get();
-    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-  }
-  const snap = await query.get();
-  const students = snap.docs.map((doc) => toApiStudent(doc.id, doc.data()));
-  Object.defineProperty(students, "nextCursor", {
-    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
-    enumerable: false,
-  });
+  const { rows, nextCursor } = await paginateByCreatedAt(TABLE, { limit, cursor });
+  const students = rows.map(toApiStudent);
+  Object.defineProperty(students, "nextCursor", { value: nextCursor, enumerable: false });
   return students;
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApiStudent(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find student");
+  return toApiStudent(data);
 };
 
 const findByIds = async (ids = []) => {
   const uniqueIds = [
-    ...new Set(
-      ids
-        .filter((id) => id != null && id !== "")
-        .map((id) => String(id))
-    ),
+    ...new Set(ids.filter((id) => id != null && id !== "").map((id) => String(id))),
   ];
-
   if (!uniqueIds.length) return [];
 
   const studentsById = new Map();
-  for (let index = 0; index < uniqueIds.length; index += 30) {
-    const chunk = uniqueIds.slice(index, index + 30);
-    const snap = await studentsRef().where("__name__", "in", chunk).get();
-    for (const doc of snap.docs) {
-      studentsById.set(String(doc.id), toApiStudent(doc.id, doc.data()));
+  const CHUNK = 200;
+  for (let index = 0; index < uniqueIds.length; index += CHUNK) {
+    const chunk = uniqueIds.slice(index, index + CHUNK);
+    const { data, error } = await getSupabase().from(TABLE).select("*").in("id", chunk);
+    assertNoError(error, "Failed to find students");
+    for (const row of data || []) {
+      studentsById.set(String(row.id), toApiStudent(row));
     }
   }
 
@@ -109,19 +95,19 @@ const findByIds = async (ids = []) => {
 
 const findByEmail = async (email) => {
   const normalized = email.trim().toLowerCase();
-  const snap = await studentsRef().where("email", "==", normalized).limit(1).get();
-  if (snap.empty) return null;
-  const doc = snap.docs[0];
-  return toApiStudent(doc.id, doc.data());
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("email", normalized)
+    .maybeSingle();
+  assertNoError(error, "Failed to find student by email");
+  return toApiStudent(data);
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const payload = {
-    id,
-    studentId: data.studentId,
-    enrollmentNo: data.enrollmentNo ?? null,
+    student_id: data.studentId,
+    enrollment_no: data.enrollmentNo ?? null,
     name: data.name,
     gender: data.gender,
     email: data.email,
@@ -135,39 +121,49 @@ const create = async (data) => {
     marks: parseObjectField(data.marks),
     attendance: parseObjectField(data.attendance),
     qualifications: parseObjectField(data.qualifications),
-    avatarColor: data.avatarColor ?? null,
+    avatar_color: data.avatarColor ?? null,
     initials: data.initials ?? null,
-    created_at: now,
-    updated_at: now,
   };
 
-  await studentsRef().doc(String(id)).set(payload);
-  return toApiStudent(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create student");
+  return toApiStudent(row);
 };
 
 const update = async (id, data) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
+  const patch = {};
+  if (data.studentId !== undefined) patch.student_id = data.studentId;
+  if (data.enrollmentNo !== undefined) patch.enrollment_no = data.enrollmentNo;
+  if (data.name !== undefined) patch.name = data.name;
+  if (data.gender !== undefined) patch.gender = data.gender;
+  if (data.email !== undefined) patch.email = data.email;
+  if (data.phone !== undefined) patch.phone = data.phone;
+  if (data.centre !== undefined) patch.centre = data.centre;
+  if (data.course !== undefined) patch.course = data.course;
+  if (data.category !== undefined) patch.category = data.category;
+  if (data.address !== undefined) patch.address = data.address;
+  if (data.avatarColor !== undefined) patch.avatar_color = data.avatarColor;
+  if (data.initials !== undefined) patch.initials = data.initials;
+  if (data.parents !== undefined) patch.parents = parseObjectField(data.parents);
+  if (data.subjects !== undefined) patch.subjects = parseSubjectsField(data.subjects);
+  if (data.marks !== undefined) patch.marks = parseObjectField(data.marks);
+  if (data.attendance !== undefined) patch.attendance = parseObjectField(data.attendance);
+  if (data.qualifications !== undefined) patch.qualifications = parseObjectField(data.qualifications);
 
-  const updated = { ...data, updated_at: new Date() };
-  if (data.parents !== undefined) updated.parents = parseObjectField(data.parents);
-  if (data.subjects !== undefined) updated.subjects = parseSubjectsField(data.subjects);
-  if (data.marks !== undefined) updated.marks = parseObjectField(data.marks);
-  if (data.attendance !== undefined) updated.attendance = parseObjectField(data.attendance);
-  if (data.qualifications !== undefined) {
-    updated.qualifications = parseObjectField(data.qualifications);
-  }
-
-  await ref.update(updated);
-  const doc = await ref.get();
-  return toApiStudent(doc.id, doc.data());
+  const { data: row, error } = await getSupabase()
+    .from(TABLE)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  assertNoError(error, "Failed to update student");
+  return toApiStudent(row);
 };
 
 const destroy = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return 0;
-  await ref.delete();
-  return 1;
+  const { data, error } = await getSupabase().from(TABLE).delete().eq("id", id).select("id");
+  assertNoError(error, "Failed to delete student");
+  return data && data.length ? 1 : 0;
 };
 
 module.exports = {

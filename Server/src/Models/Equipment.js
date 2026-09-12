@@ -1,58 +1,55 @@
-const { getDb } = require("../config/firebase");
-const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getSupabase, assertNoError } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "equipments";
+const TABLE = "equipments";
 
-const equipmentsRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(equipmentsRef(), id);
-const getNextId = () => nextId(equipmentsRef());
-
-const toApiEquipment = (docId, data) => ({
-  id: Number(docId) || docId,
-  name: data.name ?? "",
-  description: data.description ?? "",
-  quantity: Number(data.quantity) || 0,
-  serialNumber: data.serialNumber ?? null,
-  centre: data.centre ?? null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
+const toApiEquipment = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    name: row.name ?? "",
+    description: row.description ?? "",
+    quantity: Number(row.quantity) || 0,
+    serialNumber: row.serial_number ?? null,
+    centre: row.centre ?? null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
+};
 
 const findAll = async () => {
-  const snap = await equipmentsRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApiEquipment(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: false });
+  assertNoError(error, "Failed to list equipment");
+  return (data || []).map(toApiEquipment);
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApiEquipment(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find equipment");
+  return toApiEquipment(data);
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const payload = {
-    id,
     name: data.name,
     description: data.description,
     quantity: Number(data.quantity) || 0,
-    serialNumber: data.serialNumber ?? null,
+    serial_number: data.serialNumber ?? null,
     centre: data.centre ?? null,
-    created_at: now,
-    updated_at: now,
   };
 
-  await equipmentsRef().doc(String(id)).set(payload);
-  return toApiEquipment(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create equipment");
+  return toApiEquipment(row);
 };
 
 const destroy = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return 0;
-  await ref.delete();
-  return 1;
+  const { data, error } = await getSupabase().from(TABLE).delete().eq("id", id).select("id");
+  assertNoError(error, "Failed to delete equipment");
+  return data && data.length ? 1 : 0;
 };
 
 module.exports = {

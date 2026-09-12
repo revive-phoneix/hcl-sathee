@@ -1,52 +1,51 @@
-const { getDb } = require("../config/firebase");
-const { toDate, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getSupabase, assertNoError } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "subjectPerformances";
+const TABLE = "subject_performances";
 
-const performancesRef = () => getDb().collection(COLLECTION);
-const getNextId = () => nextId(performancesRef());
-
-const toApiPerformance = (docId, data) => ({
-  id: Number(docId) || docId,
-  studentId: data.studentId,
-  subject: data.subject,
-  marks: data.marks,
-  maxMarks: data.maxMarks ?? 100,
-  grade: data.grade ?? null,
-  remarks: data.remarks ?? null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
+const toApiPerformance = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    subject: row.subject,
+    marks: row.marks,
+    maxMarks: row.max_marks ?? 100,
+    grade: row.grade ?? null,
+    remarks: row.remarks ?? null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
+};
 
 const findAll = async () => {
-  const snap = await performancesRef().get();
-  return snap.docs.map((doc) => toApiPerformance(doc.id, doc.data()));
+  const { data, error } = await getSupabase().from(TABLE).select("*");
+  assertNoError(error, "Failed to list subject performance");
+  return (data || []).map(toApiPerformance);
 };
 
 const findByStudentId = async (studentId) => {
-  const snap = await performancesRef()
-    .where("studentId", "==", Number(studentId) || studentId)
-    .get();
-  return snap.docs.map((doc) => toApiPerformance(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("student_id", Number(studentId) || studentId);
+  assertNoError(error, "Failed to load student performance");
+  return (data || []).map(toApiPerformance);
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const payload = {
-    id,
-    studentId: data.studentId,
+    student_id: data.studentId,
     subject: data.subject,
     marks: data.marks,
-    maxMarks: data.maxMarks ?? 100,
+    max_marks: data.maxMarks ?? 100,
     grade: data.grade ?? null,
     remarks: data.remarks ?? null,
-    created_at: now,
-    updated_at: now,
   };
 
-  await performancesRef().doc(String(id)).set(payload);
-  return toApiPerformance(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create subject performance");
+  return toApiPerformance(row);
 };
 
 module.exports = {

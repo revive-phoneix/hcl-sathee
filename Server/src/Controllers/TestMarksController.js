@@ -2,9 +2,8 @@ const path = require("path");
 const Test = require("../Models/Test");
 const TestSubjectMark = require("../Models/TestSubjectMark");
 const Student = require("../Models/Student");
-const { withStorageBucket } = require("../config/firebase");
+const { uploadToStorage } = require("../config/storage");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
-const { buildCourseProgressTimeline } = require("../Utils/testProgress");
 const { matchesCentre, isAdminRole } = require("../Utils/centreMatch");
 const { toDateOnly } = require("../Utils/firestoreHelpers");
 
@@ -53,24 +52,8 @@ const uploadAnswerSheet = async (file, testId, studentId) => {
   const safeExt = [".pdf", ".jpg", ".jpeg", ".png", ".docx", ".doc"].includes(ext) ? ext : ".pdf";
   const storagePath = `test-marks/${testId}/${studentId}-${Date.now()}${safeExt}`;
 
-  return withStorageBucket(async (bucket) => {
-    const storageFile = bucket.file(storagePath);
-    await storageFile.save(file.buffer, {
-      metadata: { contentType: file.mimetype || "application/pdf", cacheControl: "public, max-age=31536000" },
-      resumable: false,
-    });
-    let url;
-    try {
-      const [signedUrl] = await storageFile.getSignedUrl({
-        action: "read",
-        expires: new Date("2500-01-01T00:00:00.000Z"),
-      });
-      url = signedUrl;
-    } catch {
-      await storageFile.makePublic();
-      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-    }
-    return { url, storagePath };
+  return uploadToStorage(storagePath, file.buffer, {
+    contentType: file.mimetype || "application/pdf",
   });
 };
 
@@ -262,16 +245,4 @@ exports.saveTestMarks = wrap(
     });
   },
   { label: "Save Test Marks Error", message: "Failed to save test marks", useErrorMessage: true }
-);
-
-exports.getCourseProgress = wrap(
-  async (req, res) => {
-    const course = String(req.query.course || "").trim();
-    if (!course) return fail(res, 400, "course is required");
-
-    const centre = isAdminRole(req.user?.role) ? req.query.centre || null : req.user?.centre || null;
-    const timeline = await buildCourseProgressTimeline(course, centre);
-    return ok(res, { course, centre, timeline });
-  },
-  { label: "Course Progress Error", message: "Failed to build course progress" }
 );
