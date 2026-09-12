@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Download, FileBarChart2, Loader2, X } from "lucide-react";
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { MainLayout } from "../../Components/MainLayout";
 import { fetchStudents } from "../../services/students";
 import { fetchUsers } from "../../services/users";
@@ -51,6 +60,28 @@ const getMonthRange = (date = new Date()) => {
 
 const isSatheeMitraRoleUser = (user) =>
   String(user?.role || "").trim().toUpperCase() === "SATHEE MITRA";
+
+const enumerateDates = (from, to) => {
+  const dates = [];
+  const cursor = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  while (cursor <= end) {
+    dates.push(toDateOnly(cursor));
+    cursor.setDate(cursor.getDate() + 1);
+  }
+  return dates;
+};
+
+/** Average % across every mark recorded for a test — null when nothing was entered. */
+const averageTestPercentage = (test) => {
+  if (!test.marks.length) return null;
+  const percentages = test.marks.map((mark) => {
+    if (mark.subjectPercentage != null) return Number(mark.subjectPercentage) || 0;
+    const total = Number(mark.totalMarks) || 0;
+    return total > 0 ? (Number(mark.marksObtained) / total) * 100 : 0;
+  });
+  return Math.round((percentages.reduce((sum, p) => sum + p, 0) / percentages.length) * 10) / 10;
+};
 
 /**
  * Build one student x subject marks table for a single test. The column list
@@ -112,19 +143,46 @@ const buildPerformanceForCourse = ({ course, students, tests, marks, period }) =
     .filter((t) => t.testType === "pre-mid")
     .sort((a, b) => String(a.testDate).localeCompare(String(b.testDate)));
 
+  const trend = [
+    ...performanceTests.map((test, index) => ({
+      label: test.name || `Week ${index + 1}`,
+      percentage: averageTestPercentage(test) ?? 0,
+    })),
+    ...(period === "monthly"
+      ? preMidTests.map((test) => ({
+          label: test.name || "Pre-Mid",
+          percentage: averageTestPercentage(test) ?? 0,
+        }))
+      : []),
+  ];
+
   return {
     performance: performanceTests.map((test) => buildMarksTable(course, test, students)),
     preMid: period === "monthly" ? preMidTests.map((test) => buildMarksTable(course, test, students)) : [],
+    trend,
   };
 };
 
-/** Per-course attendance %, denominator = days that course actually took attendance in the range. */
-const buildAttendanceForCourse = (records, students) => {
+/**
+ * Per-course attendance %, denominator = days that course actually took
+ * attendance in the range. Also returns a day-by-day trend (whole course,
+ * present-count / course size) across every day in the report's range —
+ * a day with zero records is 0%, never skipped, matching the rest of the app.
+ */
+const buildAttendanceForCourse = (records, students, range) => {
+  const studentIds = new Set(students.map((s) => String(s.id)));
   const recordsByStudent = new Map();
+  const presentIdsByDate = new Map();
   for (const record of records) {
     const key = String(record.studentId);
+    if (!studentIds.has(key)) continue;
     if (!recordsByStudent.has(key)) recordsByStudent.set(key, []);
     recordsByStudent.get(key).push(record);
+
+    if (record.status === "present") {
+      if (!presentIdsByDate.has(record.date)) presentIdsByDate.set(record.date, new Set());
+      presentIdsByDate.get(record.date).add(key);
+    }
   }
 
   const courseDates = new Set();
@@ -135,7 +193,7 @@ const buildAttendanceForCourse = (records, students) => {
   }
   const totalDays = courseDates.size;
 
-  return students.map((student) => {
+  const rows = students.map((student) => {
     const studentRecords = recordsByStudent.get(String(student.id)) || [];
     const presentDays = new Set(
       studentRecords.filter((r) => r.status === "present").map((r) => r.date)
@@ -143,6 +201,17 @@ const buildAttendanceForCourse = (records, students) => {
     const percentage = totalDays > 0 ? Math.round((presentDays / totalDays) * 100) : 0;
     return { student, presentDays, totalDays, percentage };
   });
+
+  const totalStudents = students.length;
+  const trend = enumerateDates(range.from, range.to).map((date) => ({
+    label: date,
+    percentage:
+      totalStudents > 0
+        ? Math.round(((presentIdsByDate.get(date)?.size || 0) / totalStudents) * 100)
+        : 0,
+  }));
+
+  return { rows, trend };
 };
 
 function CourseMultiSelect({ selected, onChange }) {
@@ -329,6 +398,50 @@ function AttendanceTable({ rows }) {
   );
 }
 
+/** Shared line-graph for both Performance (per test) and Attendance (per day) trends. */
+function TrendChart({ title, data, xLabel }) {
+  if (!data.length) return null;
+
+  // Thin out x-axis labels once there are many points (e.g. a monthly attendance trend).
+  const tickInterval = data.length > 10 ? Math.ceil(data.length / 10) - 1 : 0;
+
+  return (
+    <div className="mt-3 rounded-xl border border-slate-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
+      <div className="mt-2 h-56 w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 5, right: 16, left: -16, bottom: xLabel ? 20 : 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis
+              dataKey="label"
+              tick={{ fontSize: 10, fill: "#64748b" }}
+              interval={tickInterval}
+              angle={data.length > 6 ? -35 : 0}
+              textAnchor={data.length > 6 ? "end" : "middle"}
+              height={xLabel ? 40 : 24}
+            />
+            <YAxis
+              domain={[0, 100]}
+              tick={{ fontSize: 10, fill: "#64748b" }}
+              tickFormatter={(v) => `${v}%`}
+              width={36}
+            />
+            <Tooltip formatter={(value) => [`${value}%`, "Score"]} />
+            <Line
+              type="monotone"
+              dataKey="percentage"
+              stroke="#2563eb"
+              strokeWidth={2}
+              dot={{ r: 3, fill: "#2563eb" }}
+              isAnimationActive={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  );
+}
+
 function ExportReportModal({
   open,
   onClose,
@@ -488,7 +601,7 @@ export default function CentreReport({
           marks: courseTestData[index].marks,
           period,
         });
-        attendanceByCourse[course] = buildAttendanceForCourse(attendanceRecords, courseStudents);
+        attendanceByCourse[course] = buildAttendanceForCourse(attendanceRecords, courseStudents, range);
       });
 
       // Render order is always canonical (JEE..CUET), never the order courses
@@ -702,6 +815,8 @@ export default function CentreReport({
                 <div key={course} className="mt-6">
                   <h4 className="text-base font-semibold text-blue-700">{course}</h4>
 
+                  <TrendChart title="Average Score Trend" data={report.performanceByCourse[course].trend} />
+
                   <p className="mt-3 text-sm font-semibold text-slate-600">Performance Test</p>
                   {report.performanceByCourse[course].performance.length === 0 ? (
                     <p className="mt-1 text-sm text-slate-400">
@@ -738,7 +853,12 @@ export default function CentreReport({
               {report.courses.map((course) => (
                 <div key={course} className="mt-6">
                   <h4 className="text-base font-semibold text-blue-700">{course}</h4>
-                  <AttendanceTable rows={report.attendanceByCourse[course]} />
+                  <TrendChart
+                    title="Daily Attendance Trend"
+                    data={report.attendanceByCourse[course].trend}
+                    xLabel
+                  />
+                  <AttendanceTable rows={report.attendanceByCourse[course].rows} />
                 </div>
               ))}
             </section>

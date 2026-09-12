@@ -115,6 +115,66 @@ const addVishistSection = (doc, y, rows) => {
   });
 };
 
+const CHART_HEIGHT = 90;
+const CHART_LEFT_GUTTER = 24;
+const MAX_CHART_LABELS = 8;
+
+/** A simple vector line chart (0-100% y-axis) — no external charting library needed in the PDF. */
+const addLineChart = (doc, y, { title, data }) => {
+  y = ensureSpace(doc, y, CHART_HEIGHT + 40);
+  doc.setFontSize(9);
+  doc.setFont(undefined, "bold");
+  setText(doc, INK);
+  doc.text(title, MARGIN, y);
+  doc.setFont(undefined, "normal");
+  y += 10;
+
+  if (!data.length) return addNote(doc, "No data to chart.", y);
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const chartTop = y;
+  const chartBottom = y + CHART_HEIGHT;
+  const chartLeft = MARGIN + CHART_LEFT_GUTTER;
+  const chartRight = pageWidth - MARGIN;
+  const plotWidth = chartRight - chartLeft;
+
+  doc.setFontSize(7);
+  setText(doc, MUTED);
+  doc.setDrawColor(226, 232, 240);
+  [0, 25, 50, 75, 100].forEach((tick) => {
+    const ty = chartBottom - (tick / 100) * CHART_HEIGHT;
+    doc.line(chartLeft, ty, chartRight, ty);
+    doc.text(`${tick}`, chartLeft - 4, ty + 2, { align: "right" });
+  });
+
+  const n = data.length;
+  const xStep = n > 1 ? plotWidth / (n - 1) : 0;
+  const points = data.map((d, i) => ({
+    x: chartLeft + (n > 1 ? i * xStep : plotWidth / 2),
+    y: chartBottom - (Math.max(0, Math.min(100, Number(d.percentage) || 0)) / 100) * CHART_HEIGHT,
+  }));
+
+  doc.setDrawColor(37, 99, 235);
+  doc.setLineWidth(1.2);
+  for (let i = 0; i < points.length - 1; i += 1) {
+    doc.line(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y);
+  }
+  doc.setFillColor(37, 99, 235);
+  points.forEach((p) => doc.circle(p.x, p.y, 1.4, "F"));
+  doc.setLineWidth(0.5);
+
+  const labelStep = Math.max(1, Math.ceil(n / MAX_CHART_LABELS));
+  doc.setFontSize(6.5);
+  setText(doc, MUTED);
+  data.forEach((d, i) => {
+    if (i % labelStep !== 0 && i !== n - 1) return;
+    doc.text(String(d.label ?? ""), points[i].x, chartBottom + 10, { align: "center" });
+  });
+  setText(doc, INK);
+
+  return Math.max(chartBottom, chartTop) + 22;
+};
+
 const marksTables = (doc, y, tables, fallbackLabel) => {
   tables.forEach((table, index) => {
     const label = table.test.name || `${fallbackLabel} ${index + 1}`;
@@ -193,6 +253,8 @@ export const buildCentreReportPdf = ({
     y = addCourseHeading(doc, course, y);
     const perf = performanceByCourse[course];
 
+    y = addLineChart(doc, y, { title: "Average Score Trend", data: perf.trend || [] });
+
     y = addSubHeading(doc, "Performance Test", y);
     y = perf.performance.length
       ? marksTables(doc, y, perf.performance, "Week")
@@ -210,7 +272,11 @@ export const buildCentreReportPdf = ({
   y = addSectionHeading(doc, "Attendance", y, headingNumber);
   for (const course of courses) {
     y = addCourseHeading(doc, course, y);
-    const rows = attendanceByCourse[course] || [];
+    const courseAttendance = attendanceByCourse[course] || { rows: [], trend: [] };
+    const rows = courseAttendance.rows || [];
+
+    y = addLineChart(doc, y, { title: "Daily Attendance Trend", data: courseAttendance.trend || [] });
+
     y = rows.length
       ? addTable(doc, y, {
           head: ["Student", "Student ID", "Attendance %"],
