@@ -9,8 +9,9 @@ const {
   saveTestMarks,
   getCourseProgress,
   getTestTypeProgress,
+  getCourseTestMarks,
 } = require("../Controllers/TestMarksController");
-const { authenticate, requireAdminOrMitra } = require("../Middleware/auth");
+const { authenticate, requireAdminOrMitra, requireAdmin } = require("../Middleware/auth");
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -40,4 +41,6 @@ router.post("/", authenticate, requireAdminOrMitra, uploadConcurrencyLimiter, up
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);
 router.get("/test-type-progress", authenticate, requireAdminOrMitra, getTestTypeProgress);
+// Raw per-student marks for the Centre Report — admin-only (bulk export, not a dashboard widget).
+router.get("/course-marks", authenticate, requireAdmin, getCourseTestMarks);
 module.exports = router;

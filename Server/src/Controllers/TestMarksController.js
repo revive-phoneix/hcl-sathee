@@ -6,6 +6,7 @@ const { withStorageBucket } = require("../config/firebase");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const { buildCourseProgressTimeline } = require("../Utils/testProgress");
 const { matchesCentre, isAdminRole } = require("../Utils/centreMatch");
+const { toDateOnly } = require("../Utils/firestoreHelpers");
 
 const assertCentreAccess = (req, centre) => {
   if (isAdminRole(req.user?.role)) return true;
@@ -131,6 +132,38 @@ exports.getTestTypeProgress = wrap(
     return ok(res, { course, testType, slots });
   },
   { label: "Test Type Progress Error", message: "Failed to load test type progress" }
+);
+
+/**
+ * Raw tests + subject marks for a course — used by the Centre Report to build
+ * the Performance section (student x subject tables per test/week). Optional
+ * from/to trims to tests dated within that range (the report's weekly/monthly
+ * window) so the payload stays small.
+ */
+exports.getCourseTestMarks = wrap(
+  async (req, res) => {
+    const course = String(req.query.course || "").trim().toUpperCase();
+    if (!course) return fail(res, 400, "course is required");
+
+    const centre = isAdminRole(req.user?.role) ? req.query.centre || null : req.user?.centre || null;
+    const from = toDateOnly(req.query.from);
+    const to = toDateOnly(req.query.to);
+
+    const [allTests, allMarks] = await Promise.all([
+      Test.findByCourse(course, centre),
+      TestSubjectMark.findByCourse(course, centre),
+    ]);
+
+    const tests =
+      from && to
+        ? allTests.filter((t) => t.testDate && t.testDate >= from && t.testDate <= to)
+        : allTests;
+    const testIds = new Set(tests.map((t) => String(t.id)));
+    const marks = allMarks.filter((m) => testIds.has(String(m.testId)));
+
+    return ok(res, { course, centre, tests, marks });
+  },
+  { label: "Course Test Marks Error", message: "Failed to fetch course test marks" }
 );
 
 exports.deleteTest = wrap(

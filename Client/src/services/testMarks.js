@@ -44,3 +44,17 @@ export const fetchTestTypeProgress = async (course, testType, centre) => {
   });
   return response.data;
 };
+
+// Admin-only: raw tests + subject marks for a course, optionally trimmed to a
+// date range (Centre Report's Performance section).
+export const fetchCourseTestMarks = async ({ course, centre, from, to }) => {
+  const response = await api.get("/api/test-marks/course-marks", {
+    params: {
+      course,
+      ...(centre ? { centre } : {}),
+      ...(from ? { from } : {}),
+      ...(to ? { to } : {}),
+    },
+  });
+  return { tests: response.data.tests ?? [], marks: response.data.marks ?? [] };
+};

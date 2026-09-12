@@ -576,3 +576,25 @@ exports.getAttendanceRange = wrap(
   },
   { label: "Attendance Range Error", message: "Failed to load attendance range" }
 );
+
+/**
+ * Raw per-record daily attendance for a date range — used by the Centre
+ * Report to compute per-student, per-course attendance %. Unlike
+ * getAttendanceRange (which only returns centre-wide daily totals), this
+ * hands back the individual student rows so the client can group them.
+ */
+exports.getAttendanceDetail = wrap(
+  async (req, res) => {
+    const from = toDateOnly(req.query.from);
+    const to = toDateOnly(req.query.to) || from;
+    const centre = req.query.centre || null;
+
+    if (!from || !to) {
+      return fail(res, 400, "from and to dates are required");
+    }
+
+    const records = await DailySubjectAttendance.findByDateRange(from, to, centre);
+    return ok(res, { from, to, records });
+  },
+  { label: "Attendance Detail Error", message: "Failed to load attendance detail" }
+);

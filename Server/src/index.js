@@ -63,6 +63,7 @@ app.use(express.json({ limit: "1mb" }));
 
 app.use("/api/students/performance/attendance-range", apiRateLimiter);
 app.use("/api/students/performance/attendance-summary", apiRateLimiter);
+app.use("/api/students/performance/attendance-detail", apiRateLimiter);
 app.use((req, res, next) => {
   if (["POST", "PUT", "PATCH", "DELETE"].includes(req.method)) {
     return mutationRateLimiter(req, res, next);
