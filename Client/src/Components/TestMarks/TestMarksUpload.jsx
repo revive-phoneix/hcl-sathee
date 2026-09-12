@@ -470,11 +470,11 @@ export default function TestMarksUpload({ mitraCentre = "", isCustomCentre = fal
                       <input
                         type="number"
                         min="0"
+                        step="any"
                         onWheel={(e) => e.target.blur()}
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isMarksExceeded ? "text-red-700" : "text-slate-900"}`}
                         value={row.marksObtained}
                         onChange={(e) => updateRow(i, "marksObtained", e.target.value)}
-                        
                       />
                       {isMarksExceeded && hasError && <p className="mt-1 text-xs text-red-600">{hasError}</p>}
                     </div>
@@ -485,7 +485,7 @@ export default function TestMarksUpload({ mitraCentre = "", isCustomCentre = fal
                       <input
                         type="number"
                         min="0"
-                        step="1"
+                        step="any"
                         className={`mt-1 w-full bg-transparent text-lg font-semibold focus:outline-none ${isTotalZero ? "text-red-700" : "text-slate-900"}`}
                         value={row.totalMarks}
                         onChange={(e) => updateRow(i, "totalMarks", e.target.value)}
