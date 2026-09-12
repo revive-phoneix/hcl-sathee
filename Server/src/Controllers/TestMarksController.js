@@ -135,7 +135,7 @@ exports.getTestTypeProgress = wrap(
 );
 
 /**
- * Raw tests + subject marks for a course — used by the Centre Report to build
+ * Raw tests + subject marks for a course — used by the Kendra Report to build
  * the Performance section (student x subject tables per test/week). Optional
  * from/to trims to tests dated within that range (the report's weekly/monthly
  * window) so the payload stays small.

@@ -233,7 +233,7 @@ const AppContent = () => {
     { icon: IdCard, label: "Students" },
     { icon: Megaphone, label: "Announcements" },
     { icon: MessageSquareText, label: "Queries" },
-    { icon: FileBarChart2, label: "Centre Report" },
+    { icon: FileBarChart2, label: "Kendra Report" },
   ];
 
   const partnerNavItems = [

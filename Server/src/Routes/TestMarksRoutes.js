@@ -41,6 +41,6 @@ router.post("/", authenticate, requireAdminOrMitra, uploadConcurrencyLimiter, up
 
 router.get("/course-progress", authenticate, requireAdminOrMitra, getCourseProgress);
 router.get("/test-type-progress", authenticate, requireAdminOrMitra, getTestTypeProgress);
-// Raw per-student marks for the Centre Report — admin-only (bulk export, not a dashboard widget).
+// Raw per-student marks for the Kendra Report — admin-only (bulk export, not a dashboard widget).
 router.get("/course-marks", authenticate, requireAdmin, getCourseTestMarks);
 module.exports = router;

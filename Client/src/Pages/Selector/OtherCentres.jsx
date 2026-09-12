@@ -163,7 +163,7 @@ export default function OtherCentres({
 
                   <h2 className="mt-4 text-xl font-bold leading-snug">{centre.name}</h2>
                   <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    Centre ID: {getCentreId(centre.name) ?? "—"}
+                    Kendra ID: {getCentreId(centre.name) ?? "—"}
                   </p>
 
                   <div className="mt-5 grid grid-cols-2 gap-3">

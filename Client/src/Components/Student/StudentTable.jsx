@@ -7,7 +7,7 @@ const TABLE_COLUMNS = [
   "Student Full Name",
   "Gender",
   "Centre",
-  "Centre ID",
+  "Kendra ID",
   "Student ID",
   "Email Address",
   "Phone Number",
@@ -17,7 +17,7 @@ const TABLE_COLUMNS = [
 
 // Short, badge-like columns read better centered; everything else stays
 // left-aligned with the text it holds.
-const CENTERED_COLUMNS = new Set(["Centre ID", "Actions"]);
+const CENTERED_COLUMNS = new Set(["Kendra ID", "Actions"]);
 
 const headerStyle = {
   padding: "14px 20px",

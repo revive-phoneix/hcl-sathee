@@ -42,7 +42,7 @@ export const fetchAttendanceSummary = async ({ period = "daily", date, centre })
   return response.data;
 };
 
-// Admin-only: raw per-student attendance rows for a date range (Centre Report).
+// Admin-only: raw per-student attendance rows for a date range (Kendra Report).
 export const fetchAttendanceDetail = async ({ from, to, centre }) => {
   const response = await api.get("/api/students/performance/attendance-detail", {
     params: { from, to, ...(centre ? { centre } : {}) },

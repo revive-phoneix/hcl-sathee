@@ -223,7 +223,7 @@ export const buildCentreReportPdf = ({
   doc.setFontSize(10);
   [
     `Centre: ${centreValue}`,
-    `Centre ID: ${centreId ?? "—"}`,
+    `Kendra ID: ${centreId ?? "—"}`,
     `Place: ${place ?? "—"}`,
     `Address: ${address ?? "—"}`,
   ].forEach((line) => {

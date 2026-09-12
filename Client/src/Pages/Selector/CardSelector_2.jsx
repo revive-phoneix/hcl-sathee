@@ -217,7 +217,7 @@ export default function CardSelector_2({ openDashboard, userCentre, userRole }) 
                   {state.title}
                 </h2>
                 <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-                  Centre ID: {getCentreId(state.title) ?? "—"}
+                  Kendra ID: {getCentreId(state.title) ?? "—"}
                 </p>
 
                 <p className="mt-3 text-black text-bold">{state.subtitle}</p>

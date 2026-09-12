@@ -41,7 +41,7 @@ router.get(
   getDailySubjectAttendance
 );
 router.get("/attendance-range", authenticate, requireAdminOrPartner, getAttendanceRange);
-// Raw per-student records for the Centre Report — admin-only (bulk export, not a dashboard widget).
+// Raw per-student records for the Kendra Report — admin-only (bulk export, not a dashboard widget).
 router.get("/attendance-detail", authenticate, requireAdmin, getAttendanceDetail);
 router.get("/attendance-summary", authenticate, requireAdminOrPartner, getAttendanceSummary);
 router.post(

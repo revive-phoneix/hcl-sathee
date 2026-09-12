@@ -536,7 +536,7 @@ function ExportReportModal({
 }
 
 /**
- * "Centre Report" (Admin only). Pick a period + courses, press Go — generates
+ * "Kendra Report" (Admin only). Pick a period + courses, press Go — generates
  * a Performance section (weekly/pre-mid test marks, course-wise) and an
  * Attendance section (course-wise, attendance % for the same window), scoped
  * to only the selected courses. Missing data always shows as 0 / 0%, never
@@ -698,7 +698,7 @@ export default function CentreReport({
             <FileBarChart2 size={24} />
           </div>
           <div>
-            <h1 className="text-2xl font-bold">Centre Report</h1>
+            <h1 className="text-2xl font-bold">Kendra Report</h1>
             <p className="mt-0.5 text-sm text-slate-500">{centreValue}</p>
           </div>
         </div>
@@ -786,7 +786,7 @@ export default function CentreReport({
                   <span className="font-semibold text-slate-700">Centre:</span> {centreValue}
                 </p>
                 <p>
-                  <span className="font-semibold text-slate-700">Centre ID:</span>{" "}
+                  <span className="font-semibold text-slate-700">Kendra ID:</span>{" "}
                   {getCentreId(portalName) ?? "—"}
                 </p>
                 <p>
