@@ -11,7 +11,11 @@ import {
   getCentreId,
   getCentrePlace,
 } from "../../utils/centreDirectory";
-import { normalizeCourseCode, getCourseSubjectConfig } from "../../utils/courseSubjects";
+import {
+  normalizeCourseCode,
+  getCourseSubjectConfig,
+  resolveEnrolledSubjects,
+} from "../../utils/courseSubjects";
 import { getApiErrorMessage } from "../../utils/apiRequest";
 import { buildCentreReportPdf } from "../../utils/centreReportPdf";
 
@@ -48,7 +52,15 @@ const getMonthRange = (date = new Date()) => {
 const isSatheeMitraRoleUser = (user) =>
   String(user?.role || "").trim().toUpperCase() === "SATHEE MITRA";
 
-/** Build one student x subject marks table for a single test. Missing marks show "0/0". */
+/**
+ * Build one student x subject marks table for a single test. The column list
+ * is the union of subjects marked for anyone in this test (e.g. across a CUET
+ * class where students picked different domain subjects) — but a cell only
+ * shows a mark for a subject the student actually opted into. A subject
+ * they're not enrolled in shows "Not Opted"; one they are enrolled in but
+ * has no mark yet shows "0/0" — those mean different things and shouldn't
+ * both read as a zero score.
+ */
 const buildMarksTable = (course, test, students) => {
   let subjects = [...new Set(test.marks.map((m) => m.subject))].sort();
   if (!subjects.length) {
@@ -63,13 +75,17 @@ const buildMarksTable = (course, test, students) => {
     marksByStudent.get(key)[mark.subject] = mark;
   }
 
-  const rows = students.map((student) => ({
-    student,
-    cells: subjects.map((subject) => {
-      const mark = marksByStudent.get(String(student.id))?.[subject];
-      return mark ? `${mark.marksObtained}/${mark.totalMarks}` : "0/0";
-    }),
-  }));
+  const rows = students.map((student) => {
+    const enrolledSubjects = new Set(resolveEnrolledSubjects(course, student.subjects));
+    return {
+      student,
+      cells: subjects.map((subject) => {
+        if (!enrolledSubjects.has(subject)) return "Not Opted";
+        const mark = marksByStudent.get(String(student.id))?.[subject];
+        return mark ? `${mark.marksObtained}/${mark.totalMarks}` : "0/0";
+      }),
+    };
+  });
 
   return { test, subjects, rows };
 };
