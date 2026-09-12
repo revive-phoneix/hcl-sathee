@@ -424,7 +424,14 @@ export default function TestMarksUpload({ mitraCentre = "", isCustomCentre = fal
       </p>
 
       {rows.length > 0 && (
-        <div className="space-y-4">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!testId || !studentId || !rows.length || saving || Object.keys(rowErrors).length > 0) return;
+            handleSave();
+          }}
+          className="space-y-4"
+        >
           <div className="flex items-center justify-between">
             <p className="text-xs font-medium text-slate-600">Manual entry — fields are editable.</p>
           </div>
@@ -528,7 +535,7 @@ export default function TestMarksUpload({ mitraCentre = "", isCustomCentre = fal
               </p>
             </div>
           </div>
-        </div>
+        </form>
       )}
 
       <button
