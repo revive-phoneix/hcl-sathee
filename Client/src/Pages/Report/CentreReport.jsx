@@ -475,9 +475,15 @@ export default function CentreReport({
         attendanceByCourse[course] = buildAttendanceForCourse(attendanceRecords, courseStudents);
       });
 
+      // Render order is always canonical (JEE..CUET), never the order courses
+      // happened to be checked/unchecked in the multi-select.
+      const orderedCourses = [...selectedCourses].sort(
+        (a, b) => COURSES.indexOf(a) - COURSES.indexOf(b)
+      );
+
       setReport({
         period,
-        courses: [...selectedCourses],
+        courses: orderedCourses,
         range,
         generatedAt: new Date(),
         performanceByCourse,
