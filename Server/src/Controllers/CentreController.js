@@ -1,5 +1,5 @@
 const Centre = require("../Models/Centre");
-const { getSupabase, assertNoError } = require("../config/supabase");
+const { getDb } = require("../config/firebase");
 const { fail, ok, wrap } = require("../Utils/httpResponse");
 const {
   getCanonicalCentreKey,
@@ -27,17 +27,15 @@ const isVishistUser = (user) => {
  */
 exports.getCentresOverview = wrap(
   async (_req, res) => {
-    const supabase = getSupabase();
-    const [centres, usersRes, studentsRes] = await Promise.all([
+    const db = getDb();
+    const [centres, usersSnap, studentsSnap] = await Promise.all([
       Centre.findAll(),
-      supabase.from("users").select("centre, role, is_vishist"),
-      supabase.from("students").select("centre"),
+      db.collection("users").get(),
+      db.collection("students").get(),
     ]);
-    assertNoError(usersRes.error, "Failed to load users for centres overview");
-    assertNoError(studentsRes.error, "Failed to load students for centres overview");
 
-    const users = (usersRes.data || []).map((u) => ({ centre: u.centre, role: u.role, isVishist: u.is_vishist }));
-    const students = studentsRes.data || [];
+    const users = usersSnap.docs.map((d) => d.data());
+    const students = studentsSnap.docs.map((d) => d.data());
 
     const overview = centres.map((centre) => {
       const key = getCanonicalCentreKey(centre.name);

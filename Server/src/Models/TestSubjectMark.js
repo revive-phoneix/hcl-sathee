@@ -1,70 +1,93 @@
-const { getSupabase, assertNoError } = require("../config/supabase");
+const { getDb } = require("../config/firebase");
 const { toDate } = require("../Utils/firestoreHelpers");
+const { mirrorUpsert, mirrorDelete } = require("../Utils/supabaseMirror");
 
-const TABLE = "test_subject_marks";
+const COLLECTION = "testSubjectMarks";
+
+const marksRef = () => getDb().collection(COLLECTION);
 
 const roundPct = (obtained, total) => {
   if (!total || total <= 0) return null;
   return Math.round((Number(obtained) / Number(total)) * 1000) / 10;
 };
 
+const slugPart = (value) =>
+  String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "") || "subject";
+
 const normalizeTestType = (testType) => String(testType || "performance").trim().toLowerCase();
 
-const toApiMark = (row) => {
-  if (!row) return null;
-  return {
-    id: row.id,
-    testId: row.test_id,
-    testType: row.test_type ?? "performance",
-    studentId: row.student_id,
-    course: row.course ?? null,
-    centre: row.centre ?? null,
-    subject: row.subject,
-    marksObtained: row.marks_obtained ?? 0,
-    totalMarks: row.total_marks ?? 0,
-    subjectPercentage: row.subject_percentage ?? roundPct(row.marks_obtained, row.total_marks),
-    answerSheetUrl: row.answer_sheet_url ?? null,
-    answerSheetPath: row.answer_sheet_path ?? null,
-    source: row.source ?? "manual",
-    verifiedByMitra: Boolean(row.verified_by_mitra),
-    enteredBy: row.entered_by ?? null,
-    created_at: toDate(row.created_at),
-    updated_at: toDate(row.updated_at),
-  };
-};
+const buildDocId = (testId, studentId, subject, testType = "performance") =>
+  `${testId}_${studentId}_${normalizeTestType(testType)}_${slugPart(subject)}`;
+
+const buildLegacyDocId = (testId, studentId, subject) =>
+  `${testId}_${studentId}_${slugPart(subject)}`;
+
+const toApiMark = (docId, data) => ({
+  id: docId,
+  testId: data.testId,
+  testType: data.testType ?? "performance",
+  studentId: data.studentId,
+  course: data.course ?? null,
+  centre: data.centre ?? null,
+  subject: data.subject,
+  marksObtained: data.marksObtained ?? 0,
+  totalMarks: data.totalMarks ?? 0,
+  subjectPercentage: data.subjectPercentage ?? roundPct(data.marksObtained, data.totalMarks),
+  answerSheetUrl: data.answerSheetUrl ?? null,
+  answerSheetPath: data.answerSheetPath ?? null,
+  source: data.source ?? "manual",
+  verifiedByMitra: Boolean(data.verifiedByMitra),
+  enteredBy: data.enteredBy ?? null,
+  created_at: toDate(data.created_at),
+  updated_at: toDate(data.updated_at),
+});
+
+/** Maps to the Supabase `test_subject_marks` row shape (id is auto-generated there — this table's natural key is test_id+student_id+test_type+subject). */
+const toMirrorRow = (data) => ({
+  test_id: data.testId,
+  test_type: data.testType ?? "performance",
+  student_id: data.studentId,
+  course: data.course ?? null,
+  centre: data.centre ?? null,
+  subject: data.subject,
+  marks_obtained: data.marksObtained ?? 0,
+  total_marks: data.totalMarks ?? 0,
+  subject_percentage: data.subjectPercentage ?? roundPct(data.marksObtained, data.totalMarks),
+  answer_sheet_url: data.answerSheetUrl ?? null,
+  answer_sheet_path: data.answerSheetPath ?? null,
+  source: data.source ?? "manual",
+  verified_by_mitra: Boolean(data.verifiedByMitra),
+  entered_by: data.enteredBy ?? null,
+  created_at: (toDate(data.created_at) || new Date()).toISOString(),
+});
 
 const findByTest = async (testId) => {
-  const { data, error } = await getSupabase().from(TABLE).select("*").eq("test_id", testId);
-  assertNoError(error, "Failed to load test marks");
-  return (data || []).map(toApiMark);
+  const snap = await marksRef().where("testId", "==", testId).get();
+  return snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
 };
 
 const findByStudentAndTest = async (studentId, testId) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("test_id", testId)
-    .eq("student_id", Number(studentId) || studentId);
-  assertNoError(error, "Failed to load student test marks");
-  return (data || []).map(toApiMark);
+  const snap = await marksRef()
+    .where("testId", "==", testId)
+    .where("studentId", "==", Number(studentId) || studentId)
+    .get();
+  return snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
 };
 
 const findByStudent = async (studentId) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("student_id", Number(studentId) || studentId);
-  assertNoError(error, "Failed to load student marks");
-  return (data || []).map(toApiMark);
+  const snap = await marksRef()
+    .where("studentId", "==", Number(studentId) || studentId)
+    .get();
+  return snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
 };
 
 const findByCourse = async (course, centre = null) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("course", String(course || "").trim().toUpperCase());
-  assertNoError(error, "Failed to load course marks");
-  let rows = (data || []).map(toApiMark);
+  const snap = await marksRef().where("course", "==", String(course || "").trim().toUpperCase()).get();
+  let rows = snap.docs.map((doc) => toApiMark(doc.id, doc.data()));
   if (centre) {
     const { matchesCentre } = require("../Utils/centreMatch");
     rows = rows.filter((r) => matchesCentre(r.centre, centre));
@@ -73,9 +96,14 @@ const findByCourse = async (course, centre = null) => {
 };
 
 const deleteByTestId = async (testId) => {
-  const { data, error } = await getSupabase().from(TABLE).delete().eq("test_id", testId).select("id");
-  assertNoError(error, "Failed to delete test marks");
-  return data ? data.length : 0;
+  const snap = await marksRef().where("testId", "==", testId).get();
+  if (snap.empty) return 0;
+
+  const batch = getDb().batch();
+  snap.docs.forEach((doc) => batch.delete(doc.ref));
+  await batch.commit();
+  await mirrorDelete("test_subject_marks", "test_id", testId);
+  return snap.docs.length;
 };
 
 const upsert = async ({
@@ -100,47 +128,52 @@ const upsert = async ({
   }
 
   const normalizedTestType = normalizeTestType(testType);
-  const normalizedStudentId = Number(studentId) || studentId;
-  const supabase = getSupabase();
+  const docId = buildDocId(testId, studentId, subjectName, normalizedTestType);
+  let persistedDocId = docId;
+  let ref = marksRef().doc(docId);
+  let existing = await ref.get();
 
-  const { data: existing, error: fetchError } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("test_id", testId)
-    .eq("student_id", normalizedStudentId)
-    .eq("test_type", normalizedTestType)
-    .eq("subject", subjectName)
-    .maybeSingle();
-  assertNoError(fetchError, "Failed to load existing test mark");
+  if (!existing.exists && normalizedTestType === "performance") {
+    const legacyRef = marksRef().doc(buildLegacyDocId(testId, studentId, subjectName));
+    const legacy = await legacyRef.get();
+    if (legacy.exists && normalizeTestType(legacy.data().testType) === "performance") {
+      ref = legacyRef;
+      persistedDocId = buildLegacyDocId(testId, studentId, subjectName);
+      existing = legacy;
+    }
+  }
+  const now = new Date();
 
   const obtained = Math.max(0, Number(marksObtained) || 0);
   const total = Math.max(0, Number(totalMarks) || 0);
 
-  const payload = {
-    test_id: testId,
-    test_type: normalizedTestType,
-    student_id: normalizedStudentId,
-    course: course || existing?.course || null,
-    centre: centre || existing?.centre || null,
-    subject: subjectName,
-    marks_obtained: obtained,
-    total_marks: total,
-    subject_percentage: subjectPercentage ?? roundPct(obtained, total), // Use provided or calculate
-    answer_sheet_url: answerSheetUrl ?? existing?.answer_sheet_url ?? null,
-    answer_sheet_path: answerSheetPath ?? existing?.answer_sheet_path ?? null,
-    source,
-    verified_by_mitra: Boolean(verifiedByMitra),
-    entered_by: enteredBy ?? existing?.entered_by ?? null,
-  };
-  if (existing) payload.id = existing.id;
+  const base = existing.exists
+    ? existing.data()
+    : { id: persistedDocId, testId, studentId: Number(studentId) || studentId, created_at: now };
 
-  const { data, error } = await supabase
-    .from(TABLE)
-    .upsert(payload, { onConflict: "test_id,student_id,test_type,subject" })
-    .select("*")
-    .single();
-  assertNoError(error, "Failed to save test mark");
-  return toApiMark(data);
+  const payload = {
+    ...base,
+    id: persistedDocId,
+    testId,
+    testType: normalizedTestType,
+    studentId: Number(studentId) || studentId,
+    course: course || base.course || null,
+    centre: centre || base.centre || null,
+    subject: subjectName,
+    marksObtained: obtained,
+    totalMarks: total,
+    subjectPercentage: subjectPercentage ?? roundPct(obtained, total), // Use provided or calculate
+    answerSheetUrl: answerSheetUrl ?? base.answerSheetUrl ?? null,
+    answerSheetPath: answerSheetPath ?? base.answerSheetPath ?? null,
+    source,
+    verifiedByMitra: Boolean(verifiedByMitra),
+    enteredBy: enteredBy ?? base.enteredBy ?? null,
+    updated_at: now,
+  };
+
+  await ref.set(payload, { merge: true });
+  await mirrorUpsert("test_subject_marks", toMirrorRow(payload), "test_id,student_id,test_type,subject");
+  return toApiMark(docId, payload);
 };
 
 module.exports = {

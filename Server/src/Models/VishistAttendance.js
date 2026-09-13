@@ -1,52 +1,78 @@
+const { getDb, withStorageBucket } = require("../config/firebase");
 const path = require("path");
-const { getSupabase, assertNoError } = require("../config/supabase");
-const { uploadToStorage } = require("../config/storage");
 const { toDate } = require("../Utils/firestoreHelpers");
+const { mirrorUpsert } = require("../Utils/supabaseMirror");
 
-const TABLE = "vishist_attendances";
+const COLLECTION = "vishistAttendances";
+const attendancesRef = () => getDb().collection(COLLECTION);
 
-const toApiRecord = (row) => {
-  if (!row) return null;
-  return {
-    id: row.id,
-    vishistUserId: row.vishist_user_id ?? null,
-    vishistName: row.vishist_name ?? null,
-    vishistEmail: row.vishist_email ?? null,
-    centre: row.centre ?? null,
-    subject: row.subject ?? null,
-    topicTaught: row.topic_taught ?? null,
-    photoUrl: row.photo_url ?? null,
-    photoPath: row.photo_path ?? null,
-    markedByUserId: row.marked_by_user_id ?? null,
-    markedByName: row.marked_by_name ?? null,
-    date: row.date ?? null,
-    created_at: toDate(row.created_at),
-    status: row.status || "pending",
-    approvedByUserId: row.approved_by_user_id ?? null,
-    approvedAt: toDate(row.approved_at),
-  };
-};
-
-const uploadPhoto = async (file, vishistUserId, date) => {
+const uploadPhotoToBucket = async (bucket, file, vishistUserId, date) => {
   const ext = path.extname(file.originalname || "").toLowerCase() || ".jpg";
   const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
   const storagePath = `vishist-attendance/${vishistUserId}/${date}/${Date.now()}${safeExt}`;
-  return uploadToStorage(storagePath, file.buffer, {
-    contentType: file.mimetype || "image/jpeg",
+  const storageFile = bucket.file(storagePath);
+
+  await storageFile.save(file.buffer, {
+    metadata: { contentType: file.mimetype || "image/jpeg", cacheControl: "public, max-age=31536000" },
+    resumable: false,
   });
+
+  let url;
+  try {
+    const [signedUrl] = await storageFile.getSignedUrl({
+      action: "read",
+      expires: new Date("2500-01-01T00:00:00.000Z"),
+    });
+    url = signedUrl;
+  } catch {
+    await storageFile.makePublic();
+    url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+  }
+  return { url, storagePath };
 };
 
+const toApiRecord = (docId, data) => ({
+  id: docId,
+  vishistUserId: data.vishistUserId ?? null,
+  vishistName: data.vishistName ?? null,
+  vishistEmail: data.vishistEmail ?? null,
+  centre: data.centre ?? null,
+  subject: data.subject ?? null,
+  topicTaught: data.topicTaught ?? null,
+  photoUrl: data.photoUrl ?? null,
+  photoPath: data.photoPath ?? null,
+  markedByUserId: data.markedByUserId ?? null,
+  markedByName: data.markedByName ?? null,
+  date: data.date ?? null,
+  created_at: toDate(data.created_at),
+  status: data.status || "pending",
+approvedByUserId: data.approvedByUserId ?? null,
+approvedAt: toDate(data.approvedAt),
+});
+
+/** Maps to the Supabase `vishist_attendances` row shape (matched by firestore_id, since the Firestore doc id here is a random auto-generated string). */
+const toMirrorRow = (docId, data) => ({
+  firestore_id: docId,
+  vishist_user_id: Number(data.vishistUserId) || data.vishistUserId,
+  vishist_name: data.vishistName ?? null,
+  vishist_email: data.vishistEmail ?? null,
+  centre: data.centre ?? null,
+  subject: data.subject ?? null,
+  topic_taught: data.topicTaught ?? null,
+  photo_url: data.photoUrl ?? null,
+  photo_path: data.photoPath ?? null,
+  marked_by_user_id: data.markedByUserId ?? null,
+  marked_by_name: data.markedByName ?? null,
+  date: data.date ?? null,
+  status: data.status || "pending",
+  approved_by_user_id: data.approvedByUserId ?? null,
+  approved_at: data.approvedAt ? (toDate(data.approvedAt) || new Date()).toISOString() : null,
+  created_at: (toDate(data.created_at) || new Date()).toISOString(),
+});
+
 const create = async ({
-  vishistUserId,
-  vishistName,
-  vishistEmail,
-  centre,
-  subject,
-  topicTaught,
-  date,
-  file,
-  markedByUserId,
-  markedByName,
+  vishistUserId, vishistName, vishistEmail, centre,
+  subject, topicTaught, date, file, markedByUserId, markedByName,
 }) => {
   if (!vishistUserId || !subject || !topicTaught || !date) {
     throw new Error("vishistUserId, subject, topicTaught and date are required");
@@ -55,86 +81,80 @@ const create = async ({
   let photoUrl = null;
   let photoPath = null;
   if (file?.buffer?.length) {
-    const uploaded = await uploadPhoto(file, vishistUserId, date);
+    const uploaded = await withStorageBucket((bucket) =>
+      uploadPhotoToBucket(bucket, file, vishistUserId, date)
+    );
     photoUrl = uploaded.url;
     photoPath = uploaded.storagePath;
   }
 
-  const payload = {
-    vishist_user_id: Number(vishistUserId) || vishistUserId,
-    vishist_name: vishistName || null,
-    vishist_email: vishistEmail || null,
+  const docData = {
+    vishistUserId: Number(vishistUserId) || vishistUserId,
+    vishistName: vishistName || null,
+    vishistEmail: vishistEmail || null,
     centre: centre || null,
     subject,
-    topic_taught: topicTaught,
-    photo_url: photoUrl,
-    photo_path: photoPath,
-    marked_by_user_id: markedByUserId ?? null,
-    marked_by_name: markedByName || null,
+    topicTaught,
+    photoUrl,
+    photoPath,
+    markedByUserId: markedByUserId ?? null,
+    markedByName: markedByName || null,
     date,
+    created_at: new Date(),
     status: "pending",
   };
 
-  const { data, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
-  assertNoError(error, "Failed to create vishist attendance record");
-  return toApiRecord(data);
+  const ref = await attendancesRef().add(docData);
+  await mirrorUpsert("vishist_attendances", toMirrorRow(ref.id, docData), "firestore_id");
+  return toApiRecord(ref.id, docData);
 };
 
 const approve = async (recordId, approvedByUserId) => {
-  const supabase = getSupabase();
-  const { data: row, error: fetchError } = await supabase
-    .from(TABLE)
-    .select("*")
-    .eq("id", recordId)
-    .maybeSingle();
-  assertNoError(fetchError, "Failed to load vishist attendance record");
-
-  if (!row) {
+  const ref = attendancesRef().doc(recordId);
+  const doc = await ref.get();
+  if (!doc.exists) {
     const err = new Error("Vishist attendance record not found");
     err.status = 404;
     throw err;
   }
-  if (row.status === "approved") {
+  if (doc.data().status === "approved") {
     const err = new Error("This attendance is already approved");
     err.status = 400;
     throw err;
   }
 
-  const { data: updated, error } = await supabase
-    .from(TABLE)
-    .update({ status: "approved", approved_by_user_id: approvedByUserId, approved_at: new Date().toISOString() })
-    .eq("id", recordId)
-    .select("*")
-    .single();
-  assertNoError(error, "Failed to approve vishist attendance");
-  return toApiRecord(updated);
+  await ref.update({ status: "approved", approvedByUserId, approvedAt: new Date() });
+  const updated = await ref.get();
+  await mirrorUpsert("vishist_attendances", toMirrorRow(updated.id, updated.data()), "firestore_id");
+  return toApiRecord(updated.id, updated.data());
 };
 
 const findByDate = async (date, centre = null, status = null) => {
-  const { data, error } = await getSupabase().from(TABLE).select("*").eq("date", date);
-  assertNoError(error, "Failed to load vishist attendance");
-  let rows = (data || []).map(toApiRecord);
+  const snap = await attendancesRef().where("date", "==", date).get();
+  let rows = snap.docs.map((doc) => toApiRecord(doc.id, doc.data()));
   if (centre) {
     const { matchesCentre } = require("../Utils/centreMatch");
     rows = rows.filter((r) => matchesCentre(r.centre, centre));
   }
-  if (status) rows = rows.filter((r) => r.status === status);
+  if (status) {
+    rows = rows.filter((r) => r.status === status);
+  }
   return rows.sort((a, b) => (b.created_at?.getTime() || 0) - (a.created_at?.getTime() || 0));
 };
 
 const findByDateRange = async (fromDate, toDateArg, centre = null, status = null) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .gte("date", fromDate)
-    .lte("date", toDateArg);
-  assertNoError(error, "Failed to load vishist attendance");
-  let rows = (data || []).map(toApiRecord);
+  const snap = await attendancesRef()
+    .where("date", ">=", fromDate)
+    .where("date", "<=", toDateArg)
+    .get();
+  let rows = snap.docs.map((doc) => toApiRecord(doc.id, doc.data()));
   if (centre) {
     const { matchesCentre } = require("../Utils/centreMatch");
     rows = rows.filter((r) => matchesCentre(r.centre, centre));
   }
-  if (status) rows = rows.filter((r) => r.status === status);
+  if (status) {
+    rows = rows.filter((r) => r.status === status);
+  }
   return rows.sort((a, b) => (b.created_at?.getTime() || 0) - (a.created_at?.getTime() || 0));
 };
 

@@ -1,7 +1,12 @@
-const { getSupabase, assertNoError } = require("../config/supabase");
-const { toDate } = require("../Utils/firestoreHelpers");
+const { toDate, findDocRefById: findRef, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { getDb } = require("../config/firebase");
+const { mirrorUpsert } = require("../Utils/supabaseMirror");
 
-const TABLE = "support_queries";
+const COLLECTION = "support_queries";
+
+const supportQueriesRef = () => getDb().collection(COLLECTION);
+const findDocRefById = (id) => findRef(supportQueriesRef(), id);
+const getNextId = () => nextId(supportQueriesRef());
 
 const normalizeReplies = (value) => {
   if (!Array.isArray(value)) return [];
@@ -16,94 +21,105 @@ const normalizeReplies = (value) => {
     .filter((reply) => reply.message);
 };
 
-const toApiSupportQuery = (row) => {
-  if (!row) return null;
-  return {
-    id: row.id,
-    title: row.title || "Untitled query",
-    description: row.description || "",
-    status: row.status || "Open",
-    submittedBy: row.submitted_by || "Partner User",
-    submittedByEmail: row.submitted_by_email || "",
-    submittedByRole: row.submitted_by_role || "HCL Partner",
-    centre: row.centre || null,
-    created_at: toDate(row.created_at),
-    updated_at: toDate(row.updated_at),
-    replies: normalizeReplies(row.replies),
-  };
-};
+const toApiSupportQuery = (docId, data) => ({
+  id: Number(docId) || docId,
+  title: data.title || "Untitled query",
+  description: data.description || "",
+  status: data.status || "Open",
+  submittedBy: data.submittedBy || "Partner User",
+  submittedByEmail: data.submittedByEmail || "",
+  submittedByRole: data.submittedByRole || "HCL Partner",
+  centre: data.centre || null,
+  created_at: toDate(data.created_at),
+  updated_at: toDate(data.updated_at),
+  replies: normalizeReplies(data.replies),
+});
+
+/** Maps the same Firestore document shape to the Supabase `support_queries` row shape. */
+const toMirrorRow = (id, data) => ({
+  id: Number(id) || id,
+  title: data.title || "Untitled query",
+  description: data.description || "",
+  status: data.status || "Open",
+  submitted_by: data.submittedBy || "Partner User",
+  submitted_by_email: data.submittedByEmail || "",
+  submitted_by_role: data.submittedByRole || "HCL Partner",
+  centre: data.centre || null,
+  replies: normalizeReplies(data.replies).map((reply) => ({
+    ...reply,
+    created_at: (toDate(reply.created_at) || new Date()).toISOString(),
+  })),
+  created_at: (toDate(data.created_at) || new Date()).toISOString(),
+});
 
 const findAll = async () => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .order("created_at", { ascending: false });
-  assertNoError(error, "Failed to list support queries");
-  return (data || []).map(toApiSupportQuery);
+  const snap = await supportQueriesRef().orderBy("created_at", "desc").get();
+  return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
 };
 
 const findBySubmittedByEmail = async (email) => {
   const normalized = String(email || "").trim().toLowerCase();
   if (!normalized) return [];
 
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("submitted_by_email", normalized);
-  assertNoError(error, "Failed to load support queries");
-  return (data || []).map(toApiSupportQuery);
+  const snap = await supportQueriesRef().where("submittedByEmail", "==", normalized).get();
+  return snap.docs.map((doc) => toApiSupportQuery(doc.id, doc.data()));
 };
 
 const findById = async (id) => {
-  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
-  assertNoError(error, "Failed to find support query");
-  return toApiSupportQuery(data);
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
+  const doc = await ref.get();
+  return toApiSupportQuery(doc.id, doc.data());
 };
 
 const create = async (data) => {
+  const now = new Date();
+  const id = await getNextId();
   const payload = {
+    id,
     title: String(data.title || "").trim(),
     description: String(data.description || "").trim(),
     status: data.status || "Open",
-    submitted_by: String(data.submittedBy || "Partner User").trim(),
-    submitted_by_email: String(data.submittedByEmail || "").trim(),
-    submitted_by_role: String(data.submittedByRole || "HCL Partner").trim(),
+    submittedBy: String(data.submittedBy || "Partner User").trim(),
+    submittedByEmail: String(data.submittedByEmail || "").trim(),
+    submittedByRole: String(data.submittedByRole || "HCL Partner").trim(),
     centre: data.centre || null,
     replies: normalizeReplies(data.replies),
+    created_at: now,
+    updated_at: now,
   };
 
-  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
-  assertNoError(error, "Failed to create support query");
-  return toApiSupportQuery(row);
+  await supportQueriesRef().doc(String(id)).set(payload);
+  await mirrorUpsert("support_queries", toMirrorRow(id, payload));
+  return toApiSupportQuery(String(id), payload);
 };
 
 const addReply = async (id, { adminName, message }) => {
-  const { data: current, error: fetchError } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  assertNoError(fetchError, "Failed to load support query");
-  if (!current) return null;
+  const ref = await findDocRefById(id);
+  if (!ref) return null;
 
+  const existing = await ref.get();
+  const current = existing.data() || {};
+  const nextReplies = normalizeReplies(current.replies || []);
   const reply = {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
     adminName: String(adminName || "Admin").trim(),
     message: String(message || "").trim(),
     created_at: new Date(),
   };
+
   if (!reply.message) return null;
 
-  const nextReplies = [...normalizeReplies(current.replies || []), reply];
+  const updated = {
+    replies: [...nextReplies, reply],
+    status: "Replied",
+    updated_at: new Date(),
+  };
 
-  const { data: row, error } = await getSupabase()
-    .from(TABLE)
-    .update({ replies: nextReplies, status: "Replied" })
-    .eq("id", id)
-    .select("*")
-    .single();
-  assertNoError(error, "Failed to add reply");
-  return toApiSupportQuery(row);
+  await ref.update(updated);
+  const doc = await ref.get();
+  await mirrorUpsert("support_queries", toMirrorRow(doc.id, doc.data()));
+  return toApiSupportQuery(doc.id, doc.data());
 };
 
 module.exports = { findAll, findBySubmittedByEmail, findById, create, addReply };

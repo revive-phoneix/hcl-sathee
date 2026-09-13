@@ -4,8 +4,8 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 require("dotenv").config();
 
-const { initSupabase } = require("./config/supabase");
-const { initFirebaseMessaging } = require("./config/firebase");
+const { initFirebase } = require("./config/firebase");
+const { initSupabaseMirror } = require("./config/supabase");
 const authRoutes = require("./Routes/AuthRoutes");
 const centreRoutes = require("./Routes/CentreRoutes");
 const userRoutes = require("./Routes/UserRoutes");
@@ -113,21 +113,19 @@ app.use((err, _req, res, _next) => {
 });
 
 try {
-  initSupabase();
+  initFirebase();
 
-  // Push notifications (FCM) are optional — don't block server boot on them.
-  try {
-    initFirebaseMessaging();
-  } catch (err) {
-    console.warn("⚠️  Push notifications disabled:", err.message);
-  }
+  // Supabase is a best-effort mirror during the migration window — Firebase
+  // stays the real, primary database until real Supabase credentials are
+  // added, so a missing/incomplete Supabase config must never block boot.
+  initSupabaseMirror();
 
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
   });
 } catch (err) {
-  console.error("❌ Supabase Connection Failed");
+  console.error("❌ Firebase Connection Failed");
   console.error(err.message);
   process.exit(1);
 }

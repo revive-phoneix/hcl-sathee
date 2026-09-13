@@ -1,82 +1,108 @@
-const { getSupabase, assertNoError } = require("../config/supabase");
-const { toDate } = require("../Utils/firestoreHelpers");
+const { getDb } = require("../config/firebase");
+const { toDate, getNextId: nextId } = require("../Utils/firestoreHelpers");
+const { mirrorUpsert } = require("../Utils/supabaseMirror");
 
-const TABLE = "subject_attendances";
+const COLLECTION = "subjectAttendances";
+
+const attendancesRef = () => getDb().collection(COLLECTION);
+const getNextId = () => nextId(attendancesRef());
 
 const roundPct = (attended, total) => {
   if (!total || total <= 0) return 0;
   return Math.round((Number(attended) / Number(total)) * 1000) / 10;
 };
 
-const toApiAttendance = (row) => {
-  if (!row) return null;
-  return {
-    id: row.id,
-    studentId: row.student_id,
-    subject: row.subject,
-    dailyAttendancePercentage: row.daily_attendance_percentage ?? 0,
-    weeklyAttendancePercentage: row.weekly_attendance_percentage ?? 0,
-    monthlyAttendancePercentage: row.monthly_attendance_percentage ?? 0,
-    percentage: row.percentage ?? roundPct(row.classes_attended, row.total_classes),
-    totalClasses: row.total_classes ?? 0,
-    classesAttended: row.classes_attended ?? 0,
-    created_at: toDate(row.created_at),
-    updated_at: toDate(row.updated_at),
-  };
-};
+const toApiAttendance = (docId, data) => ({
+  id: Number(docId) || docId,
+  studentId: data.studentId,
+  subject: data.subject,
+  dailyAttendancePercentage: data.dailyAttendancePercentage ?? 0,
+  weeklyAttendancePercentage: data.weeklyAttendancePercentage ?? 0,
+  monthlyAttendancePercentage: data.monthlyAttendancePercentage ?? 0,
+  percentage: data.percentage ?? roundPct(data.classesAttended, data.totalClasses),
+  totalClasses: data.totalClasses ?? 0,
+  classesAttended: data.classesAttended ?? 0,
+  created_at: toDate(data.created_at),
+  updated_at: toDate(data.updated_at),
+});
+
+/** Maps the same Firestore document shape to the Supabase `subject_attendances` row shape. */
+const toMirrorRow = (id, data) => ({
+  id: Number(id) || id,
+  student_id: data.studentId,
+  subject: data.subject,
+  daily_attendance_percentage: data.dailyAttendancePercentage ?? 0,
+  weekly_attendance_percentage: data.weeklyAttendancePercentage ?? 0,
+  monthly_attendance_percentage: data.monthlyAttendancePercentage ?? 0,
+  percentage: data.percentage ?? roundPct(data.classesAttended, data.totalClasses),
+  total_classes: data.totalClasses ?? 0,
+  classes_attended: data.classesAttended ?? 0,
+  created_at: (toDate(data.created_at) || new Date()).toISOString(),
+});
 
 const findAll = async () => {
-  const { data, error } = await getSupabase().from(TABLE).select("*");
-  assertNoError(error, "Failed to list subject attendance");
-  return (data || []).map(toApiAttendance);
+  const snap = await attendancesRef().get();
+  return snap.docs.map((doc) => toApiAttendance(doc.id, doc.data()));
 };
 
 const findByStudentId = async (studentId) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("student_id", Number(studentId) || studentId);
-  assertNoError(error, "Failed to load student attendance");
-  return (data || []).map(toApiAttendance);
+  const snap = await attendancesRef()
+    .where("studentId", "==", Number(studentId) || studentId)
+    .get();
+  return snap.docs.map((doc) => toApiAttendance(doc.id, doc.data()));
 };
 
 const findByStudentAndSubject = async (studentId, subject) => {
   const subjectName = String(subject || "").trim();
   if (!subjectName) return null;
 
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .select("*")
-    .eq("student_id", Number(studentId) || studentId)
-    .eq("subject", subjectName)
-    .maybeSingle();
-  assertNoError(error, "Failed to load student attendance");
-  return toApiAttendance(data);
+  const snap = await attendancesRef()
+    .where("studentId", "==", Number(studentId) || studentId)
+    .where("subject", "==", subjectName)
+    .limit(1)
+    .get();
+
+  if (snap.empty) return null;
+  const doc = snap.docs[0];
+  return { ref: doc.ref, data: toApiAttendance(doc.id, doc.data()) };
 };
 
 const create = async (data) => {
+  const now = new Date();
+  const id = await getNextId();
   const totalClasses = data.totalClasses ?? 0;
   const classesAttended = data.classesAttended ?? 0;
   const percentage =
-    data.percentage != null ? Number(data.percentage) : roundPct(classesAttended, totalClasses);
+    data.percentage != null
+      ? Number(data.percentage)
+      : roundPct(classesAttended, totalClasses);
 
   const payload = {
-    student_id: data.studentId,
+    id,
+    studentId: data.studentId,
     subject: data.subject,
-    daily_attendance_percentage: data.dailyAttendancePercentage ?? percentage,
-    weekly_attendance_percentage: data.weeklyAttendancePercentage ?? percentage,
-    monthly_attendance_percentage: data.monthlyAttendancePercentage ?? percentage,
+    dailyAttendancePercentage: data.dailyAttendancePercentage ?? percentage,
+    weeklyAttendancePercentage: data.weeklyAttendancePercentage ?? percentage,
+    monthlyAttendancePercentage: data.monthlyAttendancePercentage ?? percentage,
     percentage,
-    total_classes: totalClasses,
-    classes_attended: classesAttended,
+    totalClasses,
+    classesAttended,
+    created_at: now,
+    updated_at: now,
   };
 
-  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
-  assertNoError(error, "Failed to create subject attendance");
-  return toApiAttendance(row);
+  await attendancesRef().doc(String(id)).set(payload);
+  await mirrorUpsert("subject_attendances", toMirrorRow(id, payload), "student_id,subject");
+  return toApiAttendance(String(id), payload);
 };
 
-const upsertTotals = async ({ studentId, subject, totalClasses, classesAttended, percentage }) => {
+const upsertTotals = async ({
+  studentId,
+  subject,
+  totalClasses,
+  classesAttended,
+  percentage,
+}) => {
   const subjectName = String(subject || "").trim();
   const total = Math.max(0, Number(totalClasses) || 0);
   const attended = Math.max(0, Number(classesAttended) || 0);
@@ -85,58 +111,37 @@ const upsertTotals = async ({ studentId, subject, totalClasses, classesAttended,
       ? Number(percentage)
       : roundPct(attended, total);
 
-  const normalizedStudentId = Number(studentId) || studentId;
-  const supabase = getSupabase();
+  const existing = await findByStudentAndSubject(studentId, subjectName);
+  const now = new Date();
 
-  const { data: existing, error: fetchError } = await supabase
-    .from(TABLE)
-    .select("id")
-    .eq("student_id", normalizedStudentId)
-    .eq("subject", subjectName)
-    .maybeSingle();
-  assertNoError(fetchError, "Failed to load subject attendance");
+  if (existing) {
+    const payload = {
+      studentId: Number(studentId) || studentId,
+      subject: subjectName,
+      totalClasses: total,
+      classesAttended: attended,
+      percentage: pct,
+      dailyAttendancePercentage: pct,
+      weeklyAttendancePercentage: pct,
+      monthlyAttendancePercentage: pct,
+      updated_at: now,
+    };
+    await existing.ref.update(payload);
+    const doc = await existing.ref.get();
+    await mirrorUpsert("subject_attendances", toMirrorRow(doc.id, doc.data()), "student_id,subject");
+    return toApiAttendance(doc.id, doc.data());
+  }
 
-  const payload = {
-    student_id: normalizedStudentId,
+  return create({
+    studentId: Number(studentId) || studentId,
     subject: subjectName,
-    total_classes: total,
-    classes_attended: attended,
+    totalClasses: total,
+    classesAttended: attended,
     percentage: pct,
-    daily_attendance_percentage: pct,
-    weekly_attendance_percentage: pct,
-    monthly_attendance_percentage: pct,
-  };
-  if (existing) payload.id = existing.id;
-
-  const { data, error } = await supabase
-    .from(TABLE)
-    .upsert(payload, { onConflict: "student_id,subject" })
-    .select("*")
-    .single();
-  assertNoError(error, "Failed to save subject attendance");
-  return toApiAttendance(data);
-};
-
-/**
- * Patch just the daily/weekly/monthly percentage columns for an existing
- * student+subject row, leaving totalClasses/classesAttended/percentage
- * untouched. Used when the caller supplies explicit percentages instead of
- * raw class counts.
- */
-const updatePercentages = async (studentId, subject, { daily, weekly, monthly }) => {
-  const { data, error } = await getSupabase()
-    .from(TABLE)
-    .update({
-      daily_attendance_percentage: daily,
-      weekly_attendance_percentage: weekly,
-      monthly_attendance_percentage: monthly,
-    })
-    .eq("student_id", Number(studentId) || studentId)
-    .eq("subject", String(subject || "").trim())
-    .select("*")
-    .maybeSingle();
-  assertNoError(error, "Failed to update attendance percentages");
-  return toApiAttendance(data);
+    dailyAttendancePercentage: pct,
+    weeklyAttendancePercentage: pct,
+    monthlyAttendancePercentage: pct,
+  });
 };
 
 module.exports = {
@@ -145,6 +150,6 @@ module.exports = {
   findByStudentAndSubject,
   create,
   upsertTotals,
-  updatePercentages,
   roundPct,
+  toMirrorRow,
 };

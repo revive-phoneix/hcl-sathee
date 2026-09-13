@@ -22,8 +22,12 @@ end;
 $$ language plpgsql;
 
 -- ---------------------------------------------------------------- centres
+-- id is a PLAIN bigint (not identity) during the Firebase+Supabase dual-write
+-- window: the mirror always supplies Firestore's own numeric id explicitly,
+-- so ids stay identical across both databases and foreign keys below (e.g.
+-- test_subject_marks.student_id) keep meaning the same row in either one.
 create table if not exists centres (
-  id           bigint generated always as identity primary key,
+  id           bigint primary key,
   name         text not null unique,
   created_at   timestamptz not null default now(),
   created_by   bigint
@@ -31,7 +35,7 @@ create table if not exists centres (
 
 -- ---------------------------------------------------------------- users
 create table if not exists users (
-  id                 bigint generated always as identity primary key,
+  id                 bigint primary key,
   name               text,
   email              text not null unique,
   phone              text unique,
@@ -52,7 +56,7 @@ create index if not exists idx_users_role on users (role);
 
 -- ---------------------------------------------------------------- students
 create table if not exists students (
-  id              bigint generated always as identity primary key,
+  id              bigint primary key,
   student_id      text,
   enrollment_no   text,
   name            text,
@@ -79,7 +83,7 @@ create index if not exists idx_students_course on students (course);
 
 -- ---------------------------------------------------------------- tests
 create table if not exists tests (
-  id           bigint generated always as identity primary key,
+  id           bigint primary key,
   name         text,
   course       text not null,
   centre       text,
@@ -139,7 +143,7 @@ create index if not exists idx_daily_attendance_student on daily_subject_attenda
 
 -- ---------------------------------------------------------------- subject_attendances (aggregate rollup per student+subject)
 create table if not exists subject_attendances (
-  id                              bigint generated always as identity primary key,
+  id                              bigint primary key,
   student_id                      bigint not null,
   subject                         text not null,
   daily_attendance_percentage     numeric not null default 0,
@@ -155,7 +159,7 @@ create table if not exists subject_attendances (
 
 -- ---------------------------------------------------------------- subject_performances
 create table if not exists subject_performances (
-  id           bigint generated always as identity primary key,
+  id           bigint primary key,
   student_id   bigint not null,
   subject      text not null,
   marks        numeric,
@@ -195,8 +199,12 @@ create table if not exists mitra_attendances (
 create index if not exists idx_mitra_attendance_date on mitra_attendances (date);
 
 -- ---------------------------------------------------------------- vishist_attendances
+-- firestore_id lets the mirror upsert the SAME row on repeat writes (e.g. the
+-- approve step) even though Firestore assigned this collection a random
+-- auto-generated doc id instead of a reusable numeric one.
 create table if not exists vishist_attendances (
   id                bigint generated always as identity primary key,
+  firestore_id      text unique,
   vishist_user_id   bigint not null,
   vishist_name      text,
   vishist_email     text,
@@ -217,7 +225,7 @@ create index if not exists idx_vishist_attendance_date on vishist_attendances (d
 
 -- ---------------------------------------------------------------- announcements
 create table if not exists announcements (
-  id                bigint generated always as identity primary key,
+  id                bigint primary key,
   title             text,
   description       text,
   category          text not null default 'General',
@@ -235,7 +243,7 @@ create table if not exists announcements (
 
 -- ---------------------------------------------------------------- equipments
 create table if not exists equipments (
-  id             bigint generated always as identity primary key,
+  id             bigint primary key,
   name           text,
   description    text,
   quantity       integer not null default 0,
@@ -248,7 +256,7 @@ create index if not exists idx_equipment_centre on equipments (centre);
 
 -- ---------------------------------------------------------------- leave_requests
 create table if not exists leave_requests (
-  id                bigint generated always as identity primary key,
+  id                bigint primary key,
   user_id           bigint,
   name              text,
   email             text,
@@ -268,7 +276,7 @@ create index if not exists idx_leave_requests_centre on leave_requests (centre);
 
 -- ---------------------------------------------------------------- support_queries
 create table if not exists support_queries (
-  id                  bigint generated always as identity primary key,
+  id                  bigint primary key,
   title               text not null default 'Untitled query',
   description         text not null default '',
   status              text not null default 'Open',
@@ -339,12 +347,25 @@ create or replace trigger trg_support_queries_updated_at before update on suppor
 -- ============================================================================
 -- Notes
 -- ============================================================================
--- * Firestore's `_counters` and `_unique_user_fields` helper collections have
---   no equivalent here: `bigint generated always as identity` replaces manual
---   counters, and the `unique` constraints on users(email)/users(phone) and
---   the composite uniques above replace the manual lock-collection pattern.
+-- * DUAL-WRITE WINDOW: Firebase/Firestore is the real, primary database right
+--   now. The Node server mirrors every write into these tables on a
+--   best-effort basis (see Server/src/Utils/supabaseMirror.js) so this data
+--   is already caught up whenever Firebase is retired. Reads still come from
+--   Firestore — nothing queries these tables yet.
+-- * Tables whose Firestore documents used a manually-counted numeric id
+--   (centres, users, students, tests, announcements, equipments,
+--   leave_requests, subject_performances, subject_attendances) declare
+--   `id bigint primary key` WITHOUT identity/auto-increment — the mirror
+--   always supplies Firestore's own id explicitly, so the two databases'
+--   ids match and foreign keys (e.g. test_subject_marks.student_id) mean the
+--   same row in either one.
+-- * Tables whose Firestore documents used a composite/auto-generated string
+--   id instead (test_subject_marks, daily_subject_attendances,
+--   mitra_attendances, vishist_attendances) keep
+--   `bigint generated always as identity` and are upserted by the mirror on
+--   their natural unique constraint (e.g. test_id+student_id+test_type+subject)
+--   rather than by id, since nothing else references their id as a foreign key.
 -- * All tables are queried through the `service_role` key from the Node
---   server only — Row Level Security is intentionally left OFF (default deny
---   would otherwise block the service role's own access is not affected by
---   RLS, but if you ever expose these tables to anon/client-side queries,
---   enable RLS and write policies before doing so).
+--   server only — Row Level Security is intentionally left OFF (the service
+--   role bypasses RLS regardless, but if you ever expose these tables to
+--   anon/client-side queries, enable RLS and write policies before doing so).

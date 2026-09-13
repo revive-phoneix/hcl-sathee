@@ -13,7 +13,8 @@ const {
 const { toDateOnly } = require("../Utils/firestoreHelpers");
 const { recomputeSubjectAttendance } = require("../Utils/recomputeSubjectAttendance");
 const { normalizeCourseCode, resolveEnrolledSubjects } = require("../Utils/courseSubjects");
-const { uploadToStorage } = require("../config/storage");
+const { withStorageBucket } = require("../config/firebase");
+const { mirrorUpsert } = require("../Utils/supabaseMirror");
 
 const subjectPct = (row) => {
   if (!row) return 0;
@@ -201,12 +202,24 @@ exports.addSubjectAttendance = wrap(
         subject
       );
       if (found) {
-        const updated = await SubjectAttendance.updatePercentages(student.id, subject, {
-          daily,
-          weekly,
-          monthly,
+        await found.ref.update({
+          dailyAttendancePercentage: daily,
+          weeklyAttendancePercentage: weekly,
+          monthlyAttendancePercentage: monthly,
+          updated_at: new Date(),
         });
-        return ok(res, 201, { attendance: updated });
+        const doc = await found.ref.get();
+        await mirrorUpsert(
+          "subject_attendances",
+          SubjectAttendance.toMirrorRow(doc.id, doc.data()),
+          "student_id,subject"
+        );
+        return ok(res, 201, {
+          attendance: {
+            id: Number(doc.id) || doc.id,
+            ...doc.data(),
+          },
+        });
       }
     }
 
@@ -259,8 +272,29 @@ const uploadClassPhoto = async (file, date, subject, time) => {
   const safeExt = [".jpg", ".jpeg", ".png", ".webp"].includes(ext) ? ext : ".jpg";
   const storagePath = `class-attendance/${date}/${subject.replace(/[^a-zA-Z0-9]+/g, "-")}/${time || "notime"}-${Date.now()}${safeExt}`;
 
-  const uploadResult = await uploadToStorage(storagePath, file.buffer, {
-    contentType: file.mimetype || "image/jpeg",
+  const uploadResult = await withStorageBucket(async (bucket) => {
+    const storageFile = bucket.file(storagePath);
+    await storageFile.save(file.buffer, {
+      metadata: {
+        contentType: file.mimetype || "image/jpeg",
+        cacheControl: "public, max-age=31536000",
+      },
+      resumable: false,
+    });
+
+    let url;
+    try {
+      const [signedUrl] = await storageFile.getSignedUrl({
+        action: "read",
+        expires: new Date("2500-01-01T00:00:00.000Z"),
+      });
+      url = signedUrl;
+    } catch {
+      await storageFile.makePublic();
+      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
+    }
+
+    return { url, storagePath };
   });
 
   return {
