@@ -56,7 +56,7 @@ export default function Student({
 
     try {
       const created = await createStudent({
-        studentId: student.studentId?.trim() || `STU${Date.now().toString().slice(-6)}`,
+        studentId: student.studentId?.trim() || "",
         enrollmentNo: student.enrollmentNo?.trim() || `ENR${Date.now().toString().slice(-6)}`,
         name: fullName || "New Student",
         gender: student.gender || "Male",

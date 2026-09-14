@@ -8,17 +8,17 @@ import { getCanonicalCentreKey } from "./portalMapping";
  */
 const CENTRE_DIRECTORY_BY_KEY = {
   HCLRAJASTHAN: {
-    id: 1,
-    place: "Jaipur, Rajasthan",
+    id: "RJ-JU-01",
+    place: "Jhunjhunu, Rajasthan",
     address: "HCL SATHEE Learning Centre, Jaipur, Rajasthan – 302001",
   },
   HCLJHARKHAND: {
-    id: 2,
-    place: "Ranchi, Jharkhand",
+    id: "JH-EM-01",
+    place: "East Singhbhum, Jharkhand",
     address: "HCL SATHEE Learning Centre, Ranchi, Jharkhand – 834001",
   },
   HCLMADHYAPRADESH: {
-    id: 3,
+    id: "MP-BT-01",
     place: "Bhopal, Madhya Pradesh",
     address: "HCL SATHEE Learning Centre, Bhopal, Madhya Pradesh – 462001",
   },

@@ -13,6 +13,8 @@ const {
   isOptionalPhone10,
   normalizePhone10,
 } = require("../Utils/phone");
+const { getCentreId, getStudentIdPrefix } = require("../Utils/centreDirectory");
+const { getNextStudentSequence } = require("../Utils/studentIdCounter");
 
 const subjectPct = (row) => {
   if (!row) return 0;
@@ -238,8 +240,22 @@ const createStudentRecord = async (body = {}) => {
   const suffix = Date.now().toString().slice(-6);
   const initialMaps = buildMapsFromRecords(resolved.subjects, [], []);
 
+  // Auto-generated IDs are sequential per Kendra: RJ-JU-001, RJ-JU-002, ...
+  // (falls back to the old STU-prefix scheme for centres with no Kendra ID
+  // yet, e.g. custom centres). An explicitly supplied studentId is never
+  // overridden, and the sequence is only consumed when actually needed.
+  let autoStudentId = `STU${suffix}`;
+  if (!studentId?.trim()) {
+    const kendraId = getCentreId(centre);
+    if (kendraId) {
+      const prefix = getStudentIdPrefix(centre);
+      const sequence = await getNextStudentSequence(kendraId);
+      autoStudentId = `${prefix}-${String(sequence).padStart(3, "0")}`;
+    }
+  }
+
   const student = await Student.create({
-    studentId: studentId?.trim() || `STU${suffix}`,
+    studentId: studentId?.trim() || autoStudentId,
     enrollmentNo: enrollmentNo?.trim() || `ENR${suffix}`,
     name: name.trim(),
     gender: gender.trim(),

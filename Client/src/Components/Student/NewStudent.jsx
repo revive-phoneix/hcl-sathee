@@ -445,8 +445,9 @@ export default function NewStudent({ open, onClose, onSubmit, error, submitting,
             <Field
               label="Student ID"
               value={form.studentId}
-              onChange={(v) => handleChange("studentId", v)}
-              placeholder="Enter student ID"
+              onChange={() => {}}
+              placeholder="Auto-generated based on the student's Kendra (e.g. RJ-JU-001)"
+              readOnly
             />
           </div>
 
