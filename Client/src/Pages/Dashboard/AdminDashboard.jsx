@@ -23,6 +23,7 @@ export default function AdminDashboard({
   studentsNavIndex = 4,
   attendanceNavIndex = 1,
   isCustomCentre = false,
+  notificationMessage = "Get notified about Attendance, Leave Requests, and Queries.",
 }) {
   const [students, setStudents] = useState([]);
   const [loadingStats, setLoadingStats] = useState(true);
@@ -100,7 +101,7 @@ export default function AdminDashboard({
       roleLabel={roleLabel}
     >
       <div className="max-w-7xl mx-auto space-y-8">
-        <NotificationSettingsBanner />
+        <NotificationSettingsBanner message={notificationMessage} />
 
         <WelcomeBanner portalName={portalName} userName={userName} />
 

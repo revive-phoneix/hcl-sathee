@@ -7,6 +7,7 @@ export default function SatheeMitraDashboard(props) {
       roleLabel="SATHEE MITRA PORTAL"
       studentsNavIndex={3}
       attendanceNavIndex={1}
+      notificationMessage="Get notified about Announcements by Admins."
     />
   );
 }

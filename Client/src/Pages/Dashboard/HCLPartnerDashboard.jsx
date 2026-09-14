@@ -8,6 +8,7 @@ export default function HCLPartnerDashboard(props) {
       roleLabel="Partner Portal"
       studentsNavIndex={3}
       attendanceNavIndex={1}
+      notificationMessage="Get notified about Announcements and Query replies."
     />
   );
 }

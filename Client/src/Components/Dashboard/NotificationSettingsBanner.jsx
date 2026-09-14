@@ -21,7 +21,9 @@ const writeStoredPref = (value) => {
   }
 };
 
-export function NotificationSettingsBanner() {
+export function NotificationSettingsBanner({
+  message = "Get notified about announcements, leave requests, and query replies.",
+}) {
   const [enabled, setEnabled] = useState(() => {
     const stored = readStoredPref();
     if (stored === "yes") return true;
@@ -89,9 +91,7 @@ export function NotificationSettingsBanner() {
     <div className="flex flex-col gap-3 rounded-2xl border border-blue-200 bg-blue-50 px-5 py-4 text-blue-900 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <Bell size={18} className="mt-0.5 shrink-0" />
-        <p className="text-sm">
-          Get notified about announcements, leave requests, and query replies.
-        </p>
+        <p className="text-sm">{message}</p>
       </div>
 
       <div className="flex items-center gap-3">
