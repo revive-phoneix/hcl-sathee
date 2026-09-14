@@ -9,6 +9,7 @@ const {
   updateCurrentUser,
   deleteUser,
   saveFcmToken,
+  removeFcmToken,
   resendInvite,
 } = require("../Controllers/UserController");
 const {
@@ -23,6 +24,7 @@ router.use(authenticate);
 
 router.get("/me", getMe);
 router.patch("/me/fcm-token", saveFcmToken);
+router.delete("/me/fcm-token", removeFcmToken);
 
 // Any authenticated user may fetch Vishist mentors; the handler enforces
 // centre-scoping per role (admins may pass ?centre=, others are locked to their own).

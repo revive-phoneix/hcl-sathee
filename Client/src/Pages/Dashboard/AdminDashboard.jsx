@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { MainLayout } from "../../Components/MainLayout";
 import { WelcomeBanner } from "../../Components/Dashboard/WelcomeBanner";
+import { NotificationSettingsBanner } from "../../Components/Dashboard/NotificationSettingsBanner";
 import { AttendanceChart } from "../../Components/Dashboard/AttendanceChart";
 import { StudentsByCourseChart } from "../../Components/Dashboard/StudentsByCourseChart";
 import { QuickActions } from "../../Components/Dashboard/QuickActions";
@@ -99,6 +100,8 @@ export default function AdminDashboard({
       roleLabel={roleLabel}
     >
       <div className="max-w-7xl mx-auto space-y-8">
+        <NotificationSettingsBanner />
+
         <WelcomeBanner portalName={portalName} userName={userName} />
 
         <QuickActions

@@ -117,6 +117,16 @@ exports.saveFcmToken = wrap(
   { label: "Save FCM Token Error", message: "Failed to save device token" }
 );
 
+exports.removeFcmToken = wrap(
+  async (req, res) => {
+    const token = String(req.body?.token || "").trim();
+    if (!token) return fail(res, 400, "Token is required");
+    await User.removeFcmToken(req.user?.id, token);
+    return ok(res, { message: "Device unregistered from notifications" });
+  },
+  { label: "Remove FCM Token Error", message: "Failed to remove device token" }
+);
+
 exports.addUser = wrap(
   async (req, res) => {
     const { name, email, phone, role, centre, availableDays, isVishist } =

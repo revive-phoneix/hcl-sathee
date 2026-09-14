@@ -157,6 +157,40 @@ async function sendSupportQueryEmail(to, { partnerName, title, description }) {
   await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
 }
 
+async function sendSupportQueryReplyEmail(to, { adminName, title, message }) {
+  const from = String(process.env.EMAIL_USER || "").trim();
+  const subject = `Re: ${title}`;
+  const text = [
+    "Hello,",
+    "",
+    `${adminName} replied to your query "${title}":`,
+    "",
+    message,
+    "",
+    "Log in to the partner portal to view the full conversation or reply.",
+  ].join("\n");
+
+  const html = `
+    <div style="font-family: Arial, sans-serif; color: #1f2937; line-height: 1.6;">
+      <div style="max-width: 600px; margin: auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden;">
+        <div style="background: linear-gradient(135deg, #0f172a 0%, #2563eb 100%); padding: 28px; color: white;">
+          <h2 style="margin:0; font-size: 24px;">Admin Replied to Your Query</h2>
+        </div>
+        <div style="padding: 28px; background: white;">
+          <p style="margin: 0 0 12px;"><strong>Query:</strong> ${title}</p>
+          <p style="margin: 0 0 12px;"><strong>${adminName}</strong> wrote:</p>
+          <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px; white-space: pre-wrap;">${message}</div>
+          <p style="margin: 20px 0 0;">Log in to the partner portal to view the full conversation or reply.</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const gmail = await getGmailClient();
+  const raw = createMessage(from, to, subject, text, html);
+  await gmail.users.messages.send({ userId: "me", requestBody: { raw } });
+}
+
 async function sendPasswordResetOtpEmail(to, name, otp) {
   const from = String(process.env.EMAIL_USER || "").trim();
   const subject = "Your SATHEE password reset code";
@@ -201,5 +235,6 @@ async function sendPasswordResetOtpEmail(to, name, otp) {
 module.exports = {
   sendWelcomeEmail,
   sendSupportQueryEmail,
+  sendSupportQueryReplyEmail,
   sendPasswordResetOtpEmail,
 };

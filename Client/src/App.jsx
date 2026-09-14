@@ -28,7 +28,6 @@ import MyProfile from "./Pages/Profile/MyProfile";
 import AdminLeaveRequests from "./Pages/Attendance/AdminLeaveRequests";
 import QueryAndSupport from "./Pages/Support/QueryAndSupport";
 import AdminQueries from "./Pages/Support/AdminQueries";
-import NotificationPermissionBanner from "./Components/Notifications/NotificationPermissionBanner";
 import SM_TestMarks from "./Pages/TestMarks/SM_TestMarks";
 import CentreReport from "./Pages/Report/CentreReport";
 import {
@@ -408,9 +407,6 @@ const AppContent = () => {
 
   return (
     <>
-      <div className="px-4 pt-4 md:px-8">
-        <NotificationPermissionBanner showLeaveRequest={isAdmin} />
-      </div>
       <Routes>
         <Route path="/" element={<CardSelector_1 openHCLSathee={() => navigate("/portals")} userRole={userRole} userCentre={userCentre} />} />
 

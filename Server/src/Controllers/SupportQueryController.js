@@ -3,7 +3,7 @@ const User = require("../Models/User");
 const SupportQuery = require("../Models/SupportQuery");
 const { isAdminRole } = require("../Utils/centreMatch");
 const { sendToTokens } = require("../Utils/pushNotifications");
-const { sendSupportQueryEmail } = require("../Utils/sendEmail");
+const { sendSupportQueryEmail, sendSupportQueryReplyEmail } = require("../Utils/sendEmail");
 const { buildSupportQueryNotificationPayload } = require("../Utils/supportQueries");
 
 exports.createSupportQuery = wrap(
@@ -121,6 +121,19 @@ exports.replyToSupportQuery = wrap(
           queryTitle: updated.title,
         },
       });
+    }
+
+    const ownerEmail = String(updated.submittedByEmail || "").trim();
+    if (ownerEmail) {
+      try {
+        await sendSupportQueryReplyEmail(ownerEmail, {
+          adminName,
+          title: updated.title,
+          message,
+        });
+      } catch (emailErr) {
+        console.error("Support query reply email failed:", emailErr.message || emailErr);
+      }
     }
 
     return ok(res, { message: "Reply sent successfully", query: updated });
