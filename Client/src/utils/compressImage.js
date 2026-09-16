@@ -1,6 +1,6 @@
 /**
- * Downscale / recompress an image so uploads fit Firebase Storage fallback
- * (inline data URLs have a ~700 KB server limit when Storage bucket is missing).
+ * Downscale / recompress an image so uploads fit the inline data URL fallback
+ * (~700 KB server limit, used if the Supabase Storage upload fails).
  */
 export const compressImageForUpload = (
   file,

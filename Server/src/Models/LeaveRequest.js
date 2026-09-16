@@ -1,121 +1,97 @@
-const { getDb } = require("../config/firebase");
-const {
-  toDate,
-  findDocRefById: findRef,
-  getNextId: nextId,
-} = require("../Utils/firestoreHelpers");
-const { mirrorUpsert } = require("../Utils/supabaseMirror");
+const { getSupabase, assertNoError } = require("../config/supabase");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "leaveRequests";
+const TABLE = "leave_requests";
 
-const leaveRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(leaveRef(), id);
-const getNextId = () => nextId(leaveRef());
-
-const toApi = (docId, data = {}) => ({
-  id: Number(docId) || docId,
-  userId: data.userId ?? null,
-  name: data.name ?? null,
-  email: data.email ?? null,
-  centre: data.centre ?? null,
-  fromDate: data.fromDate ?? null,
-  toDate: data.toDate ?? null,
-  reason: data.reason ?? "",
-  status: data.status || "pending",
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
-
-/** Maps the same Firestore document shape to the Supabase `leave_requests` row shape. */
-const toMirrorRow = (id, data) => ({
-  id: Number(id) || id,
-  user_id: data.userId ?? null,
-  name: data.name ?? null,
-  email: data.email ?? null,
-  centre: data.centre ?? null,
-  from_date: data.fromDate ?? null,
-  to_date: data.toDate ?? null,
-  reason: data.reason ?? "",
-  status: data.status || "pending",
-  reviewed_by: data.reviewedBy ?? null,
-  reviewed_by_email: data.reviewedByEmail ?? null,
-  reviewed_at: data.reviewedAt ? (toDate(data.reviewedAt) || new Date()).toISOString() : null,
-  created_at: (toDate(data.created_at) || new Date()).toISOString(),
-});
+const toApi = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    userId: row.user_id ?? null,
+    name: row.name ?? null,
+    email: row.email ?? null,
+    centre: row.centre ?? null,
+    fromDate: row.from_date ?? null,
+    toDate: row.to_date ?? null,
+    reason: row.reason ?? "",
+    status: row.status || "pending",
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
+};
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
   const payload = {
-    id,
-    userId: data.userId ?? null,
+    user_id: data.userId ?? null,
     name: data.name || null,
     email: data.email || null,
     centre: data.centre || null,
-    fromDate: data.fromDate,
-    toDate: data.toDate,
+    from_date: data.fromDate,
+    to_date: data.toDate,
     reason: String(data.reason || "").trim(),
     status: "pending",
-    created_at: now,
-    updated_at: now,
   };
 
-  await leaveRef().doc(String(id)).set(payload);
-  await mirrorUpsert("leave_requests", toMirrorRow(id, payload));
-  return toApi(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create leave request");
+  return toApi(row);
 };
 
 const findByUser = async (userId) => {
-  const snap = await leaveRef().where("userId", "==", userId).get();
-  const rows = snap.docs.map((doc) => toApi(doc.id, doc.data()));
-  return rows.sort(
-    (a, b) => (b.created_at?.getTime?.() || 0) - (a.created_at?.getTime?.() || 0)
-  );
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .eq("user_id", Number(userId) || userId)
+    .order("created_at", { ascending: false });
+  assertNoError(error, "Failed to load leave requests");
+  return (data || []).map(toApi);
 };
 
 const findByCentre = async (centre) => {
-  const snap = await leaveRef().where("centre", "==", centre).get();
-  return snap.docs.map((doc) => toApi(doc.id, doc.data()));
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("centre", centre);
+  assertNoError(error, "Failed to load leave requests");
+  return (data || []).map(toApi);
 };
 
 const findAll = async () => {
-  const snap = await leaveRef().orderBy("created_at", "desc").get();
-  return snap.docs.map((doc) => toApi(doc.id, doc.data()));
+  const { data, error } = await getSupabase()
+    .from(TABLE)
+    .select("*")
+    .order("created_at", { ascending: false });
+  assertNoError(error, "Failed to list leave requests");
+  return (data || []).map(toApi);
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApi(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find leave request");
+  return toApi(data);
 };
 
 const updateStatus = async (id, status, meta = {}) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
+  const supabase = getSupabase();
+  const { data: existing, error: fetchError } = await supabase
+    .from(TABLE)
+    .select("*")
+    .eq("id", id)
+    .maybeSingle();
+  assertNoError(fetchError, "Failed to find leave request");
+  if (!existing) return null;
 
-  const doc = await ref.get();
-  if (!doc.exists) return null;
-
-  const current = doc.data() || {};
-  if (String(current.status || "pending").toLowerCase() !== "pending") {
-    return toApi(doc.id, current);
+  if (String(existing.status || "pending").toLowerCase() !== "pending") {
+    return toApi(existing);
   }
 
-  const nextStatus = String(status || "").trim().toLowerCase();
   const patch = {
-    status: nextStatus,
-    updated_at: new Date(),
+    status: String(status || "").trim().toLowerCase(),
   };
+  if (meta.reviewedBy != null) patch.reviewed_by = meta.reviewedBy;
+  if (meta.reviewedByEmail != null) patch.reviewed_by_email = meta.reviewedByEmail;
+  if (meta.reviewedAt != null) patch.reviewed_at = new Date(meta.reviewedAt).toISOString();
 
-  if (meta.reviewedBy != null) patch.reviewedBy = meta.reviewedBy;
-  if (meta.reviewedByEmail != null) patch.reviewedByEmail = meta.reviewedByEmail;
-  if (meta.reviewedAt != null) patch.reviewedAt = meta.reviewedAt;
-
-  await ref.set(patch, { merge: true });
-  const updated = await ref.get();
-  await mirrorUpsert("leave_requests", toMirrorRow(updated.id, updated.data()));
-  return toApi(updated.id, updated.data());
+  const { data, error } = await supabase.from(TABLE).update(patch).eq("id", id).select("*").maybeSingle();
+  assertNoError(error, "Failed to update leave request");
+  return toApi(data);
 };
 
 module.exports = {

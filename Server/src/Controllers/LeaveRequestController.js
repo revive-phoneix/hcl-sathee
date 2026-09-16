@@ -39,7 +39,7 @@ exports.createLeaveRequest = wrap(
 
     const allUsers = await User.findAll();
     const admins = allUsers.filter((u) => isAdminRole(u.role));
-    const tokens = admins.flatMap((u) => u.fcmTokens || []);
+    const tokens = admins.flatMap((u) => u.pushSubscriptions || []);
 
     sendToTokens(tokens, {
       title: "New Leave Request",

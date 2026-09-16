@@ -1,18 +1,11 @@
-const { getDb, getBucket } = require("../config/firebase");
+const { getSupabase, assertNoError, paginateByCreatedAt } = require("../config/supabase");
+const { uploadToStorage } = require("../config/storage");
 const path = require("path");
-const {
-  toDate,
-  findDocRefById: findRef,
-  getNextId: nextId,
-} = require("../Utils/firestoreHelpers");
-const { mirrorUpsert, mirrorDelete } = require("../Utils/supabaseMirror");
+const { toDate } = require("../Utils/firestoreHelpers");
 
-const COLLECTION = "announcements";
+const TABLE = "announcements";
 const ALLOWED_EXTS = [".pdf", ".jpg", ".jpeg", ".png", ".webp", ".doc", ".docx"];
-
-const announcementsRef = () => getDb().collection(COLLECTION);
-const findDocRefById = (id) => findRef(announcementsRef(), id);
-const getNextId = () => nextId(announcementsRef());
+const MAX_INLINE_BYTES = 600 * 1024;
 
 const normalizeOtherCentres = (value) => {
   if (value == null || value === "") return null;
@@ -25,84 +18,48 @@ const normalizeOtherCentres = (value) => {
     }
   }
   if (!Array.isArray(list)) return null;
-  const cleaned = [
-    ...new Set(
-      list
-        .map((c) => String(c || "").trim())
-        .filter(Boolean)
-    ),
-  ];
+  const cleaned = [...new Set(list.map((c) => String(c || "").trim()).filter(Boolean))];
   return cleaned.length ? cleaned : null;
 };
 
-const toApiAnnouncement = (docId, data) => ({
-  id: Number(docId) || docId,
-  title: data.title,
-  description: data.description,
-  category: data.category || "General",
-  priority: data.priority || "Medium",
-  postedBy: data.postedBy || "Admin",
-  centre: data.centre ?? null,
-  otherCentres: normalizeOtherCentres(
-    data.otherCentres ?? data["other-centres"]
-  ),
-  attachmentName: data.attachmentName ?? null,
-  attachmentUrl: data.attachmentUrl ?? null,
-  attachmentType: data.attachmentType ?? null,
-  created_at: toDate(data.created_at),
-  updated_at: toDate(data.updated_at),
-});
-
-/** Maps the same Firestore document shape to the Supabase `announcements` row shape. */
-const toMirrorRow = (id, data) => ({
-  id: Number(id) || id,
-  title: data.title,
-  description: data.description,
-  category: data.category || "General",
-  priority: data.priority || "Medium",
-  posted_by: data.postedBy || "Admin",
-  centre: data.centre ?? null,
-  other_centres: normalizeOtherCentres(data.otherCentres ?? data["other-centres"]),
-  attachment_name: data.attachmentName ?? null,
-  attachment_url: data.attachmentUrl ?? null,
-  attachment_type: data.attachmentType ?? null,
-  attachment_path: data.attachmentPath ?? null,
-  created_at: (toDate(data.created_at) || new Date()).toISOString(),
-});
+const toApiAnnouncement = (row) => {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title,
+    description: row.description,
+    category: row.category || "General",
+    priority: row.priority || "Medium",
+    postedBy: row.posted_by || "Admin",
+    centre: row.centre ?? null,
+    otherCentres: normalizeOtherCentres(row.other_centres),
+    attachmentName: row.attachment_name ?? null,
+    attachmentUrl: row.attachment_url ?? null,
+    attachmentType: row.attachment_type ?? null,
+    created_at: toDate(row.created_at),
+    updated_at: toDate(row.updated_at),
+  };
+};
 
 const findAll = async ({ limit = 200, cursor } = {}) => {
-  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
-  let query = announcementsRef().orderBy("created_at", "desc").limit(pageLimit);
-  if (cursor) {
-    const cursorDoc = await announcementsRef().doc(String(cursor)).get();
-    if (cursorDoc.exists) query = query.startAfter(cursorDoc);
-  }
-  const snap = await query.get();
-  const announcements = snap.docs.map((doc) => toApiAnnouncement(doc.id, doc.data()));
-  Object.defineProperty(announcements, "nextCursor", {
-    value: snap.docs.length === pageLimit ? snap.docs.at(-1).id : null,
-    enumerable: false,
-  });
+  const { rows, nextCursor } = await paginateByCreatedAt(TABLE, { limit, cursor });
+  const announcements = rows.map(toApiAnnouncement);
+  Object.defineProperty(announcements, "nextCursor", { value: nextCursor, enumerable: false });
   return announcements;
 };
 
 const findById = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-  const doc = await ref.get();
-  return toApiAnnouncement(doc.id, doc.data());
+  const { data, error } = await getSupabase().from(TABLE).select("*").eq("id", id).maybeSingle();
+  assertNoError(error, "Failed to find announcement");
+  return toApiAnnouncement(data);
 };
-
-const MAX_INLINE_BYTES = 600 * 1024;
 
 const toInlineDataUrl = (file) => {
   if (!file?.buffer) {
     throw new Error("Attachment file is missing or empty");
   }
   if (file.buffer.length > MAX_INLINE_BYTES) {
-    throw new Error(
-      "Attachment is too large for inline storage (max 600 KB). Enable Firebase Storage or use a smaller file."
-    );
+    throw new Error("Attachment is too large for inline storage (max 600 KB). Use a smaller file.");
   }
   const contentType = file.mimetype || "application/octet-stream";
   const originalName = String(file.originalname || "attachment").trim();
@@ -125,32 +82,8 @@ const uploadAttachment = async (file) => {
   const contentType = file.mimetype || "application/octet-stream";
 
   try {
-    const storagePath = `announcements/${Date.now()}-${Math.random()
-      .toString(36)
-      .slice(2)}${safeExt}`;
-    const bucket = getBucket();
-    const storageFile = bucket.file(storagePath);
-
-    await storageFile.save(file.buffer, {
-      metadata: {
-        contentType,
-        cacheControl: "public, max-age=31536000",
-        metadata: { originalName },
-      },
-      resumable: false,
-    });
-
-    let url;
-    try {
-      const [signedUrl] = await storageFile.getSignedUrl({
-        action: "read",
-        expires: new Date("2500-01-01T00:00:00.000Z"),
-      });
-      url = signedUrl;
-    } catch {
-      await storageFile.makePublic();
-      url = `https://storage.googleapis.com/${bucket.name}/${storagePath}`;
-    }
+    const storagePath = `announcements/${Date.now()}-${Math.random().toString(36).slice(2)}${safeExt}`;
+    const { url } = await uploadToStorage(storagePath, file.buffer, { contentType });
 
     return {
       attachmentName: originalName || `attachment${safeExt}`,
@@ -159,79 +92,66 @@ const uploadAttachment = async (file) => {
       attachmentPath: storagePath,
     };
   } catch (storageErr) {
-    console.error("Firebase Storage upload failed, using inline fallback:", storageErr);
+    console.error("Supabase Storage upload failed, using inline fallback:", storageErr);
     try {
       return toInlineDataUrl(file);
     } catch (inlineErr) {
-      throw new Error(
-        `Attachment upload failed: ${storageErr.message || "storage error"}. ${inlineErr.message}`
-      );
+      throw new Error(`Attachment upload failed: ${storageErr.message || "storage error"}. ${inlineErr.message}`);
     }
   }
 };
 
 const create = async (data) => {
-  const now = new Date();
-  const id = await getNextId();
-  const otherCentres = normalizeOtherCentres(
-    data.otherCentres ?? data["other-centres"]
-  );
+  const otherCentres = normalizeOtherCentres(data.otherCentres ?? data["other-centres"]);
   const payload = {
-    id,
     title: data.title,
     description: data.description,
     category: data.category || "General",
     priority: data.priority || "Medium",
-    postedBy: data.postedBy || "Admin",
+    posted_by: data.postedBy || "Admin",
     centre: data.centre ?? null,
-    otherCentres,
-    "other-centres": otherCentres,
-    attachmentName: data.attachmentName ?? null,
-    attachmentUrl: data.attachmentUrl ?? null,
-    attachmentType: data.attachmentType ?? null,
-    attachmentPath: data.attachmentPath ?? null,
-    created_at: now,
-    updated_at: now,
+    other_centres: otherCentres,
+    attachment_name: data.attachmentName ?? null,
+    attachment_url: data.attachmentUrl ?? null,
+    attachment_type: data.attachmentType ?? null,
+    attachment_path: data.attachmentPath ?? null,
   };
 
-  await announcementsRef().doc(String(id)).set(payload);
-  await mirrorUpsert("announcements", toMirrorRow(id, payload));
-  return toApiAnnouncement(String(id), payload);
+  const { data: row, error } = await getSupabase().from(TABLE).insert(payload).select("*").single();
+  assertNoError(error, "Failed to create announcement");
+  return toApiAnnouncement(row);
 };
 
 const update = async (id, data) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return null;
-
-  const updated = { updated_at: new Date() };
-  Object.entries(data || {}).forEach(([key, value]) => {
-    if (value !== undefined) updated[key] = value;
-  });
-
-  if (
-    Object.prototype.hasOwnProperty.call(updated, "otherCentres") ||
-    Object.prototype.hasOwnProperty.call(updated, "other-centres")
-  ) {
-    const otherCentres = normalizeOtherCentres(
-      updated.otherCentres ?? updated["other-centres"]
-    );
-    updated.otherCentres = otherCentres;
-    updated["other-centres"] = otherCentres;
+  const patch = {};
+  if (data.title !== undefined) patch.title = data.title;
+  if (data.description !== undefined) patch.description = data.description;
+  if (data.category !== undefined) patch.category = data.category;
+  if (data.priority !== undefined) patch.priority = data.priority;
+  if (data.postedBy !== undefined) patch.posted_by = data.postedBy;
+  if (data.centre !== undefined) patch.centre = data.centre;
+  if (data.otherCentres !== undefined || data["other-centres"] !== undefined) {
+    patch.other_centres = normalizeOtherCentres(data.otherCentres ?? data["other-centres"]);
   }
+  if (data.attachmentName !== undefined) patch.attachment_name = data.attachmentName;
+  if (data.attachmentUrl !== undefined) patch.attachment_url = data.attachmentUrl;
+  if (data.attachmentType !== undefined) patch.attachment_type = data.attachmentType;
+  if (data.attachmentPath !== undefined) patch.attachment_path = data.attachmentPath;
 
-  // merge:true safely adds new attachment fields on older announcement docs
-  await ref.set(updated, { merge: true });
-  const doc = await ref.get();
-  await mirrorUpsert("announcements", toMirrorRow(doc.id, doc.data()));
-  return toApiAnnouncement(doc.id, doc.data());
+  const { data: row, error } = await getSupabase()
+    .from(TABLE)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+  assertNoError(error, "Failed to update announcement");
+  return toApiAnnouncement(row);
 };
 
 const destroy = async (id) => {
-  const ref = await findDocRefById(id);
-  if (!ref) return 0;
-  await ref.delete();
-  await mirrorDelete("announcements", "id", Number(id) || id);
-  return 1;
+  const { data, error } = await getSupabase().from(TABLE).delete().eq("id", id).select("id");
+  assertNoError(error, "Failed to delete announcement");
+  return data && data.length ? 1 : 0;
 };
 
 module.exports = {

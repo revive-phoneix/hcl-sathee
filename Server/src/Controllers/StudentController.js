@@ -14,7 +14,15 @@ const {
   normalizePhone10,
 } = require("../Utils/phone");
 const { getCentreId, getStudentIdPrefix } = require("../Utils/centreDirectory");
-const { getNextStudentSequence } = require("../Utils/studentIdCounter");
+const { getSupabase, assertNoError } = require("../config/supabase");
+
+const getNextStudentSequence = async (kendraId) => {
+  const { data, error } = await getSupabase().rpc("increment_student_counter", {
+    p_kendra_id: kendraId,
+  });
+  assertNoError(error, "Failed to generate student ID sequence");
+  return data;
+};
 
 const subjectPct = (row) => {
   if (!row) return 0;

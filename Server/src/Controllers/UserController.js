@@ -107,24 +107,26 @@ exports.getVishistMentors = wrap(
   { label: "Get Vishist Mentors Error", message: "Failed to fetch Vishist mentors" }
 );
 
-exports.saveFcmToken = wrap(
+exports.savePushSubscription = wrap(
   async (req, res) => {
-    const token = String(req.body?.token || "").trim();
-    if (!token) return fail(res, 400, "Token is required");
-    await User.addFcmToken(req.user?.id, token);
+    const subscription = req.body?.subscription;
+    if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+      return fail(res, 400, "A valid push subscription is required");
+    }
+    await User.addPushSubscription(req.user?.id, subscription);
     return ok(res, { message: "Device registered for notifications" });
   },
-  { label: "Save FCM Token Error", message: "Failed to save device token" }
+  { label: "Save Push Subscription Error", message: "Failed to save device subscription" }
 );
 
-exports.removeFcmToken = wrap(
+exports.removePushSubscription = wrap(
   async (req, res) => {
-    const token = String(req.body?.token || "").trim();
-    if (!token) return fail(res, 400, "Token is required");
-    await User.removeFcmToken(req.user?.id, token);
+    const endpoint = String(req.body?.endpoint || "").trim();
+    if (!endpoint) return fail(res, 400, "endpoint is required");
+    await User.removePushSubscription(req.user?.id, endpoint);
     return ok(res, { message: "Device unregistered from notifications" });
   },
-  { label: "Remove FCM Token Error", message: "Failed to remove device token" }
+  { label: "Remove Push Subscription Error", message: "Failed to remove device subscription" }
 );
 
 exports.addUser = wrap(

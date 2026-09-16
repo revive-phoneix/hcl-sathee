@@ -108,7 +108,7 @@ exports.addAnnouncement = wrap(
         const others = Array.isArray(announcement.otherCentres) ? announcement.otherCentres : [];
         return others.some((c) => matchesCentre(c, u.centre));
       })
-      .flatMap((u) => u.fcmTokens || []);
+      .flatMap((u) => u.pushSubscriptions || []);
 
     sendToTokens(tokens, {
       title: "New Announcement",

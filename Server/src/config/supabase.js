@@ -1,45 +1,97 @@
 const { createClient } = require("@supabase/supabase-js");
 
-// --- Migration-window dual-write support -----------------------------------
-// Firebase/Firestore is the real, primary database right now. Supabase is a
-// best-effort MIRROR: every create/update/delete in the Models also tries to
-// write the same row into Postgres (see Utils/supabaseMirror.js), using the
-// schema in Server/supabase/schema.sql, so that once a real Supabase project
-// is provisioned, its data is already caught up and Firebase can be retired.
-//
-// Until real SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY values are set, this
-// module simply stays disabled — no error, no crash, nothing written.
-
 let client = null;
-let enabled = false;
 
-const isSupabaseConfigured = () =>
-  Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+/** Initializes the Supabase client (service_role key — server-only, bypasses RLS). */
+const initSupabase = () => {
+  if (client) return client;
 
-/**
- * Called once at boot. Never throws — a missing or broken Supabase config
- * must never take down the (Firebase-backed) server.
- */
-const initSupabaseMirror = () => {
-  if (!isSupabaseConfigured()) {
-    console.log("↪️  Supabase mirror disabled (SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY not set yet)");
-    return;
+  const url = process.env.SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!url || !serviceRoleKey) {
+    throw new Error(
+      "Supabase not configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env " +
+        "(see Server/.env.example and Server/supabase/schema.sql)."
+    );
   }
 
-  try {
-    client = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-    enabled = true;
-    console.log("✅ Supabase mirror enabled — writes will also be copied to Postgres");
-  } catch (err) {
-    console.warn("⚠️  Supabase mirror failed to initialize, continuing on Firebase only:", err.message);
-  }
+  client = createClient(url, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  console.log("✅ Supabase Connected Successfully");
+  return client;
 };
 
-const isMirrorEnabled = () => enabled;
+const getSupabase = () => {
+  if (!client) {
+    throw new Error("Supabase not initialized. Call initSupabase() first.");
+  }
+  return client;
+};
 
-/** Returns the Supabase client, or null if the mirror isn't configured/enabled. */
-const getSupabaseMirror = () => (enabled ? client : null);
+/**
+ * Throws a friendly error for an unexpected Postgres/PostgREST error, or
+ * returns quietly if `error` is null. Every model funnels writes/reads
+ * through this so failures surface with useful context instead of a bare
+ * PostgrestError object.
+ */
+const assertNoError = (error, context) => {
+  if (!error) return;
+  const err = new Error(`${context}: ${error.message || "database error"}`);
+  err.cause = error;
+  err.code = error.code;
+  throw err;
+};
 
-module.exports = { initSupabaseMirror, isSupabaseConfigured, isMirrorEnabled, getSupabaseMirror };
+/** Postgres unique_violation error code, raised on duplicate email/phone/etc. */
+const UNIQUE_VIOLATION = "23505";
+
+/**
+ * Keyset pagination helper shared by every model that paginates a list —
+ * orders by (created_at desc, id desc) so ordering stays stable even when
+ * two rows share a created_at timestamp, and resumes exactly after the row
+ * named by `cursor` (that row's id).
+ *
+ * Returns { rows, nextCursor } where `rows` are raw table rows (map them
+ * with the model's own toApiXxx) and `nextCursor` is the id to pass back in
+ * for the next page, or null when this was the last page.
+ */
+const paginateByCreatedAt = async (table, { limit = 200, cursor } = {}) => {
+  const supabase = getSupabase();
+  const pageLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
+
+  let query = supabase
+    .from(table)
+    .select("*")
+    .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
+    .limit(pageLimit);
+
+  if (cursor) {
+    const { data: cursorRow } = await supabase
+      .from(table)
+      .select("id, created_at")
+      .eq("id", cursor)
+      .maybeSingle();
+    if (cursorRow) {
+      query = query.or(
+        `created_at.lt.${cursorRow.created_at},and(created_at.eq.${cursorRow.created_at},id.lt.${cursorRow.id})`
+      );
+    }
+  }
+
+  const { data, error } = await query;
+  assertNoError(error, `Failed to list ${table}`);
+  const rows = data || [];
+  return { rows, nextCursor: rows.length === pageLimit ? rows.at(-1).id : null };
+};
+
+module.exports = {
+  initSupabase,
+  getSupabase,
+  assertNoError,
+  UNIQUE_VIOLATION,
+  paginateByCreatedAt,
+};

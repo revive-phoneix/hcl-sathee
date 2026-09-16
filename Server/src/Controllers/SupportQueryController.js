@@ -32,7 +32,7 @@ exports.createSupportQuery = wrap(
 
     const allUsers = await User.findAll();
     const admins = allUsers.filter((u) => isAdminRole(u.role));
-    const tokens = admins.flatMap((u) => u.fcmTokens || []);
+    const tokens = admins.flatMap((u) => u.pushSubscriptions || []);
 
     const payload = buildSupportQueryNotificationPayload({
       title,
@@ -111,8 +111,8 @@ exports.replyToSupportQuery = wrap(
     }
 
     const queryOwner = await User.findByEmail(updated.submittedByEmail || "");
-    if (queryOwner?.fcmTokens?.length) {
-      await sendToTokens(queryOwner.fcmTokens, {
+    if (queryOwner?.pushSubscriptions?.length) {
+      await sendToTokens(queryOwner.pushSubscriptions, {
         title: "Admin replied to your query",
         body: `${adminName}: ${message}`,
         data: {

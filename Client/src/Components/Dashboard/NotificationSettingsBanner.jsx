@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
-import { requestNotificationPermission } from "../../firebase";
-import { registerDeviceToken, unregisterDeviceToken } from "../../services/notifications";
+import { subscribeToPush, unsubscribeFromPush } from "../../utils/webPush";
+import { registerPushSubscription, unregisterPushSubscription } from "../../services/notifications";
 
 const PREF_KEY = "sathee_notifications_pref";
 
@@ -33,13 +33,13 @@ export function NotificationSettingsBanner({
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState(null);
 
-  // Keep the server-side device token fresh on every visit, unless the user
+  // Keep the server-side subscription fresh on every visit, unless the user
   // has explicitly opted out.
   useEffect(() => {
     if (typeof Notification === "undefined") return;
     if (Notification.permission === "granted" && readStoredPref() !== "no") {
-      requestNotificationPermission()
-        .then((token) => token && registerDeviceToken(token))
+      subscribeToPush()
+        .then((subscription) => subscription && registerPushSubscription(subscription))
         .catch(() => {});
     }
   }, []);
@@ -56,9 +56,9 @@ export function NotificationSettingsBanner({
 
     if (enabled) {
       try {
-        const token = await requestNotificationPermission();
-        if (token) {
-          await registerDeviceToken(token);
+        const subscription = await subscribeToPush();
+        if (subscription) {
+          await registerPushSubscription(subscription);
           writeStoredPref("yes");
           setStatus({ type: "success", text: "Notifications enabled." });
         } else if (Notification.permission === "denied") {
@@ -74,10 +74,8 @@ export function NotificationSettingsBanner({
       }
     } else {
       try {
-        if (Notification.permission === "granted") {
-          const token = await requestNotificationPermission().catch(() => null);
-          if (token) await unregisterDeviceToken(token);
-        }
+        const subscription = await unsubscribeFromPush();
+        if (subscription) await unregisterPushSubscription(subscription);
       } finally {
         writeStoredPref("no");
         setStatus({ type: "success", text: "Notifications disabled." });
