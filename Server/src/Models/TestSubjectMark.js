@@ -58,6 +58,31 @@ const findByStudent = async (studentId) => {
   return (data || []).map(toApiMark);
 };
 
+/**
+ * Batched version of findByStudent — one (or a few, chunked) query for many
+ * students instead of one query per student. Returns a Map keyed by
+ * studentId so callers can look up each student's rows in O(1).
+ */
+const findByStudentIds = async (studentIds = []) => {
+  const uniqueIds = [...new Set(studentIds.filter((id) => id != null && id !== ""))];
+  const byStudent = new Map(uniqueIds.map((id) => [String(id), []]));
+  if (!uniqueIds.length) return byStudent;
+
+  const CHUNK = 200;
+  for (let i = 0; i < uniqueIds.length; i += CHUNK) {
+    const chunk = uniqueIds.slice(i, i + CHUNK);
+    const { data, error } = await getSupabase().from(TABLE).select("*").in("student_id", chunk);
+    assertNoError(error, "Failed to load student marks");
+    for (const row of data || []) {
+      const key = String(row.student_id);
+      if (!byStudent.has(key)) byStudent.set(key, []);
+      byStudent.get(key).push(toApiMark(row));
+    }
+  }
+
+  return byStudent;
+};
+
 const findByCourse = async (course, centre = null) => {
   const { data, error } = await getSupabase()
     .from(TABLE)
@@ -147,6 +172,7 @@ module.exports = {
   findByTest,
   findByStudentAndTest,
   findByStudent,
+  findByStudentIds,
   upsert,
   roundPct,
   findByCourse,

@@ -40,6 +40,31 @@ const findByStudentId = async (studentId) => {
   return (data || []).map(toApiAttendance);
 };
 
+/**
+ * Batched version of findByStudentId — one (or a few, chunked) query for
+ * many students instead of one query per student. Returns a Map keyed by
+ * studentId so callers can look up each student's rows in O(1).
+ */
+const findByStudentIds = async (studentIds = []) => {
+  const uniqueIds = [...new Set(studentIds.filter((id) => id != null && id !== ""))];
+  const byStudent = new Map(uniqueIds.map((id) => [String(id), []]));
+  if (!uniqueIds.length) return byStudent;
+
+  const CHUNK = 200;
+  for (let i = 0; i < uniqueIds.length; i += CHUNK) {
+    const chunk = uniqueIds.slice(i, i + CHUNK);
+    const { data, error } = await getSupabase().from(TABLE).select("*").in("student_id", chunk);
+    assertNoError(error, "Failed to load subject attendance");
+    for (const row of data || []) {
+      const key = String(row.student_id);
+      if (!byStudent.has(key)) byStudent.set(key, []);
+      byStudent.get(key).push(toApiAttendance(row));
+    }
+  }
+
+  return byStudent;
+};
+
 const findByStudentAndSubject = async (studentId, subject) => {
   const subjectName = String(subject || "").trim();
   if (!subjectName) return null;
@@ -142,6 +167,7 @@ const updatePercentages = async (studentId, subject, { daily, weekly, monthly })
 module.exports = {
   findAll,
   findByStudentId,
+  findByStudentIds,
   findByStudentAndSubject,
   create,
   upsertTotals,

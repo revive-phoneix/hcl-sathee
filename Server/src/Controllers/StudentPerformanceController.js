@@ -111,18 +111,23 @@ const assertCentreAccess = (req, centre) => {
 exports.getStudentsWithPerformance = wrap(
   async (req, res) => {
     const students = filterByUserCentre(await Student.findAll(), req.user);
+    const studentIds = students.map((student) => Number(student.id) || student.id);
 
-    const enriched = await Promise.all(
-      students.map(async (student) => {
-        const studentKey = Number(student.id) || student.id;
-        const [performances, attendances, testMarks] = await Promise.all([
-          SubjectPerformance.findByStudentId(studentKey),
-          SubjectAttendance.findByStudentId(studentKey),
-          TestSubjectMark.findByStudent(studentKey),
-        ]);
-        return enrichWithSubjectMaps(student, performances, attendances, testMarks);
-      })
-    );
+    const [performancesByStudent, attendancesByStudent, testMarksByStudent] = await Promise.all([
+      SubjectPerformance.findByStudentIds(studentIds),
+      SubjectAttendance.findByStudentIds(studentIds),
+      TestSubjectMark.findByStudentIds(studentIds),
+    ]);
+
+    const enriched = students.map((student) => {
+      const studentKey = String(Number(student.id) || student.id);
+      return enrichWithSubjectMaps(
+        student,
+        performancesByStudent.get(studentKey) || [],
+        attendancesByStudent.get(studentKey) || [],
+        testMarksByStudent.get(studentKey) || []
+      );
+    });
 
     return ok(res, { students: enriched });
   },
