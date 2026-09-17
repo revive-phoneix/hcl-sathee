@@ -10,17 +10,17 @@ const CENTRE_DIRECTORY_BY_KEY = {
   HCLRAJASTHAN: {
     id: "RJ-JU-01",
     place: "Jhunjhunu, Rajasthan",
-    address: "HCL SATHEE Learning Centre, Jaipur, Rajasthan – 302001",
+    address: "Kendriye Vidhyalaya Khetri Nagar, Jhunjhunu, Rajasthan 333504",
   },
   HCLJHARKHAND: {
     id: "JH-EM-01",
     place: "East Singhbhum, Jharkhand",
-    address: "HCL SATHEE Learning Centre, Ranchi, Jharkhand – 834001",
+    address: "HCL VTC SATHEE Kendra, Sohda, Jharkhand",
   },
   HCLMADHYAPRADESH: {
     id: "MP-BT-01",
     place: "Bhopal, Madhya Pradesh",
-    address: "HCL SATHEE Learning Centre, Bhopal, Madhya Pradesh – 462001",
+    address: "SATHEE Kendra Malanjkhand, Township DAV School Malanjkhand",
   },
 };
 
