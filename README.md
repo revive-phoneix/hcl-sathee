@@ -7,6 +7,8 @@ A multi-centre learning-management portal for the **HCL SATHEE** programme. It l
 - **Database and file storage:** **Supabase** (PostgreSQL + Supabase Storage)
 - **Notifications:** Web Push (VAPID) and Gmail API email
 
+**More documentation:** [PAGES.md](PAGES.md) shows which role can open which page, and [MANAGEMENT.md](MANAGEMENT.md) explains what every button does and describes every file in the repository.
+
 ---
 
 ## Table of contents
