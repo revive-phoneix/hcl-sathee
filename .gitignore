@@ -70,3 +70,6 @@ firebase-service-account.json
 
 # dataconnect generated files
 .dataconnect
+
+# Claude Code local tooling/config
+.claude/
