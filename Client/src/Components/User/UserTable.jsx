@@ -1,7 +1,14 @@
 import { Trash2, Send, Users as UsersIcon } from "lucide-react";
 
-const GRID_COLS = "2fr 1.5fr 2.5fr 1.2fr 1fr";
+const GRID_COLS = "2fr 1.4fr 2.4fr 1.2fr 1.2fr 0.9fr";
 const DEFAULT_BADGE = { bg: "bg-gray-100 text-gray-700 border border-gray-200", icon: null };
+
+const formatDateAdded = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+};
 
 const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser, onResendInvite, loading }) => (
   <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
@@ -17,7 +24,7 @@ const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser,
         letterSpacing: "0.5px",
       }}
     >
-      {["Name", "Phone Number", "Email Address", "Role", "Actions"].map((col) => (
+      {["Name", "Phone Number", "Email Address", "Role", "Date Added", "Actions"].map((col) => (
         <span key={col}>{col}</span>
       ))}
     </div>
@@ -65,6 +72,10 @@ const UserTable = ({ users, allUsersCount, roleBadge, avatarColor, onDeleteUser,
                   {user.role}
                 </span>
               </div>
+
+              <span className="text-sm text-slate-600 whitespace-nowrap">
+                {formatDateAdded(user.created_at)}
+              </span>
 
               <div className="flex items-center gap-1">
                 {!user.hasPassword && (
