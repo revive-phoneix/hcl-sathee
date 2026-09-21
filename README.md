@@ -481,7 +481,7 @@ Two tabs.
 ### 10.5 Users & Roles
 
 - Table of **Name, Phone, Email, Role, Actions** with role tabs (All, Admin, Sathee Mitra, HCL Partner) and counts, search (name, email, phone) and sort. Admin users show in every portal; others only in their own centre.
-- **Add User:** name, email, phone (10 digits) and role. The centre is the current portal's. For **Sathee Mitra**, tick **Is Vishist?** and choose **Available Days** (Mon–Sat) if applicable. The server creates the account with no password and emails the invite (subject *"Welcome to HCL SATHEE - Create Your Password"*). Duplicate email or phone returns a conflict error.
+- **Add User:** name, email, phone (10 digits) and role. The centre is the current portal's. For **Sathee Mitra**, tick **Is Vishist?** and choose **Available Days** (Mon–Sat) if applicable. The server creates the account with no password and emails the invite (subject *"Set up your HCL SATHEE account"*). Duplicate email or phone returns a conflict error.
 - **Resend invite** (paper-plane icon, shown only while the user has no password).
 - **Delete** with a confirmation modal.
 - User editing (days, phone) happens from the Mentors tab in Analytics; there is no separate edit form on this page.
@@ -633,14 +633,18 @@ The app does not branch on the logged-in user's own Vishist flag: a Vishist sees
 | New leave request | All Admins | — |
 | New support query | All Admins | All Admins (*"New partner query submitted"*) |
 | Admin replies to a query | The query's author | The query's author (*"Re: <title>"*) |
-| User account created / invite resent | — | The new user (*"Welcome to HCL SATHEE - Create Your Password"*) |
-| Forgot-password request | — | The requesting user (*"Your SATHEE password reset code"*) |
+| User account created / invite resent | — | The new user (*"Set up your HCL SATHEE account"*) |
+| Forgot-password request | — | The requesting user (*"Your HCL SATHEE verification code"*) |
 
 Leave decisions and attendance approvals do not currently trigger notifications.
 
 ### Email
 
 Sent through the **Gmail API** using OAuth2 (`EMAIL_*` variables). If Gmail is misconfigured the API still returns success for the action and logs the failure; when creating a user the response includes `emailSent`, `emailError` and a copyable `passwordSetupLink`. A Gmail `invalid_grant` error means `EMAIL_REFRESH_TOKEN` has expired and must be regenerated.
+
+**Deliverability.** Emails are built in `Server/src/Utils/sendEmail.js` to look like ordinary transactional mail: plain layout with no banner graphics, a single setup link (shown once in the HTML and once in the plain-text part), the portal address spelled out so recipients can verify it, no "click below / urgent" wording, UTF-8 content encoded as base64 with RFC 2047-encoded subjects, a `Message-ID`, and every user-supplied value HTML-escaped. The sender's display name is set to *SATHEE Admin*, but Gmail replaces it with the account's **Settings → Accounts and Import → Send mail as** name, so set that name in the sending Gmail account.
+
+Whether a message lands in Inbox or Spam is still decided per recipient by Gmail, and a new sending address has no reputation yet. For consistently good delivery, send from a custom domain through a transactional provider (Resend, Brevo, SendGrid) with SPF, DKIM and DMARC configured, and host the portal on that domain instead of `*.vercel.app`. Until then, ask new users to check Spam and mark the message "Not spam".
 
 ---
 
@@ -771,7 +775,7 @@ Run `Server/supabase/schema.sql`, create the `sathee-uploads` bucket, and copy t
 
 ## 17. Scripts and tests
 
-**Tests** (`npm test` in `Server/`): `tests/mitraAttendance.test.js` (attendance percentage resolution) and `tests/supportQueries.test.js` (support-query notification payload). Both currently pass.
+**Tests** (`npm test` in `Server/`): `tests/mitraAttendance.test.js` (attendance percentage resolution), `tests/supportQueries.test.js` (support-query notification payload) and `tests/sendEmail.test.js` (MIME encoding, header-injection protection, HTML escaping and the single-link welcome email). All currently pass.
 
 **`Server/scripts/`**: `delete-attendance-data.js`, `rehash-plaintext-passwords.js` and `seed-dummy-students.js` were written for the previous Firebase/Firestore version and import `firebase-admin` / `config/firebase.js`, which no longer exist. They **will not run** until ported to Supabase (or removed).
 
@@ -802,7 +806,7 @@ These are accurate to the current code and are good candidates for follow-up wor
 | `Supabase Connection Failed` on boot | `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` missing or wrong |
 | `permission denied for table …` from Supabase | The grants block in `schema.sql` was not run; re-run the script |
 | "Invalid credentials" though the password is right | Login also requires the **exact name** on the account |
-| Invite email not received | Gmail OAuth not configured or `invalid_grant`; use the setup link shown in the Add User result and regenerate `EMAIL_REFRESH_TOKEN` |
+| Invite email not received | Check the recipient's **Spam** folder first. Otherwise Gmail OAuth is not configured or returned `invalid_grant`: use the setup link shown in the Add User result and regenerate `EMAIL_REFRESH_TOKEN` |
 | Invite link "expired" | Links last 24 h; use **Resend invite** |
 | Push toggle says notifications are not configured/enabled | `VITE_VAPID_PUBLIC_KEY` missing in the client build (redeploy after adding), or the browser blocked notifications |
 | Push never arrives | Server `VAPID_*` missing or not matching the client key; subscriptions created with an old key must be re-enabled |
