@@ -7,7 +7,7 @@ A multi-centre learning-management portal for the **HCL SATHEE** programme. It l
 - **Database and file storage:** **Supabase** (PostgreSQL + Supabase Storage)
 - **Notifications:** Web Push (VAPID) and Gmail API email
 
-**More documentation:** [PAGES.md](PAGES.md) shows which role can open which page, and [MANAGEMENT.md](MANAGEMENT.md) explains what every button does and describes every file in the repository.
+**More documentation:** [PAGES.md](PAGES.md) shows which role can open which page, [MANAGEMENT.md](MANAGEMENT.md) explains what every button does and describes every file in the repository.
 
 ---
 
@@ -109,7 +109,6 @@ HCL Sathee/
     │   ├── Models/                 Supabase data access, one per table
     │   └── Utils/                  Passwords, tokens, OTP, email, push, course rules, centre matching
     ├── supabase/schema.sql         Full database schema (idempotent)
-    ├── scripts/                    Legacy maintenance scripts (see §17)
     └── tests/                      Node assertion tests
 ```
 
@@ -779,7 +778,7 @@ Run `Server/supabase/schema.sql`, create the `sathee-uploads` bucket, and copy t
 
 **Tests** (`npm test` in `Server/`): `tests/mitraAttendance.test.js` (attendance percentage resolution), `tests/supportQueries.test.js` (support-query notification payload) and `tests/sendEmail.test.js` (MIME encoding, header-injection protection, HTML escaping and the single-link welcome email). All currently pass.
 
-**`Server/scripts/`**: `delete-attendance-data.js`, `rehash-plaintext-passwords.js` and `seed-dummy-students.js` were written for the previous Firebase/Firestore version and import `firebase-admin` / `config/firebase.js`, which no longer exist. They **will not run** until ported to Supabase (or removed).
+There are no maintenance scripts. The three old Firebase-era scripts (attendance cleanup, password re-hash, dummy-student seeder) were removed because they depended on Firebase, which is gone. To load sample students, use **Import Data** on the Students page with the downloadable template.
 
 ---
 
@@ -788,15 +787,14 @@ Run `Server/supabase/schema.sql`, create the `sathee-uploads` bucket, and copy t
 These are accurate to the current code and are good candidates for follow-up work:
 
 1. **External "SATHEE" card** on the home selector opens the hard-coded `http://localhost:5174/` (`Client/src/Pages/Selector/CardSelector_1.jsx`); it is a placeholder for a companion portal and does nothing useful in production.
-2. **Trust proxy not set.** Express is not told it runs behind Render's proxy, so `express-rate-limit` logs `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR` and treats all users as one IP. Fix: `app.set("trust proxy", 1)` in `Server/src/index.js`.
-3. **`GET /api/students`** still enriches each student with three separate queries (an N+1 pattern); `GET /api/students/performance` was already batched. With many students the Students page will be slower than the dashboard.
-4. **Partner attendance for Mitras/Vishists** is offered in the UI but returns no data for Partners because the page never loads Mitra records for that role.
-5. **Client-side centre filtering for Admins.** Admin dashboards fetch all centres' rows and filter in the browser; fine at current scale.
-6. **Announcement categories** differ between the filter (includes IPBS, ICAR, RRB) and the create form (JEE, NEET, SSC, CLAT, CUET, General). The 10 MB attachment limit is enforced only on the server.
-7. **"Last Login"** on the welcome banner is the current time, not a stored login timestamp.
-8. **No Mitra self-service for support queries** in the UI, and leave decisions do not notify the Mitra.
-9. **Legacy naming:** `Utils/firestoreHelpers.js` now only contains date helpers; some comments still mention Firestore.
-10. **Remember me** stores the password base64-encoded in `localStorage`; treat it as convenience, not security, and consider removing it.
+2. **`GET /api/students`** still enriches each student with three separate queries (an N+1 pattern); `GET /api/students/performance` was already batched. With many students the Students page will be slower than the dashboard.
+3. **Partner attendance for Mitras/Vishists** is offered in the UI but returns no data for Partners because the page never loads Mitra records for that role.
+4. **Client-side centre filtering for Admins.** Admin dashboards fetch all centres' rows and filter in the browser; fine at current scale.
+5. **Announcement categories** differ between the filter (includes IPBS, ICAR, RRB) and the create form (JEE, NEET, SSC, CLAT, CUET, General). The 10 MB attachment limit is enforced only on the server.
+6. **"Last Login"** on the welcome banner is the current time, not a stored login timestamp.
+7. **No Mitra self-service for support queries** in the UI, and leave decisions do not notify the Mitra.
+8. **Legacy naming:** `Utils/firestoreHelpers.js` now only contains date helpers; some comments still mention Firestore.
+9. **Remember me** stores the password base64-encoded in `localStorage`; treat it as convenience, not security, and consider removing it.
 
 ---
 

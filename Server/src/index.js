@@ -22,6 +22,10 @@ const vishistAttendanceRoutes = require("./Routes/VishistAttendanceRoutes");
 
 const app = express();
 
+// Render terminates TLS in front of the app; trust its single proxy hop so
+// req.ip (and therefore the rate limiters) sees the real client address.
+app.set("trust proxy", 1);
+
 const apiRateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 100,

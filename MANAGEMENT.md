@@ -227,8 +227,7 @@ Files ignored by git (secrets and generated folders such as `node_modules/`, `di
 |---|---|
 | `README.md` | Complete project guide: setup, architecture, roles, every operation, API, deployment |
 | `PAGES.md` | Which role can open which page |
-| `MANAGEMENT.md` | This file: button guide and file guide |
-| `.gitignore` | Files git should not track (env files, `node_modules`, `dist`, service keys, `.claude/`) |
+| `MANAGEMENT.md` | This file: button guide and file guide || `.gitignore` | Files git should not track (env files, `node_modules`, `dist`, service keys, `.claude/`) |
 | `.claude/` | Local Claude Code tooling folder *(ignored)* |
 | `Client/` | The React web app |
 | `Server/` | The Express API |
@@ -522,13 +521,10 @@ Files ignored by git (secrets and generated folders such as `node_modules/`, `di
 | `uploadConcurrency.js` | Limits simultaneous uploads |
 | `firestoreHelpers.js` | Date helpers (filename is a leftover from the earlier Firebase version) |
 
-### `scripts/` and `tests/`
+### `tests/`
 
 | File | Description |
 |---|---|
-| `scripts/delete-attendance-data.js` | Old Firebase-era attendance cleanup. Does not run any more |
-| `scripts/rehash-plaintext-passwords.js` | Old Firebase-era password migration. Does not run any more |
-| `scripts/seed-dummy-students.js` | Old Firebase-era dummy student seeder. Does not run any more |
 | `tests/mitraAttendance.test.js` | Tests for attendance percentage rules |
 | `tests/supportQueries.test.js` | Tests for the support-query notification message |
 | `tests/sendEmail.test.js` | Tests for email encoding, escaping and template rules |
